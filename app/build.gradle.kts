@@ -271,6 +271,12 @@ android {
     }
     testOptions {
         unitTests.isIncludeAndroidResources = true
+        unitTests.all {
+            it.systemProperty(
+                "pastiera.eval.realDictionary",
+                providers.gradleProperty("pastiera.eval.realDictionary").getOrElse("false")
+            )
+        }
     }
 }
 
