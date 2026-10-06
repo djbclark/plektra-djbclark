@@ -1754,4 +1754,10 @@ Each key can be configured as Keycode, Action, Native Ctrl, or None. Use overrid
     <string name="titan2_elite_top_corner_description">Round only the upper corner facing the display edge. Corners facing inward and inner buttons stay unchanged.</string>
     <string name="titan2_elite_max_icon_shrink_title">Maximum icon reduction: %1$d%%</string>
     <string name="titan2_elite_max_icon_shrink_description">Automatically shrink outer button icons only as much as needed, up to this limit. 0% disables shrinking; positioning stays active.</string>
+    <!-- djb/exact-typing: per-app Exact Typing -->
+    <string name="app_raw_mode_title">Exact typing</string>
+    <string name="app_raw_mode_row_description">For terminals, SSH and code: what you type is what goes in, nothing corrected or capitalised</string>
+    <string name="app_raw_mode_description">In the apps you pick here, Pastiera sends every keystroke as-is: no suggestions, no auto-correction, no capital at the start of a line, no full stop from a double space. Meant for terminals, SSH clients, code editors and anything else where a helpful correction turns a command into a typo — `ls -la` should never become `Ls -la.`</string>
+    <string name="app_raw_mode_webapk_note">Web app — types inside %1$s, so %1$s is excluded too</string>
+    <string name="kw_auto_correction_exact_typing">exact typing, raw, per app, terminal, termux, ssh, disable autocorrect, auto-capitalization</string>
 </resources>
