@@ -92,3 +92,16 @@ documentation trail, so their exact upstream corpus IDs are not fully reconstruc
 The downloadable Greek base dictionary distributed through the companion `pastiera-dict`
 repository is derived from the top frequency-ranked, letter-only entries in the eellak
 Greek spelling dictionary with Pastiera-specific filtering, truncation, and normalization.
+
+<!-- djb/broker: vendored wireless-ADB -->
+## Shizuku wireless-ADB implementation (vendored)
+
+- Project: Shizuku, by RikkaApps
+- Source repository: https://github.com/RikkaApps/Shizuku
+- License: Apache License, Version 2.0
+- License text: `third_party/licenses/Apache-2.0.txt`
+- Vendored source: `app/src/main/java/moe/shizuku/manager/adb/` (AdbClient, AdbKey, AdbMdns, AdbMessage, AdbPairingClient, AdbPairingService, AdbProtocol, AdbException; see the NOTICE file there)
+
+Pastiera's embedded broker pairs with the device's own Wireless debugging using Shizuku's ADB pairing and connection classes, vendored with the original `moe.shizuku.manager.adb` package name. This is separate from the optional Shizuku integration.
+
+The bundled prebuilt native library `libadb.so` (`app/src/main/jniLibs/arm64-v8a/libadb.so`, arm64-v8a only) is built from the Shizuku project's native `adb` module, which incorporates BoringSSL for the SPAKE2 pairing handshake and TLS. BoringSSL is distributed under the OpenSSL License / ISC-style terms documented in its source (https://boringssl.googlesource.com/boringssl). The JNI entry class name `moe/shizuku/manager/adb/PairingContext` is hardcoded in the binary and is therefore preserved in the vendored Kotlin sources.

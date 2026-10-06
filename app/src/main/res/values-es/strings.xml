@@ -975,4 +975,34 @@ Cada tecla puede configurarse como Keycode, Acción, Native Ctrl o Ninguno. Usa 
     <string name="voice_section_assistant">Asistente de voz</string>
     <string name="voice_section_triggers">Activadores</string>
     <string name="voice_section_transcription">Transcripción</string>
+
+    <!-- djb/broker: embedded wireless-ADB broker, pairing service, Titan 2 Elite tools screen -->
+    <string name="notification_channel_adb_pairing">Emparejamiento ADB</string>
+    <string name="notification_adb_pairing_searching_for_service_title">Buscando el servicio de emparejamiento…</string>
+    <string name="notification_adb_pairing_service_found_title">Servicio de emparejamiento encontrado</string>
+    <string name="notification_adb_pairing_working_title">Emparejando…</string>
+    <string name="notification_adb_pairing_succeed_title">Emparejado correctamente</string>
+    <string name="notification_adb_pairing_succeed_text">Este dispositivo ya puede conectarse a la depuración inalámbrica.</string>
+    <string name="notification_adb_pairing_failed_title">Error de emparejamiento</string>
+    <string name="notification_adb_pairing_stop_searching">Detener</string>
+    <string name="notification_adb_pairing_retry">Reintentar</string>
+    <string name="notification_adb_pairing_input_paring_code">Introducir código de emparejamiento</string>
+    <string name="dialog_adb_pairing_paring_code">Código de emparejamiento</string>
+    <string name="cannot_connect_port">No se puede conectar al puerto de emparejamiento.</string>
+    <string name="paring_code_is_wrong">El código de emparejamiento es incorrecto.</string>
+    <string name="adb_error_key_store">No se pudo acceder al almacén de claves de ADB.</string>
+    <string name="device_setup_needed_title">Configuración necesaria</string>
+    <string name="device_setup_ready_title">Emparejado</string>
+    <string name="device_setup_ready_body">Las herramientas de abajo pueden acceder al sistema. Sobrevive a los reinicios.</string>
+    <string name="device_setup_step_dev_1">Abra Ajustes → Información del teléfono</string>
+    <string name="device_setup_step_dev_2">Toque Número de compilación siete veces</string>
+    <string name="device_setup_step_dev_3">Vuelva aquí</string>
+    <string name="device_setup_step_pair_1">Active la Depuración inalámbrica</string>
+    <string name="device_setup_step_pair_2">Toque Vincular dispositivo con código de vinculación</string>
+    <string name="device_setup_step_pair_3">Escriba el código en la notificación de Pastiera</string>
+    <string name="device_setup_open_about">Abrir Información del teléfono</string>
+    <string name="device_setup_open_wireless">Abrir Depuración inalámbrica</string>
+    <string name="device_setup_open_pairing">Abrir Depuración inalámbrica</string>
+    <string name="device_setup_dnd_on">No molestar está activado y puede ocultar el código de emparejamiento. Desactívelo hasta que esté emparejado.</string>
+    <string name="device_setup_needs_notifications">Permita primero las notificaciones de Pastiera: el código de emparejamiento llega como una de ellas.</string>
 </resources>

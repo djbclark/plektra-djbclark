@@ -267,6 +267,9 @@ android {
         resources {
             // Exclude legacy JSON base dictionaries; keep serialized .dict and user_defaults.json
             excludes += "assets/common/dictionaries/*_base.json"
+            // djb/broker: BouncyCastle (bcpkix/bcutil/bcprov) + jspecify ship duplicate OSGI metadata
+            excludes += "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
+            excludes += "META-INF/versions/**/OSGI-INF/**"
         }
     }
     testOptions {
@@ -316,7 +319,9 @@ val generateStableReleaseSbom = tasks.register("generateStableReleaseSbom") {
             bundled("OpenGameArt typewriter sounds", "vendored:opengameart-typewriter-sounds", "https://opengameart.org/content/typewriter-sounds", "CC0-1.0"),
             bundled("OpenGameArt mechanical sounds", "vendored:opengameart-mechanical-sounds", "https://opengameart.org/content/mechanical-sounds", "CC0-1.0"),
             bundled("Unicode CLDR emoji annotations", "vendored:unicode-cldr-annotations", "https://github.com/unicode-org/cldr-json", "Unicode-DFS-2016"),
-            bundled("Leipzig Corpora frequency data", "vendored:leipzig-corpora", "https://corpora.uni-leipzig.de/", "CC-BY-3.0")
+            bundled("Leipzig Corpora frequency data", "vendored:leipzig-corpora", "https://corpora.uni-leipzig.de/", "CC-BY-3.0"),
+            // djb/broker
+            bundled("Shizuku wireless-ADB sources and libadb.so", "vendored:shizuku-wireless-adb", "https://github.com/RikkaApps/Shizuku", "Apache-2.0")
         )
         val components = libraries + bundledAssets
         val bom = linkedMapOf<String, Any>(
@@ -377,6 +382,12 @@ dependencies {
     // Shizuku for ADB shell access
     implementation("dev.rikka.shizuku:api:13.1.5")
     implementation("dev.rikka.shizuku:provider:13.1.5")
+    // djb/broker: embedded wireless-ADB broker (vendored moe.shizuku.manager.adb)
+    implementation("org.bouncycastle:bcpkix-jdk18on:1.80")
+    implementation("org.lsposed.hiddenapibypass:hiddenapibypass:6.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.9.2")
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
     testImplementation("org.mockito:mockito-core:5.11.0")

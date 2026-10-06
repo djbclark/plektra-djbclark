@@ -975,4 +975,34 @@ Mỗi phím có thể cấu hình là Keycode, Action, Native Ctrl hoặc None. 
     <string name="voice_section_assistant">Trợ lý giọng nói</string>
     <string name="voice_section_triggers">Kích hoạt</string>
     <string name="voice_section_transcription">Phiên âm</string>
+
+    <!-- djb/broker: embedded wireless-ADB broker, pairing service, Titan 2 Elite tools screen -->
+    <string name="notification_channel_adb_pairing">Ghép nối ADB</string>
+    <string name="notification_adb_pairing_searching_for_service_title">Đang tìm dịch vụ ghép nối…</string>
+    <string name="notification_adb_pairing_service_found_title">Đã tìm thấy dịch vụ ghép nối</string>
+    <string name="notification_adb_pairing_working_title">Đang ghép nối…</string>
+    <string name="notification_adb_pairing_succeed_title">Ghép nối thành công</string>
+    <string name="notification_adb_pairing_succeed_text">Thiết bị này giờ có thể kết nối với gỡ lỗi không dây.</string>
+    <string name="notification_adb_pairing_failed_title">Ghép nối thất bại</string>
+    <string name="notification_adb_pairing_stop_searching">Dừng</string>
+    <string name="notification_adb_pairing_retry">Thử lại</string>
+    <string name="notification_adb_pairing_input_paring_code">Nhập mã ghép nối</string>
+    <string name="dialog_adb_pairing_paring_code">Mã ghép nối</string>
+    <string name="cannot_connect_port">Không thể kết nối tới cổng ghép nối.</string>
+    <string name="paring_code_is_wrong">Mã ghép nối không đúng.</string>
+    <string name="adb_error_key_store">Không truy cập được kho khóa ADB.</string>
+    <string name="device_setup_needed_title">Cần thiết lập</string>
+    <string name="device_setup_ready_title">Đã ghép nối</string>
+    <string name="device_setup_ready_body">Các công cụ bên dưới có thể truy cập hệ thống. Vẫn còn sau khi khởi động lại.</string>
+    <string name="device_setup_step_dev_1">Mở Cài đặt → Giới thiệu điện thoại</string>
+    <string name="device_setup_step_dev_2">Chạm Số bản dựng bảy lần</string>
+    <string name="device_setup_step_dev_3">Quay lại đây</string>
+    <string name="device_setup_step_pair_1">Bật Gỡ lỗi không dây</string>
+    <string name="device_setup_step_pair_2">Chạm Ghép nối thiết bị bằng mã ghép nối</string>
+    <string name="device_setup_step_pair_3">Nhập mã vào thông báo của Pastiera</string>
+    <string name="device_setup_open_about">Mở Giới thiệu điện thoại</string>
+    <string name="device_setup_open_wireless">Mở Gỡ lỗi không dây</string>
+    <string name="device_setup_open_pairing">Mở Gỡ lỗi không dây</string>
+    <string name="device_setup_dnd_on">Không làm phiền đang bật và có thể ẩn mã ghép nối. Hãy tắt cho tới khi ghép nối xong.</string>
+    <string name="device_setup_needs_notifications">Cho phép thông báo của Pastiera trước — mã ghép nối được gửi dưới dạng thông báo.</string>
 </resources>

@@ -975,4 +975,34 @@ Każdy klawisz można skonfigurować jako Keycode, Akcja, Native Ctrl lub Brak. 
     <string name="voice_section_assistant">Asystent głosowy</string>
     <string name="voice_section_triggers">Wyzwalacze</string>
     <string name="voice_section_transcription">Transkrypcja</string>
+
+    <!-- djb/broker: embedded wireless-ADB broker, pairing service, Titan 2 Elite tools screen -->
+    <string name="notification_channel_adb_pairing">Parowanie ADB</string>
+    <string name="notification_adb_pairing_searching_for_service_title">Szukanie usługi parowania…</string>
+    <string name="notification_adb_pairing_service_found_title">Znaleziono usługę parowania</string>
+    <string name="notification_adb_pairing_working_title">Parowanie…</string>
+    <string name="notification_adb_pairing_succeed_title">Sparowano pomyślnie</string>
+    <string name="notification_adb_pairing_succeed_text">To urządzenie może teraz łączyć się z debugowaniem bezprzewodowym.</string>
+    <string name="notification_adb_pairing_failed_title">Parowanie nie powiodło się</string>
+    <string name="notification_adb_pairing_stop_searching">Zatrzymaj</string>
+    <string name="notification_adb_pairing_retry">Ponów</string>
+    <string name="notification_adb_pairing_input_paring_code">Wpisz kod parowania</string>
+    <string name="dialog_adb_pairing_paring_code">Kod parowania</string>
+    <string name="cannot_connect_port">Nie można połączyć się z portem parowania.</string>
+    <string name="paring_code_is_wrong">Kod parowania jest nieprawidłowy.</string>
+    <string name="adb_error_key_store">Nie udało się uzyskać dostępu do magazynu kluczy ADB.</string>
+    <string name="device_setup_needed_title">Wymagana konfiguracja</string>
+    <string name="device_setup_ready_title">Sparowano</string>
+    <string name="device_setup_ready_body">Poniższe narzędzia mają dostęp do systemu. Działa po ponownym uruchomieniu.</string>
+    <string name="device_setup_step_dev_1">Otwórz Ustawienia → Informacje o telefonie</string>
+    <string name="device_setup_step_dev_2">Dotknij „Numer kompilacji” siedem razy</string>
+    <string name="device_setup_step_dev_3">Wróć tutaj</string>
+    <string name="device_setup_step_pair_1">Włącz Debugowanie bezprzewodowe</string>
+    <string name="device_setup_step_pair_2">Dotknij „Sparuj urządzenie za pomocą kodu parowania”</string>
+    <string name="device_setup_step_pair_3">Wpisz kod w powiadomieniu Pastiera</string>
+    <string name="device_setup_open_about">Otwórz Informacje o telefonie</string>
+    <string name="device_setup_open_wireless">Otwórz Debugowanie bezprzewodowe</string>
+    <string name="device_setup_open_pairing">Otwórz Debugowanie bezprzewodowe</string>
+    <string name="device_setup_dnd_on">Tryb Nie przeszkadzać jest włączony i może ukryć kod parowania. Wyłącz go do czasu sparowania.</string>
+    <string name="device_setup_needs_notifications">Najpierw zezwól na powiadomienia Pastiera — kod parowania przychodzi jako powiadomienie.</string>
 </resources>
