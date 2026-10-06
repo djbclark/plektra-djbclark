@@ -87,6 +87,9 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
 
     companion object {
         private const val TAG = "PastieraInputMethod"
+        // djb/caret-badge: how often and how soon to re-ask an editor that refused cursor updates
+        private const val MAX_CURSOR_UPDATE_ATTEMPTS = 8
+        private val CURSOR_UPDATE_RETRY_DELAYS_MS = longArrayOf(80L, 250L, 600L, 1200L)
         private const val TRACKPAD_DEBUG_TAG = "TrackpadDebug"
         private const val NATIVE_TRACKPAD_MIN_SWIPE_VELOCITY_PX_PER_MS = 2f
         private const val KEYBOARD_SURFACE_TRANSITION_DELAY_MS = 32L
@@ -327,6 +330,11 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
     private var screenTrackpadReplaying = false
     private lateinit var screenTrackpadController: ScreenTrackpadController
     private val uiHandler = Handler(Looper.getMainLooper())
+    // djb/caret-badge: modifier badge beside the text cursor, and the state of its cursor-update request
+    private val caretBadgeController by lazy { CaretBadgeController(this) }
+    private var lastCaretBadgeEnabled: Boolean? = null
+    private var cursorUpdatesAccepted = false
+    private var cursorUpdateAttempts = 0
     private var inputManager: InputManager? = null
     private var lastObservedAutoSoftwareKeyboardMode: SettingsManager.SoftwareKeyboardMode? = null
     private var pendingInputDeviceModeRefresh: Runnable? = null
@@ -2770,6 +2778,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
     
     override fun onDestroy() {
         if (::screenTrackpadController.isInitialized) screenTrackpadController.deactivate() // djb/screen-trackpad
+        caretBadgeController.destroy() // djb/caret-badge
         ClicksAccessibilityKeyBridge.unregister(this)
         clicksPowerShiftTapFilter.reset()
         accidentalKeyPressFilter.reset()
@@ -2953,6 +2962,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
 
     override fun onUpdateCursorAnchorInfo(cursorAnchorInfo: CursorAnchorInfo?) {
         super.onUpdateCursorAnchorInfo(cursorAnchorInfo)
+        caretBadgeController.onCursorAnchorInfo(cursorAnchorInfo) // djb/caret-badge
         if (
             symPage != 4 ||
             !::candidatesBarController.isInitialized ||
@@ -3002,7 +3012,8 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         emojiSearchExternalSelectionEnd = null
         emojiSearchCursorAnchorMonitoringRequested = false
         ignoreNextEmojiSearchCursorAnchorUpdate = false
-        currentInputConnection?.requestCursorUpdates(0)
+        // djb/caret-badge: not requestCursorUpdates(0) - the caret badge may still need updates.
+        syncCursorAnchorMonitoring()
     }
 
     private fun updateEmojiSearchExternalSelectionSnapshot(inputConnection: InputConnection?) {
@@ -3034,6 +3045,63 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             emojiSearchCursorAnchorMonitoringRequested = true
             ignoreNextEmojiSearchCursorAnchorUpdate = true
         }
+    }
+
+    // djb/caret-badge: cursor-update arbitration between the emoji search and the modifier badge.
+
+    private fun cursorAnchorUpdatesWanted(): Boolean =
+        emojiSearchCursorAnchorMonitoringRequested || SettingsManager.getCaretModifierBadgeEnabled(this)
+
+    /**
+     * Two features want the editor's caret position - the emoji-picker search and the modifier
+     * badge - and [InputConnection.requestCursorUpdates] is a single switch, so whichever one
+     * finished last used to turn it off underneath the other. Both needs are resolved here instead.
+     */
+    private fun syncCursorAnchorMonitoring() {
+        val inputConnection = currentInputConnection ?: return
+        val flags = if (cursorAnchorUpdatesWanted()) {
+            InputConnection.CURSOR_UPDATE_IMMEDIATE or InputConnection.CURSOR_UPDATE_MONITOR
+        } else {
+            0
+        }
+        val accepted = inputConnection.requestCursorUpdates(flags)
+        cursorUpdatesAccepted = accepted || flags == 0
+        cursorUpdateAttempts++
+        Log.d(TAG, "requestCursorUpdates flags=$flags accepted=$accepted attempt=$cursorUpdateAttempts pkg=$currentPackageName")
+    }
+
+    /**
+     * Starts asking a newly connected editor for cursor updates.
+     *
+     * Hooked from onStartInput rather than only onStartInputView: with a hardware keyboard the IME
+     * frequently never creates an input view at all, so onStartInputView does not fire and a field
+     * focused in, say, Messages was never asked for its caret position. requestCursorUpdates is
+     * scoped to one InputConnection, so every new editor drops it and it has to be asked for again.
+     *
+     * Editors are not always ready to answer immediately and some refuse the first request outright,
+     * so a few attempts are staged over the first second rather than relying on the user pressing a
+     * key to drive a retry - the first Shift of a field would otherwise be spent establishing this.
+     */
+    private fun beginCursorAnchorMonitoring() {
+        caretBadgeController.onEditorGone()
+        cursorUpdatesAccepted = false
+        cursorUpdateAttempts = 0
+        // A fresh connection starts with updates off, so there is nothing to ask for or undo.
+        if (!cursorAnchorUpdatesWanted()) return
+        syncCursorAnchorMonitoring()
+        for (delay in CURSOR_UPDATE_RETRY_DELAYS_MS) {
+            uiHandler.postDelayed({ retryCursorAnchorMonitoringIfNeeded() }, delay)
+        }
+    }
+
+    /**
+     * Asks again for cursor updates when the editor turned the first request down, up to a small
+     * cap so an editor that genuinely does not support them is not retried on every keystroke.
+     */
+    private fun retryCursorAnchorMonitoringIfNeeded() {
+        if (!cursorAnchorUpdatesWanted()) return
+        if (cursorUpdatesAccepted || cursorUpdateAttempts >= MAX_CURSOR_UPDATE_ATTEMPTS) return
+        syncCursorAnchorMonitoring()
     }
     
     /**
@@ -3114,6 +3182,17 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             shouldDisableSmartFeatures = shouldDisableSmartFeatures
         )
         updateSystemStatusModifierIcon(snapshot, effectiveSoftwareKeyboardMode)
+        // djb/caret-badge: show the armed modifier beside the text cursor
+        val caretBadgeEnabled = SettingsManager.getCaretModifierBadgeEnabled(this)
+        caretBadgeController.onSnapshot(snapshot, caretBadgeEnabled)
+        if (caretBadgeEnabled != lastCaretBadgeEnabled) {
+            lastCaretBadgeEnabled = caretBadgeEnabled
+            cursorUpdatesAccepted = false
+            cursorUpdateAttempts = 0
+            syncCursorAnchorMonitoring()
+        } else if (caretBadgeEnabled) {
+            retryCursorAnchorMonitoringIfNeeded()
+        }
         val modifierIndicators = SettingsManager.getModifierIndicators(this)
         // Passa anche la mappa emoji quando SYM è attivo (solo pagina 1)
         val emojiMapText = symLayoutController.emojiMapText()
@@ -3379,6 +3458,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         pendingKeyboardSurfaceTransition?.let(uiHandler::removeCallbacks)
         pendingKeyboardSurfaceTransition = null
         super.onStartInput(info, restarting)
+        beginCursorAnchorMonitoring() // djb/caret-badge
         if (::textExpansionController.isInitialized) textExpansionController.clear()
         if (
             !restarting ||
@@ -3476,6 +3556,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+        beginCursorAnchorMonitoring() // djb/caret-badge
         if (::textExpansionController.isInitialized) textExpansionController.clear()
         updateDebugImeContextSnapshot(info)
         attachTrackpadDecorViewMotionHook("onStartInputView")
@@ -3548,6 +3629,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         pendingKeyboardSurfaceTransition?.let(uiHandler::removeCallbacks)
         pendingKeyboardSurfaceTransition = null
         super.onFinishInput()
+        caretBadgeController.onEditorGone() // djb/caret-badge
         if (::textExpansionController.isInitialized) textExpansionController.clear()
         keyboardVisibilityController.cancelPendingSurfaceTransition()
         accidentalKeyPressFilter.reset()
@@ -3571,6 +3653,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
     
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
+        caretBadgeController.onEditorGone() // djb/caret-badge
         if (::textExpansionController.isInitialized) textExpansionController.clear()
         // Finishing a view does not finish the editor session (Back and backend transitions).
         isInputViewActive = !finishingInput && inputContextState.isEditable
