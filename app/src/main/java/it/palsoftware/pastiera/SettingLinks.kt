@@ -30,6 +30,14 @@ object SettingLinkIds {
     const val TITAN2_ELITE_TOOLS_DEVICE_SETUP = "titan2_elite_tools.device_setup"
     // djb/backlight: smart keyboard backlight row on the Titan 2 Elite tools screen
     const val TITAN2_ELITE_TOOLS_SMART_BACKLIGHT = "titan2_elite_tools.smart_backlight"
+    // djb/toolbox: rows of the Titan 2 Elite toolbox (see Titan2EliteToolsSettingEntries.kt)
+    const val TITAN2_ELITE_TOOLS_BLOAT = "titan2_elite_tools.bloat_remover"
+    const val TITAN2_ELITE_TOOLS_DENSITY = "titan2_elite_tools.display_density"
+    const val TITAN2_ELITE_TOOLS_TWEAKS = "titan2_elite_tools.system_tweaks"
+    const val TITAN2_ELITE_TOOLS_KEY_MAPPING = "titan2_elite_tools.key_mapping"
+    const val TITAN2_ELITE_TOOLS_FN_CTRL = "titan2_elite_tools.fn_ctrl"
+    const val TITAN2_ELITE_TOOLS_SHOW_STATUS_BAR = "titan2_elite_tools.show_status_bar"
+    const val TITAN2_ELITE_TOOLS_RESET_TO_STOCK = "titan2_elite_tools.reset_to_stock"
 
     // Text input screen
     const val TEXT_INPUT_TEXT_EXPANSION = "text_input.text_expansion"
@@ -1042,6 +1050,14 @@ object SettingLinkRegistry {
         SettingLinkIds.TITAN2_ELITE_TOOLS_DEVICE_SETUP to R.string.kw_titan2_elite_tools_device_setup,
         // djb/backlight: smart keyboard backlight keywords
         SettingLinkIds.TITAN2_ELITE_TOOLS_SMART_BACKLIGHT to R.string.kw_titan2_elite_tools_smart_backlight,
+        // djb/toolbox: toolbox keywords
+        SettingLinkIds.TITAN2_ELITE_TOOLS_BLOAT to R.string.kw_titan2_elite_tools_bloat,
+        SettingLinkIds.TITAN2_ELITE_TOOLS_DENSITY to R.string.kw_titan2_elite_tools_density,
+        SettingLinkIds.TITAN2_ELITE_TOOLS_TWEAKS to R.string.kw_titan2_elite_tools_tweaks,
+        SettingLinkIds.TITAN2_ELITE_TOOLS_KEY_MAPPING to R.string.kw_titan2_elite_tools_key_mapping,
+        SettingLinkIds.TITAN2_ELITE_TOOLS_FN_CTRL to R.string.kw_titan2_elite_tools_fn_ctrl,
+        SettingLinkIds.TITAN2_ELITE_TOOLS_SHOW_STATUS_BAR to R.string.kw_titan2_elite_tools_show_status_bar,
+        SettingLinkIds.TITAN2_ELITE_TOOLS_RESET_TO_STOCK to R.string.kw_titan2_elite_tools_reset_to_stock,
         SettingLinkIds.TEXT_INPUT_AUTO_SPACE_PUNCTUATION to R.string.kw_text_input_auto_space_punctuation,
         SettingLinkIds.TEXT_INPUT_SPACED_HYPHEN_TO_EN_DASH to R.string.kw_text_input_spaced_hyphen,
         SettingLinkIds.TEXT_INPUT_SMART_QUOTES to R.string.kw_text_input_smart_quotes,
