@@ -2201,6 +2201,278 @@ object SettingsManager {
             .apply()
     }
 
+    // ---- djb/voice: dictation, speech engine, assistant and the orange side key ----
+
+    private const val KEY_FN_LONG_PRESS_SPEECH = "fn_long_press_speech"
+    private const val KEY_FN_SPEECH_SCAN_CODE = "fn_speech_scan_code"
+    private const val KEY_DICTATION_HAPTICS = "dictation_haptics"
+    private const val KEY_DICTATION_HAPTIC_STRENGTH = "dictation_haptic_strength"
+    private const val KEY_DICTATION_END_SILENCE_MS = "dictation_end_silence_ms"
+    private const val KEY_DICTATION_MASK_OFFENSIVE = "dictation_mask_offensive"
+    private const val KEY_DICTATION_ENGINE = "dictation_engine"
+    private const val KEY_DICTATION_CONTINUOUS = "dictation_continuous_session"
+    private const val KEY_DICTATION_AUTO_PUNCTUATION = "dictation_auto_punctuation"
+    private const val KEY_SYM_LONG_PRESS_ASSISTANT = "sym_long_press_assistant"
+    private const val KEY_ASSISTANT_ACTION = "assistant_action"
+    private const val KEY_SIDE_KEY_ASSISTANT = "side_key_assistant"
+    private const val KEY_SIDE_KEY_CAPTURED = "side_key_original_captured"
+    private const val KEY_SIDE_KEY_PREV_PACKAGE = "side_key_original_package"
+    private const val KEY_SIDE_KEY_PREV_ACTIVITY = "side_key_original_activity"
+
+    private const val DEFAULT_FN_LONG_PRESS_SPEECH = false
+    // Scan code of the physical Fn key on Unihertz Titan devices. The scan code identifies
+    // the physical key even when the system remaps Fn to another key code (Ctrl, Home, ...).
+    private const val DEFAULT_FN_SPEECH_SCAN_CODE = 251
+
+    // How firm the dictation start/stop cues are. Amplitude is already pinned to the hardware
+    // maximum, so these differ in how LONG the pulses run: that, not amplitude, is what makes
+    // a cue feel firmer once you are at 255.
+    const val DICTATION_HAPTIC_LIGHT = "light"
+    const val DICTATION_HAPTIC_STANDARD = "standard"
+    const val DICTATION_HAPTIC_STRONG = "strong"
+
+    // Which request opens the assistant. No intent reproduces the system assist gesture, and each
+    // assistant decides for itself whether a given one starts listening, so this is the user's
+    // choice rather than a constant. AUTO tries them in a listening-first order.
+    const val ASSISTANT_ACTION_AUTO = "auto"
+    const val ASSISTANT_ACTION_VOICE_COMMAND = "voice_command"
+    const val ASSISTANT_ACTION_HANDS_FREE = "hands_free"
+    const val ASSISTANT_ACTION_ASSIST = "assist"
+
+    /** Follow the system's voice-input service (Settings > Apps > Default apps). */
+    const val DICTATION_ENGINE_SYSTEM_DEFAULT = ""
+    /** Pin the platform's on-device recognizer: no network, lower latency. */
+    const val DICTATION_ENGINE_ON_DEVICE = "ondevice"
+
+    /**
+     * Returns whether long-pressing the Fn key starts speech recognition.
+     */
+    fun getFnLongPressSpeechEnabled(context: Context): Boolean {
+        return getPreferences(context).getBoolean(KEY_FN_LONG_PRESS_SPEECH, DEFAULT_FN_LONG_PRESS_SPEECH)
+    }
+
+    /**
+     * Sets whether long-pressing the Fn key starts speech recognition.
+     */
+    fun setFnLongPressSpeechEnabled(context: Context, enabled: Boolean) {
+        getPreferences(context).edit()
+            .putBoolean(KEY_FN_LONG_PRESS_SPEECH, enabled)
+            .apply()
+    }
+
+    /**
+     * Returns the scan code of the physical key that triggers speech input when held.
+     */
+    fun getFnSpeechScanCode(context: Context): Int {
+        return getPreferences(context).getInt(KEY_FN_SPEECH_SCAN_CODE, DEFAULT_FN_SPEECH_SCAN_CODE)
+    }
+
+    /**
+     * Sets the scan code of the physical key that triggers speech input when held.
+     */
+    fun setFnSpeechScanCode(context: Context, scanCode: Int) {
+        getPreferences(context).edit()
+            .putInt(KEY_FN_SPEECH_SCAN_CODE, scanCode)
+            .apply()
+    }
+
+    /**
+     * Raw user preference for the dictation start/stop vibration cue.
+     * Use this for the settings toggle state; use [getDictationHapticsEnabled]
+     * for the effective value that also honors the system haptic setting.
+     */
+    fun getDictationHapticsPreference(context: Context): Boolean {
+        return getPreferences(context).getBoolean(KEY_DICTATION_HAPTICS, true)
+    }
+
+    /**
+     * Returns whether dictation start/stop is signalled with a vibration cue.
+     * Effective value: gated on the system haptic-feedback setting so the cue
+     * follows the system rather than being an independent always-on toggle.
+     */
+    fun getDictationHapticsEnabled(context: Context): Boolean {
+        return getDictationHapticsPreference(context) && isSystemHapticFeedbackEnabled(context)
+    }
+
+    /**
+     * Reads the system-wide "Haptic feedback" toggle (Settings.System). Defaults
+     * to enabled when the value cannot be read.
+     */
+    fun isSystemHapticFeedbackEnabled(context: Context): Boolean {
+        return try {
+            android.provider.Settings.System.getInt(
+                context.contentResolver,
+                android.provider.Settings.System.HAPTIC_FEEDBACK_ENABLED,
+                1
+            ) != 0
+        } catch (_: Exception) {
+            true
+        }
+    }
+
+    fun setDictationHapticsEnabled(context: Context, enabled: Boolean) {
+        getPreferences(context).edit()
+            .putBoolean(KEY_DICTATION_HAPTICS, enabled)
+            .apply()
+    }
+
+    /** How firm the dictation cues are; one of the DICTATION_HAPTIC_* constants. */
+    fun getDictationHapticStrength(context: Context): String {
+        return getPreferences(context).getString(KEY_DICTATION_HAPTIC_STRENGTH, DICTATION_HAPTIC_STRONG)
+            ?: DICTATION_HAPTIC_STRONG
+    }
+
+    fun setDictationHapticStrength(context: Context, strength: String) {
+        getPreferences(context).edit()
+            .putString(KEY_DICTATION_HAPTIC_STRENGTH, strength)
+            .apply()
+    }
+
+    /**
+     * Returns the requested end-of-speech silence length in milliseconds.
+     * 0 means the recognizer's system default. The recognition service may
+     * treat the value as a hint and is not guaranteed to honor it.
+     */
+    fun getDictationEndSilenceMs(context: Context): Int {
+        return getPreferences(context).getInt(KEY_DICTATION_END_SILENCE_MS, 0)
+    }
+
+    fun setDictationEndSilenceMs(context: Context, ms: Int) {
+        getPreferences(context).edit()
+            .putInt(KEY_DICTATION_END_SILENCE_MS, ms.coerceIn(0, 10000))
+            .apply()
+    }
+
+    /**
+     * Returns whether the recognizer should mask offensive words (e.g. "f***").
+     * The keyboard-level Google voice typing setting does not apply here because
+     * dictation runs through SpeechRecognizer with a per-request flag.
+     */
+    fun getDictationMaskOffensive(context: Context): Boolean {
+        return getPreferences(context).getBoolean(KEY_DICTATION_MASK_OFFENSIVE, true)
+    }
+
+    fun setDictationMaskOffensive(context: Context, enabled: Boolean) {
+        getPreferences(context).edit()
+            .putBoolean(KEY_DICTATION_MASK_OFFENSIVE, enabled)
+            .apply()
+    }
+
+    /**
+     * Which recognition service transcribes dictation.
+     *
+     * [DICTATION_ENGINE_SYSTEM_DEFAULT] follows the system's assistant/voice-input choice,
+     * [DICTATION_ENGINE_ON_DEVICE] pins the platform's offline recognizer, and any other
+     * value is a flattened ComponentName naming one installed RecognitionService.
+     */
+    fun getDictationEngine(context: Context): String {
+        return getPreferences(context).getString(KEY_DICTATION_ENGINE, DICTATION_ENGINE_SYSTEM_DEFAULT)
+            ?: DICTATION_ENGINE_SYSTEM_DEFAULT
+    }
+
+    fun setDictationEngine(context: Context, engineId: String) {
+        getPreferences(context).edit()
+            .putString(KEY_DICTATION_ENGINE, engineId)
+            .apply()
+    }
+
+    /**
+     * Whether to ask the engine to hold one long session open and end it on the configured
+     * pause (Android 13+). When off, or when the engine ignores the request, the keyboard
+     * falls back to restarting the recognizer after every result and timing the pause itself.
+     */
+    fun getDictationContinuousSession(context: Context): Boolean {
+        return getPreferences(context).getBoolean(KEY_DICTATION_CONTINUOUS, true)
+    }
+
+    fun setDictationContinuousSession(context: Context, enabled: Boolean) {
+        getPreferences(context).edit()
+            .putBoolean(KEY_DICTATION_CONTINUOUS, enabled)
+            .apply()
+    }
+
+    /** Whether the engine should punctuate and capitalize the transcript itself (Android 13+). */
+    fun getDictationAutoPunctuation(context: Context): Boolean {
+        return getPreferences(context).getBoolean(KEY_DICTATION_AUTO_PUNCTUATION, true)
+    }
+
+    fun setDictationAutoPunctuation(context: Context, enabled: Boolean) {
+        getPreferences(context).edit()
+            .putBoolean(KEY_DICTATION_AUTO_PUNCTUATION, enabled)
+            .apply()
+    }
+
+    /**
+     * Whether holding Sym opens the device assistant already listening. Off by default: it
+     * changes what an existing key does, and a tap of Sym must keep opening the SYM pages.
+     */
+    fun getSymLongPressAssistantEnabled(context: Context): Boolean {
+        return getPreferences(context).getBoolean(KEY_SYM_LONG_PRESS_ASSISTANT, false)
+    }
+
+    fun setSymLongPressAssistantEnabled(context: Context, enabled: Boolean) {
+        getPreferences(context).edit()
+            .putBoolean(KEY_SYM_LONG_PRESS_ASSISTANT, enabled)
+            .apply()
+    }
+
+    /** Which request opens the assistant; one of the ASSISTANT_ACTION_* constants. */
+    fun getAssistantAction(context: Context): String {
+        return getPreferences(context).getString(KEY_ASSISTANT_ACTION, ASSISTANT_ACTION_AUTO)
+            ?: ASSISTANT_ACTION_AUTO
+    }
+
+    fun setAssistantAction(context: Context, mode: String) {
+        getPreferences(context).edit()
+            .putString(KEY_ASSISTANT_ACTION, mode)
+            .apply()
+    }
+
+    /** Whether the user asked for the orange side key's long press to open the assistant. */
+    fun getSideKeyAssistantEnabled(context: Context): Boolean {
+        return getPreferences(context).getBoolean(KEY_SIDE_KEY_ASSISTANT, false)
+    }
+
+    fun setSideKeyAssistantEnabled(context: Context, enabled: Boolean) {
+        getPreferences(context).edit()
+            .putBoolean(KEY_SIDE_KEY_ASSISTANT, enabled)
+            .apply()
+    }
+
+    /** True once we've stashed what the side key's long press did before Pastiera took it. */
+    fun isSideKeyOriginalCaptured(context: Context): Boolean =
+        getPreferences(context).getBoolean(KEY_SIDE_KEY_CAPTURED, false)
+
+    /**
+     * Stash the vendor's original side-key target ONCE, before the first overwrite, so repeated
+     * applies can never record Pastiera itself as the thing to restore.
+     */
+    fun captureSideKeyOriginal(context: Context, packageName: String?, activity: String?) {
+        if (isSideKeyOriginalCaptured(context)) return
+        if (packageName == context.packageName) return
+        getPreferences(context).edit()
+            .putString(KEY_SIDE_KEY_PREV_PACKAGE, packageName)
+            .putString(KEY_SIDE_KEY_PREV_ACTIVITY, activity)
+            .putBoolean(KEY_SIDE_KEY_CAPTURED, true)
+            .apply()
+    }
+
+    fun getSideKeyOriginalPackage(context: Context): String? =
+        getPreferences(context).getString(KEY_SIDE_KEY_PREV_PACKAGE, null)
+
+    fun getSideKeyOriginalActivity(context: Context): String? =
+        getPreferences(context).getString(KEY_SIDE_KEY_PREV_ACTIVITY, null)
+
+    fun clearSideKeyOriginal(context: Context) {
+        getPreferences(context).edit()
+            .remove(KEY_SIDE_KEY_CAPTURED)
+            .remove(KEY_SIDE_KEY_PREV_PACKAGE)
+            .remove(KEY_SIDE_KEY_PREV_ACTIVITY)
+            .apply()
+    }
+
+    // ---- end djb/voice ----
+
     enum class ClicksPowerButtonMode(val persistedValue: String) {
         NATIVE("native"),
         QUICK_LAUNCHER("quick_launcher"),

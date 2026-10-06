@@ -269,6 +269,18 @@ internal object BackupPreferenceContract {
             "clicks_number_row_repeat_enabled" to PreferenceValueType.BOOLEAN,
             "clear_alt_on_space" to PreferenceValueType.BOOLEAN,
             "alt_ctrl_speech_shortcut" to PreferenceValueType.BOOLEAN,
+            // djb/voice
+            "fn_long_press_speech" to PreferenceValueType.BOOLEAN,
+            "fn_speech_scan_code" to PreferenceValueType.INT,
+            "dictation_haptics" to PreferenceValueType.BOOLEAN,
+            "dictation_haptic_strength" to PreferenceValueType.STRING,
+            "dictation_end_silence_ms" to PreferenceValueType.INT,
+            "dictation_mask_offensive" to PreferenceValueType.BOOLEAN,
+            "dictation_engine" to PreferenceValueType.STRING,
+            "dictation_continuous_session" to PreferenceValueType.BOOLEAN,
+            "dictation_auto_punctuation" to PreferenceValueType.BOOLEAN,
+            "sym_long_press_assistant" to PreferenceValueType.BOOLEAN,
+            "assistant_action" to PreferenceValueType.STRING,
             "layout_aware_ctrl_shortcuts" to PreferenceValueType.BOOLEAN,
             "sym_mappings_custom" to PreferenceValueType.STRING,
             "sym_mappings_page2_custom" to PreferenceValueType.STRING,
@@ -453,7 +465,12 @@ internal object BackupPreferenceContract {
         "software_keyboard_mode_runtime_override" to "runtime-derived state",
         "typing_sound_updated_at" to "runtime refresh marker",
         "clicks_bluetooth_permission_explained" to "permission UI state",
-        "clicks_manual_charging_until" to "transient runtime state"
+        "clicks_manual_charging_until" to "transient runtime state",
+        // djb/voice: the orange side key lives in this device's Settings.System, so a restore must not claim it
+        "side_key_assistant" to "mirrors a device-bound vendor setting",
+        "side_key_original_captured" to "device-bound restore point",
+        "side_key_original_package" to "device-bound restore point",
+        "side_key_original_activity" to "device-bound restore point"
     )
 
     fun expectedExportType(prefName: String, key: String): PreferenceValueType? {

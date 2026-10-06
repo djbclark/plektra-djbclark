@@ -703,7 +703,93 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
     }
 
     private fun openQuickLauncher(): Boolean = QuickLauncherOpener.open(this)
-    
+
+    // ---- djb/voice: hold-Fn dictation, hold-Sym assistant, dictation follows its editor ----
+
+    // 5 repeats at ~50ms adds ~200ms of hold beyond the point the vendor starts delivering
+    // them (~400ms in), ~600ms total. Chorded keys arrive earlier than that and block.
+    private val FN_SPEECH_TRIGGER_EVENT_COUNT = 5
+    // Longer than the ~50ms repeat interval, short enough to separate two distinct holds.
+    private val FN_SPEECH_BURST_RESET_MS = 200L
+    // Hold-Sym-for-the-assistant. Well clear of any tap the user means as "open the SYM page".
+    private val SYM_ASSIST_HOLD_MS = 600L
+
+    // Fn long-press speech shortcut. The physical Fn key is matched by scan code because the
+    // system may remap it to an arbitrary key code (Ctrl on Titan devices). On Titan 2 the
+    // vendor layer never delivers the key's initial down (repeat 0) or its release: while Fn
+    // is held it only emits auto-repeat events (~50ms apart, starting at the system long-press
+    // threshold), and quick chords apply Ctrl purely as meta state on the other key. A "long
+    // press" is therefore a burst of consecutive Fn repeats with no other key in between; the
+    // burst state resets when the repeats stop arriving.
+    private var fnSpeechBurstEventCount = 0
+    private var fnSpeechBurstBlocked = false
+    private val fnSpeechBurstResetRunnable = Runnable {
+        if (fnSpeechBurstEventCount > 0) {
+            Log.d(TAG, "fnSpeech: burst reset (count=$fnSpeechBurstEventCount blocked=$fnSpeechBurstBlocked)")
+        }
+        fnSpeechBurstEventCount = 0
+        fnSpeechBurstBlocked = false
+    }
+
+    private fun isFnSpeechKey(keyCode: Int, event: KeyEvent?): Boolean =
+        event?.scanCode == SettingsManager.getFnSpeechScanCode(this) ||
+            keyCode == KeyEvent.KEYCODE_FUNCTION
+
+    // Hold-Sym-for-the-assistant. Unlike Fn, Sym delivers a clean down and release, so a plain
+    // timer is enough: it is armed on the down, cancelled by the release or by any other key
+    // (that is a Sym chord, not a hold), and suppresses the SYM page toggle once it has fired.
+    private var symAssistArmed: Boolean = false
+    private var symAssistTriggered: Boolean = false
+
+    private val symAssistRunnable = Runnable {
+        symAssistArmed = false
+        // Held long enough: this press is no longer a SYM page tap.
+        symAssistTriggered = true
+        symTogglePendingOnKeyUp = false
+        if (!AssistantLauncher.launch(this)) {
+            symAssistTriggered = false
+            Toast.makeText(
+                this,
+                getString(R.string.assistant_unavailable),
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    /**
+     * Starts the hold timer for Sym. Skipped while another feature owns the Sym hold, so two
+     * things do not react to the same press.
+     */
+    private fun armSymAssistHold() {
+        // Cleared up front so a hold whose release never arrived (the assistant took focus and
+        // the IME was torn down) cannot swallow the next tap of Sym.
+        symAssistArmed = false
+        symAssistTriggered = false
+        if (!SettingsManager.getSymLongPressAssistantEnabled(this)) return
+        if (symHoldClaimedByOtherFeature()) return
+        symAssistArmed = true
+        uiHandler.removeCallbacks(symAssistRunnable)
+        uiHandler.postDelayed(symAssistRunnable, SYM_ASSIST_HOLD_MS)
+    }
+
+    private fun cancelSymAssistHold() {
+        symAssistArmed = false
+        uiHandler.removeCallbacks(symAssistRunnable)
+    }
+
+    // Hook: djb/screen-trackpad makes this true while Sym is the screen trackpad trigger.
+    private fun symHoldClaimedByOtherFeature(): Boolean = false
+
+    /**
+     * Bumped on every onStartInput, so a deferred "the editor is gone" check can tell a real
+     * focus change from an app blinking its field off and on.
+     */
+    private var editorGeneration = 0
+    /** The app dictation was started in; another app taking the editor ends the session. */
+    private var dictationPackageName: String? = null
+    /** How long after onFinishInput to wait for a replacement editor before ending dictation. */
+    private val editorGoneGraceMs = 500L
+
     /**
      * Starts voice input using SpeechRecognizer via SpeechRecognitionManager.
      */
@@ -767,6 +853,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             )
         }
         
+        dictationPackageName = currentPackageName // djb/voice
         speechRecognitionManager?.startRecognition()
     }
 
@@ -3374,6 +3461,12 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         editorHasActiveSelection = false
         
         currentPackageName = info?.packageName
+        // djb/voice: dictation follows the field it was started in. Another app taking over means
+        // the words would go nowhere, so the session ends rather than listening into a dead connection.
+        editorGeneration++
+        if (isSpeechRecognitionActive && dictationPackageName != null && info?.packageName != dictationPackageName) {
+            speechRecognitionManager?.onEditorGone()
+        }
         updateDebugImeContextSnapshot(info)
         
         // Reset clipboard overlay when starting new input
@@ -3525,6 +3618,16 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         pendingKeyboardSurfaceTransition?.let(uiHandler::removeCallbacks)
         pendingKeyboardSurfaceTransition = null
         super.onFinishInput()
+        if (isSpeechRecognitionActive) {
+            // djb/voice: apps blink their field off and on while typing; a real departure is one that
+            // no new editor follows. Wait a moment before deciding the dictation has nowhere to go.
+            val generation = editorGeneration
+            uiHandler.postDelayed({
+                if (isSpeechRecognitionActive && editorGeneration == generation) {
+                    speechRecognitionManager?.onEditorGone()
+                }
+            }, editorGoneGraceMs)
+        }
         if (::textExpansionController.isInitialized) textExpansionController.clear()
         keyboardVisibilityController.cancelPendingSurfaceTransition()
         accidentalKeyPressFilter.reset()
@@ -4407,6 +4510,48 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             return true
         }
 
+        // djb/voice: hold Sym for the assistant, hold Fn for dictation
+        if (keyCode == KEYCODE_SYM) {
+            if (event?.repeatCount == 0) armSymAssistHold()
+        } else if (symAssistArmed && !isPureModifierKey(keyCode)) {
+            // Sym is being used as a chord modifier, not held on its own.
+            cancelSymAssistHold()
+        }
+
+        if (SettingsManager.getFnLongPressSpeechEnabled(this)) {
+            if (isFnSpeechKey(keyCode, event)) {
+                uiHandler.removeCallbacks(fnSpeechBurstResetRunnable)
+                uiHandler.postDelayed(fnSpeechBurstResetRunnable, FN_SPEECH_BURST_RESET_MS)
+                if (!fnSpeechBurstBlocked) {
+                    fnSpeechBurstEventCount++
+                    if (fnSpeechBurstEventCount == 1) {
+                        Log.d(TAG, "fnSpeech: burst started (repeat=${event?.repeatCount})")
+                    }
+                    if (fnSpeechBurstEventCount >= FN_SPEECH_TRIGGER_EVENT_COUNT) {
+                        Log.d(TAG, "fnSpeech: TRIGGER at count=$fnSpeechBurstEventCount")
+                        fnSpeechBurstBlocked = true
+                        modifierStateController.clearCtrlState(resetPressedState = true)
+                        modifierStateController.clearAltState(resetPressedState = true)
+                        updateStatusBarText()
+                        startSpeechRecognition()
+                        return true
+                    }
+                }
+                // Consume every Fn-origin event: the vendor never delivers this key's
+                // release, so letting its remapped Ctrl downs into the modifier state
+                // machine leaves Ctrl stuck "pressed" and breaks Alt/Ctrl chords until
+                // something clears it. Real chords are unaffected: the Ctrl meta flag
+                // arrives on the chorded key's own event.
+                return true
+            } else if (fnSpeechBurstEventCount > 0) {
+                // Another key during the burst is a chord, not a speech request.
+                if (!fnSpeechBurstBlocked) {
+                    Log.d(TAG, "fnSpeech: blocked by chord key=$keyCode at count=$fnSpeechBurstEventCount")
+                }
+                fnSpeechBurstBlocked = true
+            }
+        }
+
         // Check if we have an editable field at the very start
         val info = currentInputEditorInfo
         val initialInputConnection = currentInputConnection
@@ -5096,6 +5241,31 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
                 outputKeyCodeName = suppressed.debugOutput()
             )
             return true
+        }
+
+        // djb/voice: release of a Sym hold, release of the Fn dictation key
+        if (keyCode == KEYCODE_SYM && (symAssistArmed || symAssistTriggered)) {
+            cancelSymAssistHold()
+            if (symAssistTriggered) {
+                // The assistant is already up; this release must not also toggle a SYM page.
+                symAssistTriggered = false
+                symTogglePendingOnKeyUp = false
+                symChordUsedSinceKeyDown = false
+                symPhysicallyPressed = false
+                updateStatusBarText()
+                return true
+            }
+        }
+
+        if (SettingsManager.getFnLongPressSpeechEnabled(this) && isFnSpeechKey(keyCode, event)) {
+            // Titan devices never deliver this release; on devices that do, end the burst and
+            // swallow the release of a triggered hold so the modifier does not latch one-shot.
+            val triggered = fnSpeechBurstEventCount >= FN_SPEECH_TRIGGER_EVENT_COUNT
+            uiHandler.removeCallbacks(fnSpeechBurstResetRunnable)
+            fnSpeechBurstResetRunnable.run()
+            if (triggered) {
+                return true
+            }
         }
 
         // Check if we have an editable field at the start (same logic as onKeyDown)

@@ -148,6 +148,20 @@ object SettingLinkIds {
     const val MODIFIERS_INDICATOR_BOTTOM_STRIP = "modifiers.indicator_bottom_strip"
     const val MODIFIERS_INDICATOR_MENU_BAR = "modifiers.indicator_menu_bar"
     const val MODIFIERS_INDICATOR_STATUS_BAR = "modifiers.indicator_status_bar"
+
+    // djb/voice: Voice screen (dictation, speech engine, assistant)
+    const val MAIN_VOICE = "main.voice"
+    const val VOICE_FN_LONG_PRESS_SPEECH = "voice.fn_long_press_speech"
+    const val VOICE_ENGINE = "voice.engine"
+    const val VOICE_AUTO_PUNCTUATION = "voice.auto_punctuation"
+    const val VOICE_MASK_OFFENSIVE = "voice.mask_offensive"
+    const val VOICE_END_SILENCE = "voice.end_silence"
+    const val VOICE_CONTINUOUS_SESSION = "voice.continuous_session"
+    const val VOICE_HAPTICS = "voice.haptics"
+    const val VOICE_HAPTIC_STRENGTH = "voice.haptic_strength"
+    const val VOICE_SIDE_KEY_ASSISTANT = "voice.side_key_assistant"
+    const val VOICE_SYM_LONG_PRESS_ASSISTANT = "voice.sym_long_press_assistant"
+    const val VOICE_ASSISTANT_ACTION = "voice.assistant_action"
 }
 
 /**
@@ -906,7 +920,8 @@ object SettingLinkRegistry {
             R.string.modifier_indicators_status_bar_description,
             destination = SettingsDestination.Modifiers
         )
-    ) + customizationSettingEntries() + inputDeviceSettingEntries() + systemSettingEntries()
+    ) + customizationSettingEntries() + inputDeviceSettingEntries() + systemSettingEntries() +
+        voiceSettingEntries() // djb/voice
 
     private val entriesById: Map<String, SettingEntry> =
         entries.associateBy { it.id }
@@ -961,7 +976,20 @@ object SettingLinkRegistry {
         SettingLinkIds.KEYBOARD_THEME_LED_COLORS to R.string.kw_theme_led_colors,
         SettingLinkIds.MODIFIERS_INDICATOR_BOTTOM_STRIP to R.string.kw_indicator_bottom_strip,
         SettingLinkIds.MODIFIERS_INDICATOR_MENU_BAR to R.string.kw_indicator_menu_bar,
-        SettingLinkIds.MODIFIERS_INDICATOR_STATUS_BAR to R.string.kw_indicator_status_bar
+        SettingLinkIds.MODIFIERS_INDICATOR_STATUS_BAR to R.string.kw_indicator_status_bar,
+        // djb/voice
+        SettingLinkIds.MAIN_VOICE to R.string.kw_main_voice,
+        SettingLinkIds.VOICE_FN_LONG_PRESS_SPEECH to R.string.kw_voice_fn_long_press_speech,
+        SettingLinkIds.VOICE_ENGINE to R.string.kw_voice_engine,
+        SettingLinkIds.VOICE_AUTO_PUNCTUATION to R.string.kw_voice_auto_punctuation,
+        SettingLinkIds.VOICE_MASK_OFFENSIVE to R.string.kw_voice_mask_offensive,
+        SettingLinkIds.VOICE_END_SILENCE to R.string.kw_voice_end_silence,
+        SettingLinkIds.VOICE_CONTINUOUS_SESSION to R.string.kw_voice_continuous_session,
+        SettingLinkIds.VOICE_HAPTICS to R.string.kw_voice_haptics,
+        SettingLinkIds.VOICE_HAPTIC_STRENGTH to R.string.kw_voice_haptic_strength,
+        SettingLinkIds.VOICE_SIDE_KEY_ASSISTANT to R.string.kw_voice_side_key_assistant,
+        SettingLinkIds.VOICE_SYM_LONG_PRESS_ASSISTANT to R.string.kw_voice_sym_long_press_assistant,
+        SettingLinkIds.VOICE_ASSISTANT_ACTION to R.string.kw_voice_assistant_action
     )
 
     fun byId(id: String): SettingEntry? = entriesById[id]
@@ -1023,7 +1051,8 @@ object SettingLinkRegistry {
         SettingsDestination.About to R.string.about_title,
         SettingsDestination.CustomInputStyles to R.string.custom_input_styles_title,
         SettingsDestination.AppLanguage to R.string.app_language_title,
-        SettingsDestination.Modifiers to R.string.modifiers_title
+        SettingsDestination.Modifiers to R.string.modifiers_title,
+        SettingsDestination.Voice to R.string.settings_category_voice // djb/voice
     )
 
     val keyboardsDevicesSubtitles: Map<KeyboardsDevicesDestination, Int> = mapOf(

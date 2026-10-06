@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.Spellcheck
+import androidx.compose.material.icons.filled.Mic // djb/voice
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Engineering
 import androidx.compose.material.icons.filled.VolunteerActivism
@@ -73,7 +74,8 @@ enum class SettingsDestination {
     CustomInputStyles,
     AppLanguage,
     DeviceSymLayerEditor,
-    Modifiers
+    Modifiers,
+    Voice // djb/voice
 }
 
 /** The destination payload of one SettingsActivity, also used by deep links. */
@@ -208,6 +210,7 @@ fun SettingsScreen(
                     onTextInputClick = { navigateTo(SettingsDestination.TextInput) },
                     onAccessibilityClick = { navigateTo(SettingsDestination.Accessibility) },
                     onAutoCorrectionClick = { navigateTo(SettingsDestination.AutoCorrection) },
+                    onVoiceClick = { navigateTo(SettingsDestination.Voice) }, // djb/voice
                     onCustomizationClick = { openCustomization(null) },
                     onStatusBarButtonsClick = {
                         openCustomization(SettingsActivity.CUSTOMIZATION_DESTINATION_STATUS_BAR_BUTTONS)
@@ -314,6 +317,12 @@ fun SettingsScreen(
             SettingsDestination.DeviceSymLayerEditor -> {
                 DeviceSymLayerEditorStubScreen(modifier = modifier, onBack = { navigateBack() })
             }
+            SettingsDestination.Voice -> { // djb/voice
+                VoiceSettingsScreen(
+                    modifier = modifier,
+                    onBack = { navigateBack() }
+                )
+            }
             SettingsDestination.Modifiers -> {
                 ModifierSettingsScreen(
                     modifier = modifier,
@@ -353,6 +362,7 @@ private fun SettingsMainScreen(
     onTextInputClick: () -> Unit,
     onAccessibilityClick: () -> Unit,
     onAutoCorrectionClick: () -> Unit,
+    onVoiceClick: () -> Unit, // djb/voice
     onCustomizationClick: () -> Unit,
     onStatusBarButtonsClick: () -> Unit,
     onKeyboardThemeClick: () -> Unit,
@@ -479,6 +489,13 @@ private fun SettingsMainScreen(
                 title = stringResource(R.string.settings_category_auto_correction),
                 linkId = SettingLinkIds.MAIN_AUTO_CORRECTION,
                 onClick = onAutoCorrectionClick
+            )
+            // djb/voice
+            SettingsCategoryRow(
+                icon = Icons.Filled.Mic,
+                title = stringResource(R.string.settings_category_voice),
+                linkId = SettingLinkIds.MAIN_VOICE,
+                onClick = onVoiceClick
             )
 
             SettingsGroupDivider(stringResource(R.string.settings_group_customization))
