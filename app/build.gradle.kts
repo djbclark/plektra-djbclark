@@ -169,6 +169,12 @@ android {
     }
 
     buildTypes {
+        // djbclark private build: a debug build installs beside the official signed app.
+        debug {
+            applicationIdSuffix = ".djb"
+            manifestPlaceholders["appLabel"] = "Pastiera djb"
+            manifestPlaceholders["imeLabel"] = "Pastiera djb"
+        }
         release {
             isMinifyEnabled = true
             proguardFiles(

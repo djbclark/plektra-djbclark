@@ -405,7 +405,9 @@ object SettingsManager {
     private const val DEFAULT_TRACKPAD_GESTURES_ENABLED = false
     private const val DEFAULT_TRACKPAD_GESTURE_ADD_WORD_ENABLED = true
     private const val DEFAULT_TRACKPAD_GESTURE_ADD_WORD_FULL_WIDTH_ENABLED = true
-    private const val DEFAULT_TRACKPAD_SWIPE_THRESHOLD = 500f
+    // 200 px: on the Titan 2 Elite a natural flick measures 280-470 px and incidental
+    // touches stay under 100 px, so 500 rejected most deliberate flicks.
+    private const val DEFAULT_TRACKPAD_SWIPE_THRESHOLD = 200f
     private const val DEFAULT_TRACKPAD_SUGGESTION_SWIPE_THRESHOLD = DEFAULT_TRACKPAD_SWIPE_THRESHOLD
     private const val DEFAULT_TRACKPAD_DELETE_SWIPE_THRESHOLD = DEFAULT_TRACKPAD_SWIPE_THRESHOLD
     private const val MIN_TRACKPAD_SWIPE_THRESHOLD = 120f

@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import it.palsoftware.pastiera.inputmethod.DeviceSpecific
 import it.palsoftware.pastiera.inputmethod.trackpad.ShizukuTrackpadDeviceDiscovery
 import it.palsoftware.pastiera.inputmethod.trackpad.TrackpadInputDevice
 import it.palsoftware.pastiera.inputmethod.trackpad.TrackpadInputDeviceDiscovery
@@ -220,6 +221,15 @@ fun TrackpadGestureSettingsScreen(
                         }
                     )
                 }
+            }
+
+            if (DeviceSpecific.isTitan2EliteDevice()) {
+                Text(
+                    text = stringResource(R.string.trackpad_titan2_elite_scroll_assistant_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
             }
 
             Surface(
