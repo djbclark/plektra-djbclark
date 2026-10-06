@@ -405,9 +405,18 @@ object SettingsManager {
     private const val DEFAULT_TRACKPAD_GESTURES_ENABLED = false
     private const val DEFAULT_TRACKPAD_GESTURE_ADD_WORD_ENABLED = true
     private const val DEFAULT_TRACKPAD_GESTURE_ADD_WORD_FULL_WIDTH_ENABLED = true
-    private const val DEFAULT_TRACKPAD_SWIPE_THRESHOLD = 500f
-    private const val DEFAULT_TRACKPAD_SUGGESTION_SWIPE_THRESHOLD = DEFAULT_TRACKPAD_SWIPE_THRESHOLD
-    private const val DEFAULT_TRACKPAD_DELETE_SWIPE_THRESHOLD = DEFAULT_TRACKPAD_SWIPE_THRESHOLD
+    private const val DEFAULT_TRACKPAD_SWIPE_THRESHOLD_GENERIC = 500f
+    // On the Titan 2 Elite a natural flick measures 280-470 px and incidental touches stay under
+    // 100 px, so 500 px rejects most deliberate flicks there.
+    private const val DEFAULT_TRACKPAD_SWIPE_THRESHOLD_TITAN2_ELITE = 200f
+    private val DEFAULT_TRACKPAD_SWIPE_THRESHOLD: Float
+        get() = if (DeviceSpecific.isTitan2EliteDevice()) {
+            DEFAULT_TRACKPAD_SWIPE_THRESHOLD_TITAN2_ELITE
+        } else {
+            DEFAULT_TRACKPAD_SWIPE_THRESHOLD_GENERIC
+        }
+    private val DEFAULT_TRACKPAD_SUGGESTION_SWIPE_THRESHOLD: Float get() = DEFAULT_TRACKPAD_SWIPE_THRESHOLD
+    private val DEFAULT_TRACKPAD_DELETE_SWIPE_THRESHOLD: Float get() = DEFAULT_TRACKPAD_SWIPE_THRESHOLD
     private const val MIN_TRACKPAD_SWIPE_THRESHOLD = 120f
     private const val MAX_TRACKPAD_SWIPE_THRESHOLD = 750f
     const val TRACKPAD_PROVIDER_SHIZUKU = "shizuku"

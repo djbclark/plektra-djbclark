@@ -211,6 +211,37 @@ class SettingsManagerLayoutSwitchTest {
     }
 
     @Test
+    fun trackpadSwipeThresholds_keepTheGenericDefaultOffTheTitan2Elite() {
+        val context = RuntimeEnvironment.getApplication()
+
+        // Robolectric is not a Titan 2 Elite, so the generic 500 px default applies; the Elite gets 200 px.
+        assertEquals(500f, SettingsManager.getDefaultTrackpadSwipeThreshold(), 0.01f)
+        assertEquals(500f, SettingsManager.getTrackpadSuggestionSwipeThreshold(context), 0.01f)
+        assertEquals(500f, SettingsManager.getTrackpadDeleteSwipeThreshold(context), 0.01f)
+    }
+
+    @Test
+    fun trackpadSwipeThresholds_defaultTo200PxOnTheTitan2Elite() {
+        val context = RuntimeEnvironment.getApplication()
+        DeviceSpecific.setBuildFingerprintForTests(
+            brand = "unihertz",
+            manufacturer = "unihertz",
+            model = "Titan 2 Elite",
+            device = "titan2",
+            product = "titan2",
+            display = "Titan 2 Elite_V02.00.04"
+        )
+        try {
+            // Natural flicks on the Elite measure 280-470 px, so 500 px rejects most of them.
+            assertEquals(200f, SettingsManager.getDefaultTrackpadSwipeThreshold(), 0.01f)
+            assertEquals(200f, SettingsManager.getTrackpadSuggestionSwipeThreshold(context), 0.01f)
+            assertEquals(200f, SettingsManager.getTrackpadDeleteSwipeThreshold(context), 0.01f)
+        } finally {
+            DeviceSpecific.clearTestOverrides()
+        }
+    }
+
+    @Test
     fun trackpadSwipeThresholds_fallBackToLegacyValue() {
         val context = RuntimeEnvironment.getApplication()
 

@@ -1527,6 +1527,7 @@ Each key can be configured as Keycode, Action, Native Ctrl, or None. Use overrid
     <string name="trackpad_gestures_title">Trackpad Gesture Suggestions</string>
     <string name="trackpad_gestures_description">Swipe up on the trackpad to accept suggestions</string>
     <string name="trackpad_gestures_enabled_title">Enable Trackpad Gestures</string>
+    <string name="trackpad_titan2_elite_scroll_assistant_note">On the Titan 2 Elite, swipes on the keys reach the keyboard only while Unihertz Scroll assistant is on (Settings → Gestures → Keyboard gestures).</string>
     <string name="trackpad_gestures_enabled_description">Swipe up on trackpad to accept word suggestions</string>
     <string name="trackpad_gesture_add_word_title">Add words with gestures</string>
     <string name="trackpad_gesture_add_word_description">Allow the suggestion gesture to activate the dictionary add button.</string>
