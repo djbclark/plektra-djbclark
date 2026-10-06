@@ -23,6 +23,10 @@ class ClipboardHistoryManager internal constructor(
 
     private lateinit var clipboardManager: ClipboardManager
     private var clipboardDao: ClipboardDao? = null
+
+    // A DAO that failed to open at startup is retried on the next use instead of staying null.
+    private val dao: ClipboardDao?
+        get() = clipboardDao ?: ClipboardDao.getInstance(context).also { clipboardDao = it }
     private var isEnabled: Boolean = true // TODO: Add setting
     private var deviceStateReceiverRegistered = false
     private var screenOffReceived = false
@@ -78,18 +82,18 @@ class ClipboardHistoryManager internal constructor(
             if (!isHistoryAccessible()) return
 
             val retentionMinutes = getClipboardRetentionTime()
-            clipboardDao?.addClip(timeStamp, false, content.toString(), retentionMinutes)
+            dao?.addClip(timeStamp, false, content.toString(), retentionMinutes)
         }
     }
 
     fun toggleClipPinned(id: Long) {
         if (!isHistoryAccessible()) return
-        clipboardDao?.togglePinned(id)
+        dao?.togglePinned(id)
     }
 
     fun clearHistory() {
         if (!isHistoryAccessible()) return
-        clipboardDao?.clearNonPinned()
+        dao?.clearNonPinned()
         try {
             // Clear system clipboard (API 28+)
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
@@ -100,7 +104,7 @@ class ClipboardHistoryManager internal constructor(
         }
     }
 
-    fun canRemove(index: Int) = isHistoryAccessible() && clipboardDao?.isPinned(index) == false
+    fun canRemove(index: Int) = isHistoryAccessible() && dao?.isPinned(index) == false
 
     fun removeEntry(index: Int, force: Boolean = false) {
         if (!isHistoryAccessible()) return
@@ -115,32 +119,32 @@ class ClipboardHistoryManager internal constructor(
             val updatedIndex = (0 until getHistorySize()).firstOrNull { idx ->
                 getHistoryEntry(idx)?.id == entry.id
             }
-            updatedIndex?.let { clipboardDao?.deleteClipAt(it) }
+            updatedIndex?.let { dao?.deleteClipAt(it) }
         } else {
-            clipboardDao?.deleteClipAt(index)
+            dao?.deleteClipAt(index)
         }
     }
 
     fun sortHistoryEntries() {
         if (!isHistoryAccessible()) return
-        clipboardDao?.sort()
+        dao?.sort()
     }
 
     fun prepareClipboardHistory() {
         if (!isHistoryAccessible()) return
         // Clear old clips before showing history
         val retentionMinutes = getClipboardRetentionTime()
-        clipboardDao?.clearOldClips(true, retentionMinutes)
+        dao?.clearOldClips(true, retentionMinutes)
     }
 
-    fun getHistorySize() = if (isHistoryAccessible()) clipboardDao?.count() ?: 0 else 0
+    fun getHistorySize() = if (isHistoryAccessible()) dao?.count() ?: 0 else 0
 
-    fun getHistoryEntry(position: Int) = if (isHistoryAccessible()) clipboardDao?.getAt(position) else null
+    fun getHistoryEntry(position: Int) = if (isHistoryAccessible()) dao?.getAt(position) else null
 
-    fun getHistoryEntryContent(id: Long) = if (isHistoryAccessible()) clipboardDao?.get(id) else null
+    fun getHistoryEntryContent(id: Long) = if (isHistoryAccessible()) dao?.get(id) else null
 
     fun setHistoryChangeListener(listener: ClipboardDao.Listener?) {
-        clipboardDao?.listener = listener
+        dao?.listener = listener
     }
 
     fun isHistoryAccessible(): Boolean = !screenOffReceived && accessPolicy.isHistoryAccessible()
