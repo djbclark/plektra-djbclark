@@ -15,6 +15,9 @@ class PastieraApplication : Application() {
         super.onCreate()
         SettingsManager.initializeAltShiftLayoutSwitchDefault(this)
         SettingsManager.enforceTitan2EliteRoundedCornersOnce(this)
+        // djb/ring: a ring that darkened the keyboard and then died with the process left the vendor
+        // switch off; every process start passes through here, so this is where it is put back.
+        it.palsoftware.pastiera.ring.RingBacklight.restoreLater(this)
         AppPackageChangeMonitor.register(this)
         ClicksPowerKeyboardController.initialize(this)
         publishSoftwareKeyboardModeShortcut()
