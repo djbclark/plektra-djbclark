@@ -1040,6 +1040,55 @@ Ogni tasto può essere configurato come Keycode, Azione, Native Ctrl o Nessuno. 
     <string name="kw_indicator_menu_bar">LED, luci, icona, barra di stato, indicatori</string>
     <string name="kw_indicator_status_bar">LED, luci, simboli, indicatori, pastiera</string>
 
+    <!-- djb/ring: notification ring (PhysiBoard translations, product name changed to Pastiera) -->
+    <string name="ring_title">Anello di notifica</string>
+    <string name="ring_row_description">Un bagliore intorno al foro della fotocamera a schermo spento</string>
+    <string name="ring_intro">Quando arriva una notifica e lo schermo è spento, un anello si illumina intorno al foro della fotocamera nel colore dell\'app, con le app in attesa sotto di esso. Il resto dello schermo resta nero, che su questo pannello AMOLED significa spento. Termina quando tocchi lo schermo, premi un tasto o sblocchi, e smette di tenere acceso lo schermo dopo il tempo che scegli.</string>
+    <string name="ring_enable_title">Anello alle nuove notifiche</string>
+    <string name="ring_enable_description">Solo le notifiche che potresti chiudere; niente per download, riproduzione o app in esecuzione in background.</string>
+    <string name="ring_access_title">Accesso alle notifiche</string>
+    <string name="ring_access_granted">Concesso</string>
+    <string name="ring_access_missing">Non concesso: l\'anello non può vedere le notifiche</string>
+    <string name="ring_fullscreen_title">Mostra sopra la schermata di blocco</string>
+    <string name="ring_fullscreen_granted">Consentito</string>
+    <string name="ring_fullscreen_missing">Non consentito: l\'anello non può accendere lo schermo</string>
+    <string name="ring_post_title">Notifiche di Pastiera</string>
+    <string name="ring_post_granted">Consentite</string>
+    <string name="ring_post_missing">Bloccate: l\'anello viene annunciato tramite una notifica silenziosa che non vedi mai</string>
+    <string name="ring_grant_via_broker">Concedi con l\'associazione configurata</string>
+    <string name="ring_grant_open_settings">Apri le impostazioni</string>
+    <string name="ring_duration_title">Mantieni lo schermo acceso per</string>
+    <string name="ring_duration_description">Dopo questo tempo l\'anello lascia andare e il timeout del telefono spegne lo schermo. Più a lungo costa batteria: il pannello è acceso, anche se quasi tutto nero.</string>
+    <string name="ring_duration_minutes">%1$d min</string>
+    <string name="ring_brightness_title">Luminosità dell\'anello</string>
+    <string name="ring_brightness_dim">Tenue</string>
+    <string name="ring_brightness_normal">Normale</string>
+    <string name="ring_brightness_bright">Intensa</string>
+    <string name="ring_app_colors_title">Colori delle app</string>
+    <string name="ring_app_colors_description">Assegna a un\'app il proprio colore dell\'anello, così sai chi è prima di prendere in mano il telefono. Le app non elencate usano il colore dichiarato per le loro notifiche, oppure il verde.</string>
+    <string name="ring_app_colors_add">Aggiungi un\'app</string>
+    <string name="ring_app_colors_remove">Rimuovi</string>
+    <string name="ring_app_colors_pick">Scegli il colore dell\'anello per questa app.</string>
+    <string name="ring_try">Prova</string>
+    <string name="ring_try_description">Mostra l\'anello per qualche secondo con l\'icona di Pastiera. Blocca prima il telefono per vederlo come apparirà davvero.</string>
+    <string name="ring_icons_title">Mostra le icone delle app</string>
+    <string name="ring_icons_description">Disegna le icone delle app in attesa sotto l\'anello. Disattivato, resta solo l\'anello.</string>
+    <string name="ring_adjust">Adatta l\'anello all\'obiettivo</string>
+    <string name="ring_adjust_description">L\'anello è calibrato su un Titan 2 Elite, e i pannelli differiscono di qualche pixel. Se il tuo è fuori posto: su uno schermo bianco l\'obiettivo appare come un punto scuro; trascina l\'anello su di esso, ridimensionalo e imposta lo spessore che preferisci. Auto ripristina la calibrazione predefinita.</string>
+    <string name="ring_adjust_hint">Trascina per spostare · le frecce regolano · + e − ridimensionano · [ e ] cambiano lo spessore · Invio salva</string>
+    <string name="ring_adjust_smaller">−</string>
+    <string name="ring_adjust_larger">+</string>
+    <string name="ring_adjust_thinner">Più sottile</string>
+    <string name="ring_adjust_thicker">Più spesso</string>
+    <string name="ring_adjust_reset">Auto</string>
+    <string name="ring_adjust_done">Fatto</string>
+    <string name="ring_launcher_text">Accensione dello schermo per una notifica</string>
+    <string name="ring_channel_name">Anello di notifica</string>
+    <string name="ring_channel_description">Usato solo per accendere lo schermo per l\'anello. Silenzioso e chiuso da solo.</string>
+    <string name="ring_default_color_title">Colore predefinito</string>
+    <string name="ring_default_color_description">Usato dalle app che non impostano un colore proprio e da quelle il cui colore è troppo scuro per vedersi su uno schermo nero.</string>
+    <string name="ring_color_too_dark">Troppo scuro per vedersi sullo schermo spento. Alza la luminosità.</string>
+    <!-- djb/ring: end -->
     <!-- djb/broker: embedded wireless-ADB broker, pairing service, Titan 2 Elite tools screen -->
     <string name="notification_channel_adb_pairing">Associazione ADB</string>
     <string name="notification_adb_pairing_searching_for_service_title">Ricerca del servizio di associazione…</string>

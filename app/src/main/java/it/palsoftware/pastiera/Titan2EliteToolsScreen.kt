@@ -18,8 +18,14 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -39,6 +45,24 @@ fun Titan2EliteToolsScreen(
     modifier: Modifier = Modifier,
     onBack: () -> Unit
 ) {
+    // djb/ring: the notification ring has its own page, shown instead of this screen. It opens as a
+    // settings child (the section row below), or here when a deep link or search hit names one of
+    // its rows.
+    val context = LocalContext.current
+    val openedAsRingChild = remember { settingsChild(context, T2E_TOOLS_CHILD_SECTION) == T2E_TOOLS_RING_PAGE }
+    var showRing by remember { mutableStateOf(openedAsRingChild) }
+    val highlightedSettingId = LocalSettingHighlightId.current
+    LaunchedEffect(highlightedSettingId) {
+        if (highlightedSettingId in notificationRingPageRowIds) showRing = true
+    }
+    if (showRing) {
+        NotificationRingScreen(
+            modifier = modifier,
+            onBack = { if (openedAsRingChild) context.settingsActivity().finish() else showRing = false }
+        )
+        return
+    }
+
     Scaffold(
         topBar = {
             Surface(
@@ -87,6 +111,9 @@ fun Titan2EliteToolsScreen(
             // djb/broker: add one section per feature below, each a composable in its own file
             // (backlight, ring, toolbox, ...). Register its settings in
             // Titan2EliteToolsSettingEntries.kt so search and deep links reach it.
+
+            // djb/ring: notification ring around the camera hole (opens its own page)
+            NotificationRingSection()
         }
     }
 }

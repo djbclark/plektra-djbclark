@@ -1444,6 +1444,55 @@ Jede Taste kann als Keycode, Aktion, Native Ctrl oder Keine konfiguriert werden.
     <string name="titan2_elite_max_icon_shrink_title">Maximale Icon-Verkleinerung: %1$d%%</string>
     <string name="titan2_elite_max_icon_shrink_description">Verkleinert äußere Buttonsymbole automatisch nur bei Bedarf bis zu dieser Grenze. 0% schaltet die Verkleinerung aus; die Positionierung bleibt aktiv.</string>
 
+    <!-- djb/ring: notification ring (PhysiBoard translations, product name changed to Pastiera) -->
+    <string name="ring_title">Benachrichtigungsring</string>
+    <string name="ring_row_description">Ein Leuchten um das Kameraloch, während der Bildschirm aus ist</string>
+    <string name="ring_intro">Wenn eine Benachrichtigung eintrifft und der Bildschirm aus ist, leuchtet ein Ring in der Farbe der App um das Kameraloch, darunter die wartenden Apps. Der Rest des Bildschirms bleibt schwarz, was auf diesem AMOLED-Panel „aus“ bedeutet. Es endet, sobald du den Bildschirm berührst, eine Taste drückst oder entsperrst, und nach der von dir gewählten Zeit hält es den Bildschirm nicht mehr an.</string>
+    <string name="ring_enable_title">Ring bei neuen Benachrichtigungen</string>
+    <string name="ring_enable_description">Nur Benachrichtigungen, die du wegwischen könntest; nichts für Downloads, Wiedergabe oder Apps im Hintergrund.</string>
+    <string name="ring_access_title">Benachrichtigungszugriff</string>
+    <string name="ring_access_granted">Erteilt</string>
+    <string name="ring_access_missing">Nicht erteilt – der Ring kann keine Benachrichtigungen sehen</string>
+    <string name="ring_fullscreen_title">Über dem Sperrbildschirm anzeigen</string>
+    <string name="ring_fullscreen_granted">Erlaubt</string>
+    <string name="ring_fullscreen_missing">Nicht erlaubt – der Ring kann den Bildschirm nicht einschalten</string>
+    <string name="ring_post_title">Pastiera-Benachrichtigungen</string>
+    <string name="ring_post_granted">Erlaubt</string>
+    <string name="ring_post_missing">Blockiert – der Ring wird über eine stille Benachrichtigung angekündigt, die du nie siehst</string>
+    <string name="ring_grant_via_broker">Über die gekoppelte Einrichtung erteilen</string>
+    <string name="ring_grant_open_settings">Einstellungen öffnen</string>
+    <string name="ring_duration_title">Bildschirm anlassen für</string>
+    <string name="ring_duration_description">Danach lässt der Ring los und das eigene Timeout des Telefons schaltet den Bildschirm aus. Länger kostet Akku: Das Panel ist an, auch wenn fast alles davon schwarz ist.</string>
+    <string name="ring_duration_minutes">%1$d Min.</string>
+    <string name="ring_brightness_title">Ringhelligkeit</string>
+    <string name="ring_brightness_dim">Gedimmt</string>
+    <string name="ring_brightness_normal">Normal</string>
+    <string name="ring_brightness_bright">Hell</string>
+    <string name="ring_app_colors_title">App-Farben</string>
+    <string name="ring_app_colors_description">Gib einer App ihre eigene Ringfarbe, damit du weißt, wer es ist, bevor du das Telefon in die Hand nimmst. Nicht aufgeführte Apps nutzen die Farbe, die sie für ihre Benachrichtigungen angeben, oder Grün.</string>
+    <string name="ring_app_colors_add">App hinzufügen</string>
+    <string name="ring_app_colors_remove">Entfernen</string>
+    <string name="ring_app_colors_pick">Wähle die Ringfarbe für diese App.</string>
+    <string name="ring_try">Ausprobieren</string>
+    <string name="ring_try_description">Zeigt den Ring ein paar Sekunden lang mit Pastieras eigenem Symbol. Sperre das Telefon vorher, um ihn so zu sehen, wie er wirklich aussehen wird.</string>
+    <string name="ring_icons_title">App-Symbole anzeigen</string>
+    <string name="ring_icons_description">Zeichnet die Symbole der wartenden Apps unter den Ring. Aus: nur der Ring.</string>
+    <string name="ring_adjust">Ring an die Linse anpassen</string>
+    <string name="ring_adjust_description">Der Ring ist auf ein Titan 2 Elite eingepasst, und die Panels unterscheiden sich um ein paar Pixel. Wenn deiner daneben liegt: Auf einem weißen Bildschirm erscheint die Linse als dunkler Fleck – zieh den Ring darauf, ändere die Größe und stelle die gewünschte Dicke ein. „Auto“ stellt den eingepassten Standard wieder her.</string>
+    <string name="ring_adjust_hint">Ziehen zum Verschieben · Pfeile für Feinjustierung · + und − für Größe · [ und ] für Dicke · Enter speichert</string>
+    <string name="ring_adjust_smaller">−</string>
+    <string name="ring_adjust_larger">+</string>
+    <string name="ring_adjust_thinner">Dünner</string>
+    <string name="ring_adjust_thicker">Dicker</string>
+    <string name="ring_adjust_reset">Auto</string>
+    <string name="ring_adjust_done">Fertig</string>
+    <string name="ring_launcher_text">Bildschirm wird für eine Benachrichtigung eingeschaltet</string>
+    <string name="ring_channel_name">Benachrichtigungsring</string>
+    <string name="ring_channel_description">Wird nur genutzt, um den Bildschirm für den Ring einzuschalten. Still, und schließt sich von selbst.</string>
+    <string name="ring_default_color_title">Standardfarbe</string>
+    <string name="ring_default_color_description">Wird von Apps genutzt, die keine eigene Farbe setzen, und von Apps, deren Farbe auf einem schwarzen Bildschirm zu dunkel ist.</string>
+    <string name="ring_color_too_dark">Das ist zu dunkel, um es bei ausgeschaltetem Bildschirm zu sehen. Schieb die Helligkeit hoch.</string>
+    <!-- djb/ring: end -->
     <!-- djb/broker: embedded wireless-ADB broker, pairing service, Titan 2 Elite tools screen -->
     <string name="notification_channel_adb_pairing">ADB-Kopplung</string>
     <string name="notification_adb_pairing_searching_for_service_title">Suche nach Kopplungsdienst…</string>
