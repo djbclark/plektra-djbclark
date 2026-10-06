@@ -1694,7 +1694,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             context = this,
             assets = assets,
             settingsProvider = { getSuggestionSettings() },
-            isEnabled = { SettingsManager.isExperimentalSuggestionsEnabled(this) },
+            isEnabled = { SettingsManager.getSuggestionsEnabled(this) },
             debugLogging = suggestionDebugLogging,
             onSuggestionsUpdated = { suggestions -> handleSuggestionsUpdated(suggestions) },
             currentLocale = initialLocale,
@@ -3047,7 +3047,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         val modifierSnapshot = modifierStateController.snapshot()
         val state = inputContextState
         val addWordCandidate = suggestionController.pendingAddWord()
-        val suggestionsEnabled = SettingsManager.isExperimentalSuggestionsEnabled(this) && SettingsManager.getSuggestionsEnabled(this)
+        val suggestionsEnabled = SettingsManager.getSuggestionsEnabled(this)
         val suggestionsStart = ImePerfLogger.mark()
         val baseSuggestions = if (suggestionsEnabled) visibleSuggestionStrings() else emptyList()
         suggestionsMs = ImePerfLogger.elapsedMs(suggestionsStart)

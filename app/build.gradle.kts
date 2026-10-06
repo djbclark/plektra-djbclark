@@ -263,6 +263,15 @@ android {
         compose = true
         buildConfig = true
     }
+    // djb/autocorrect: the `<lang>_base.json` word lists are the SOURCE the serialized `.dict`
+    // files are built from (scripts/build_en_wordlist.py -> scripts/build_symspell_dict.py).
+    // Nothing reads them at runtime (the repository loads dictionaries_serialized/<lang>_base.dict
+    // and the only asset opened from common/dictionaries/ is user_defaults.json), so they are pure
+    // payload. The `packaging.resources` exclude below filters Java resources, not Android
+    // assets, so it never removed them; `ignoreAssetsPatterns` is the switch that applies.
+    androidResources {
+        ignoreAssetsPatterns += "*_base.json"
+    }
     packaging {
         resources {
             // Exclude legacy JSON base dictionaries; keep serialized .dict and user_defaults.json
@@ -271,6 +280,21 @@ android {
     }
     testOptions {
         unitTests.isIncludeAndroidResources = true
+        // djb/autocorrect: the autocorrect evaluation against the real en_base.dict is opt-in:
+        // it is slow enough that it has no business in the normal test loop, and it skips
+        // without this.
+        //   ./gradlew :app:testStableDebugUnitTest -Ppastiera.eval.realDictionary=true
+        unitTests.all {
+            it.systemProperty(
+                "pastiera.eval.realDictionary",
+                providers.gradleProperty("pastiera.eval.realDictionary").getOrElse("false")
+            )
+            it.systemProperty(
+                "pastiera.eval.vocab",
+                providers.gradleProperty("pastiera.eval.vocab").getOrElse("")
+            )
+            it.maxHeapSize = "3g"
+        }
     }
 }
 
@@ -316,7 +340,10 @@ val generateStableReleaseSbom = tasks.register("generateStableReleaseSbom") {
             bundled("OpenGameArt typewriter sounds", "vendored:opengameart-typewriter-sounds", "https://opengameart.org/content/typewriter-sounds", "CC0-1.0"),
             bundled("OpenGameArt mechanical sounds", "vendored:opengameart-mechanical-sounds", "https://opengameart.org/content/mechanical-sounds", "CC0-1.0"),
             bundled("Unicode CLDR emoji annotations", "vendored:unicode-cldr-annotations", "https://github.com/unicode-org/cldr-json", "Unicode-DFS-2016"),
-            bundled("Leipzig Corpora frequency data", "vendored:leipzig-corpora", "https://corpora.uni-leipzig.de/", "CC-BY-3.0")
+            bundled("Leipzig Corpora frequency data", "vendored:leipzig-corpora", "https://corpora.uni-leipzig.de/", "CC-BY-3.0"),
+            // djb/autocorrect: the English base dictionary is rebuilt from these (see THIRD_PARTY_NOTICES.md)
+            bundled("wordfreq word frequency data", "vendored:wordfreq-data", "https://github.com/rspeer/wordfreq", "CC-BY-SA-4.0"),
+            bundled("pyspellchecker English word list", "vendored:pyspellchecker-en", "https://github.com/barrust/pyspellchecker", "MIT")
         )
         val components = libraries + bundledAssets
         val bom = linkedMapOf<String, Any>(

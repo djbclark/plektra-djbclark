@@ -247,8 +247,6 @@
     <string name="auto_correct_edit_type_ranking_title">Edit Type Ranking</string>
     <string name="auto_correct_edit_type_ranking_description">Rank suggestions by edit type (insert > substitute > delete)</string>
     <string name="clear">Clear</string>
-    <string name="experimental_suggestions_title">Experimental suggestions</string>
-    <string name="experimental_suggestions_subtitle">Enable the new dictionary/suggestion engine (beta)</string>
 
     <!-- User dictionary management -->
     <string name="user_dict_title">User dictionary</string>

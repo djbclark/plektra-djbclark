@@ -65,7 +65,6 @@ object SettingLinkIds {
     const val AUTO_CORRECTION_AUTO_REPLACE = "auto_correction.auto_replace"
     const val AUTO_CORRECTION_MAX_DISTANCE = "auto_correction.max_distance"
     const val AUTO_CORRECTION_USER_DICTIONARY = "auto_correction.user_dictionary"
-    const val AUTO_CORRECTION_EXPERIMENTAL_SUGGESTIONS = "auto_correction.experimental_suggestions"
     const val AUTO_CORRECTION_SUGGESTIONS = "auto_correction.suggestions"
     const val AUTO_CORRECTION_ACCENT_MATCHING = "auto_correction.accent_matching"
     const val AUTO_CORRECTION_KEYBOARD_PROXIMITY = "auto_correction.keyboard_proximity"
@@ -513,12 +512,6 @@ object SettingLinkRegistry {
             SettingLinkIds.AUTO_CORRECTION_USER_DICTIONARY,
             R.string.auto_correct_manage_user_dict_title,
             R.string.auto_correct_manage_user_dict_description,
-            destination = SettingsDestination.AutoCorrection
-        ),
-        entry(
-            SettingLinkIds.AUTO_CORRECTION_EXPERIMENTAL_SUGGESTIONS,
-            R.string.experimental_suggestions_title,
-            R.string.experimental_suggestions_subtitle,
             destination = SettingsDestination.AutoCorrection
         ),
         entry(

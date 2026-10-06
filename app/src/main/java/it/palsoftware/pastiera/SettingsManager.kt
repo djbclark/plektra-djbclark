@@ -388,9 +388,7 @@ object SettingsManager {
     private const val SYM_PAGES_SCHEMA_VERSION = 2
     private const val DEFAULT_STATIC_VARIATION_BAR_MODE = false
     private const val DEFAULT_STATIC_VARIATION_BAR_BASE_LAYER_ENABLED = false
-    private const val DEFAULT_EXPERIMENTAL_SUGGESTIONS_ENABLED = true
     private const val DEFAULT_SUGGESTION_DEBUG_LOGGING = true
-    private const val KEY_EXPERIMENTAL_SUGGESTIONS_ENABLED = "experimental_suggestions_enabled"
     private const val KEY_SUGGESTION_DEBUG_LOGGING = "suggestion_debug_logging"
     private const val KEY_IME_OVERLAY_DEBUG_LOGGING = "ime_overlay_debug_logging"
     private const val KEY_EXPERIMENTAL_CANDIDATES_VIEW_ENABLED = "experimental_candidates_view_enabled"
@@ -3016,20 +3014,6 @@ object SettingsManager {
     fun setAccentMatchingEnabled(context: Context, enabled: Boolean) {
         getPreferences(context).edit()
             .putBoolean(KEY_ACCENT_MATCHING_ENABLED, enabled)
-            .apply()
-    }
-
-    /**
-     * Master toggle for the experimental dictionary/suggestion engine.
-     * When disabled, the IME will skip initialization and hide suggestion UI.
-     */
-    fun isExperimentalSuggestionsEnabled(context: Context): Boolean {
-        return getPreferences(context).getBoolean(KEY_EXPERIMENTAL_SUGGESTIONS_ENABLED, DEFAULT_EXPERIMENTAL_SUGGESTIONS_ENABLED)
-    }
-
-    fun setExperimentalSuggestionsEnabled(context: Context, enabled: Boolean) {
-        getPreferences(context).edit()
-            .putBoolean(KEY_EXPERIMENTAL_SUGGESTIONS_ENABLED, enabled)
             .apply()
     }
 

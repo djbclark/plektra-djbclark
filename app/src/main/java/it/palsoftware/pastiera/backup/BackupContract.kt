@@ -345,6 +345,7 @@ internal object BackupPreferenceContract {
             "nav_mode_enabled" to PreferenceValueType.BOOLEAN,
             "nav_mode_ctrl_hold_enabled" to PreferenceValueType.BOOLEAN,
             "power_shortcuts_enabled" to PreferenceValueType.BOOLEAN,
+            // djb/autocorrect: retired switch, kept so old backups still validate; nothing reads it.
             "experimental_suggestions_enabled" to PreferenceValueType.BOOLEAN,
             "suggestion_debug_logging" to PreferenceValueType.BOOLEAN,
             "ime_overlay_debug_logging" to PreferenceValueType.BOOLEAN,

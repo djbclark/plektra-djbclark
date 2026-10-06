@@ -13,6 +13,7 @@ class AutoReplaceController(
     private val repository: DictionaryRepository,
     private val suggestionEngine: SuggestionEngine,
     private val settingsProvider: () -> SuggestionSettings,
+    private val languageProvider: () -> String = { "" },
     private val knownWordProvider: ((String) -> Boolean)? = null,
     private val exactReplacementProvider: ((String, Char?) -> String?)? = null
 ) {
@@ -37,6 +38,60 @@ class AutoReplaceController(
         val replaced: Boolean,
         val committed: Boolean,
         val replacement: String? = null
+    )
+
+    /**
+     * How clearly the winning candidate beat the field.
+     *
+     * The engine has always computed a score and then used it only to order the three visible
+     * suggestions; the commit decision was eight booleans, so "how sure are we" was not a
+     * question the keyboard could ask. It shows in the failures: `definately` retrieves both
+     * `definitely` and `defiantly`, the scorer separates them by almost nothing, and a boolean
+     * gate has no way to express "too close to call - offer it, do not impose it".
+     *
+     * The measure is the RELATIVE MARGIN between the top candidate and the runner-up, not the
+     * top score itself. Absolute scores are an unbounded additive pile whose scale drifts with
+     * word length, frequency and which bonuses happened to apply, so no fixed cutoff on them
+     * means the same thing twice. A margin is scale-free: it asks only whether the winner won
+     * clearly, which is exactly the question worth asking before overwriting what someone typed.
+     *
+     * A lone candidate has nothing to beat and scores [CERTAIN] - the shape gates remain
+     * responsible for whether it should be applied at all.
+     */
+    @JvmInline
+    value class Confidence(val value: Double) {
+        companion object {
+            /** Nothing competed with the winner. */
+            val CERTAIN = Confidence(1.0)
+
+            /**
+             * From the top two candidate scores. Guards the degenerate cases: a non-positive
+             * top score carries no information, so it cannot be called confident.
+             */
+            fun of(top: Double, runnerUp: Double?): Confidence {
+                if (runnerUp == null) return CERTAIN
+                if (top <= 0.0) return Confidence(0.0)
+                return Confidence(((top - runnerUp) / top).coerceIn(0.0, 1.0))
+            }
+        }
+    }
+
+    /**
+     * The facts a commit decision rests on, gathered so the decision itself can be made
+     * without an InputConnection, a dictionary or a keyboard.
+     */
+    internal data class ReplaceFacts(
+        val word: String,
+        val lookupWord: String,
+        val top: SuggestionResult?,
+        val isKnownWord: Boolean,
+        val isExactKnownWord: Boolean,
+        val hasExactPrimaryCase: Boolean,
+        val isRejected: Boolean,
+        val isOrthographicVariant: Boolean,
+        val isCaseVariant: Boolean,
+        val isSafeCandidate: Boolean,
+        val confidence: Confidence = Confidence.CERTAIN
     )
 
     companion object {
@@ -133,12 +188,49 @@ class AutoReplaceController(
             return !input[inputIndex].equals(candidate[candidateIndex], ignoreCase = true)
         }
 
+        /** Fallback guard on how much longer than the typed word a candidate may be. */
+        internal const val MAX_LENGTH_RATIO = 1.25
+
+        /** Short orthographic fixes are allowed ("ja" -> "já"); everything else needs 3 chars. */
+        internal fun minWordLength(isOrthographicVariant: Boolean): Int =
+            if (isOrthographicVariant) 2 else 3
+
+        /**
+         * Whether a candidate is committed to the text, given [facts].
+         *
+         * Extracted from `handleBoundary` so it can be measured. The offline evaluation harness
+         * (`AutocorrectEval` in the test sources) scores real typed-word corpora through THIS
+         * function; a copy of the rule kept beside it would drift from the shipped one within a
+         * release, and a measurement of a rule the keyboard does not use is worse than none.
+         *
+         * Every term but [ReplaceFacts.confidence] is a boolean veto: a candidate is either
+         * structurally permitted or not. The confidence margin is what lets a permitted but
+         * too-close-to-call candidate be offered rather than imposed.
+         */
+        internal fun shouldAutoReplace(facts: ReplaceFacts, settings: SuggestionSettings): Boolean {
+            val top = facts.top ?: return false
+            val minWordLength = minWordLength(facts.isOrthographicVariant)
+            // A known word is left alone: replacing a valid word with another valid one is the
+            // single worst thing this can do. Case and accent repairs are the exceptions.
+            val knownWordAllows = !facts.isKnownWord ||
+                (facts.isCaseVariant && !facts.hasExactPrimaryCase) ||
+                (facts.isOrthographicVariant && !facts.isExactKnownWord)
+            return knownWordAllows &&
+                !facts.isRejected &&
+                facts.confidence.value >= settings.minAutoReplaceConfidence &&
+                facts.isSafeCandidate &&
+                facts.lookupWord.length >= minWordLength &&
+                (top.candidate.length <= (facts.word.length * MAX_LENGTH_RATIO).toInt() ||
+                    hasSingleRepeatedCharInsertion(facts.word, top.candidate))
+        }
+
         internal fun isSafeAutoReplaceCandidate(
             input: String,
             lookupWord: String,
             candidate: SuggestionResult?,
             settings: SuggestionSettings,
-            isOrthographicVariant: Boolean
+            isOrthographicVariant: Boolean,
+            languageCode: String = ""
         ): Boolean {
             if (candidate == null) return false
             val isCaseVariant = isCaseOnlyVariant(input, candidate.candidate)
@@ -157,6 +249,20 @@ class AutoReplaceController(
                 return isOrthographicVariant || isCaseVariant || !changesFirstLetter(input, candidate.candidate)
             }
             if (lengthDelta == 1 && hasSingleRepeatedCharInsertion(input, candidate.candidate)) return true
+
+            // A dropped or added letter is the most common typo there is. Refusing all of them
+            // is why "definetly" survived while same-length slips were corrected, and why the
+            // Maximum correction distance setting could not deliver what it promised. How far a
+            // length change may go is a per-language decision - see TypoShapeProfile.
+            val profile = TypoShapeProfile.forLanguage(languageCode)
+            if (
+                profile.maxLengthDelta > 0 &&
+                kotlin.math.abs(lengthDelta) <= profile.maxLengthDelta &&
+                !TypoShapeProfile.isPureAffixChange(input, candidate.candidate) &&
+                !changesFirstLetter(input, candidate.candidate)
+            ) {
+                return true
+            }
 
             // Pure suffix/prefix growth or shortening is usually morphology/completion, not a typo.
             return isOrthographicVariant && lookupWord.length == candidate.candidate.length
@@ -402,12 +508,19 @@ class AutoReplaceController(
 
         val suggestions = suggestionEngine.suggest(
             lookupWord,
-            limit = 1,
+            // Two, not one: the runner-up is what makes the winner's margin measurable.
+            limit = 2,
             includeAccentMatching = settings.accentMatching,
             useKeyboardProximity = settings.useKeyboardProximity,
             useEditTypeRanking = settings.useEditTypeRanking
         )
         val topRaw = suggestions.firstOrNull()
+        val confidence = Confidence.of(
+            top = topRaw?.score ?: 0.0,
+            runnerUp = suggestions.getOrNull(1)
+                ?.takeIf { it.kind == SuggestionKind.CURRENT_WORD }
+                ?.score
+        )
         val top = topRaw?.let {
             if (apostropheSplit != null) {
                 val recomposed = recomposeApostropheCandidate(apostropheSplit, it.candidate) ?: return@let null
@@ -420,9 +533,7 @@ class AutoReplaceController(
         // Safety checks for auto-replace
         val isOrthographicVariant = top != null && isAccentOnlyVariant(word, top.candidate)
         val isCaseVariant = top != null && isCaseOnlyVariant(word, top.candidate)
-        val minWordLength = if (isOrthographicVariant) 2 else 3 // Allow short orthographic fixes (e.g., "ja" -> "já")
-        val maxLengthRatio = 1.25 // Keep as a fallback guard for longer typo candidates.
-        
+
         // Check if word has been rejected by user
         val isRejected = rejectedWords.contains(wordLower)
         
@@ -438,16 +549,26 @@ class AutoReplaceController(
             lookupWord = lookupWord,
             candidate = top,
             settings = settings,
-            isOrthographicVariant = isOrthographicVariant
+            isOrthographicVariant = isOrthographicVariant,
+            languageCode = languageProvider()
         )
 
-        val shouldReplace = top != null
-            && (!isKnownWord || (isCaseVariant && !hasExactPrimaryCase) || (isOrthographicVariant && !isExactKnownWord)) // Allow case/orthographic fixes
-            && !isRejected // Don't auto-correct if user has rejected this word
-            && isSafeCandidate
-            && lookupWord.length >= minWordLength // Minimum word length check on root
-            && (top.candidate.length <= (word.length * maxLengthRatio).toInt() ||
-                hasSingleRepeatedCharInsertion(word, top.candidate)) // Max length ratio check on full text
+        val shouldReplace = shouldAutoReplace(
+            ReplaceFacts(
+                word = word,
+                lookupWord = lookupWord,
+                top = top,
+                isKnownWord = isKnownWord,
+                isExactKnownWord = isExactKnownWord,
+                hasExactPrimaryCase = hasExactPrimaryCase,
+                isRejected = isRejected,
+                isOrthographicVariant = isOrthographicVariant,
+                isCaseVariant = isCaseVariant,
+                isSafeCandidate = isSafeCandidate,
+                confidence = confidence
+            ),
+            settings = settings
+        )
 
 	        if (shouldReplace) {
 	            val replacement = applyCasing(top!!.candidate, word)
@@ -507,8 +628,9 @@ class AutoReplaceController(
             !isOrthographicVariant && !isCaseVariant && top.distance <= 0 -> "not_edit_distance"
             word.all { it.isLowerCase() } && isAcronymLike(top.candidate) -> "acronym_candidate"
             !isSafeCandidate -> "unsafe_shape"
-            lookupWord.length < minWordLength -> "word_too_short"
-            top.candidate.length > (word.length * maxLengthRatio).toInt() &&
+            confidence.value < settings.minAutoReplaceConfidence -> "too_close_to_call"
+            lookupWord.length < minWordLength(isOrthographicVariant) -> "word_too_short"
+            top.candidate.length > (word.length * MAX_LENGTH_RATIO).toInt() &&
                 !hasSingleRepeatedCharInsertion(word, top.candidate) -> "candidate_too_long"
             else -> "constraints_not_met"
         }

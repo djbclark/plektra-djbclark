@@ -42,7 +42,6 @@ class DisabledSmartFeaturesRegressionTest {
             .clear()
             .commit()
         SettingsManager.setAutoCorrectEnabled(context, false)
-        SettingsManager.setExperimentalSuggestionsEnabled(context, false)
         SettingsManager.setSuggestionsEnabled(context, false)
         SettingsManager.setAutoReplaceOnSpaceEnter(context, false)
         AutoCorrector.loadCorrections(context.assets, context)
