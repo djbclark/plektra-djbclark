@@ -862,4 +862,34 @@ Chaque touche peut être configurée comme Keycode, Action, Native Ctrl ou Aucun
     <string name="settings_link_with_description">Avec description</string>
     <string name="settings_link_copied_toast">Lien copié</string>
     <string name="settings_link_unavailable_toast">Ce paramètre n\'est pas disponible</string>
+
+    <!-- djb/broker: embedded wireless-ADB broker, pairing service, Titan 2 Elite tools screen -->
+    <string name="notification_channel_adb_pairing">Appairage ADB</string>
+    <string name="notification_adb_pairing_searching_for_service_title">Recherche du service d\'appairage…</string>
+    <string name="notification_adb_pairing_service_found_title">Service d\'appairage trouvé</string>
+    <string name="notification_adb_pairing_working_title">Appairage…</string>
+    <string name="notification_adb_pairing_succeed_title">Appairage réussi</string>
+    <string name="notification_adb_pairing_succeed_text">Cet appareil peut maintenant se connecter au débogage sans fil.</string>
+    <string name="notification_adb_pairing_failed_title">Échec de l\'appairage</string>
+    <string name="notification_adb_pairing_stop_searching">Arrêter</string>
+    <string name="notification_adb_pairing_retry">Réessayer</string>
+    <string name="notification_adb_pairing_input_paring_code">Saisir le code d\'appairage</string>
+    <string name="dialog_adb_pairing_paring_code">Code d\'appairage</string>
+    <string name="cannot_connect_port">Impossible de se connecter au port d\'appairage.</string>
+    <string name="paring_code_is_wrong">Le code d\'appairage est incorrect.</string>
+    <string name="adb_error_key_store">Impossible d\'accéder au magasin de clés ADB.</string>
+    <string name="device_setup_needed_title">Configuration requise</string>
+    <string name="device_setup_ready_title">Appairé</string>
+    <string name="device_setup_ready_body">Les outils ci-dessous peuvent atteindre le système. Survit aux redémarrages.</string>
+    <string name="device_setup_step_dev_1">Ouvrez Paramètres → À propos du téléphone</string>
+    <string name="device_setup_step_dev_2">Touchez sept fois Numéro de build</string>
+    <string name="device_setup_step_dev_3">Revenez ici</string>
+    <string name="device_setup_step_pair_1">Activez le débogage sans fil</string>
+    <string name="device_setup_step_pair_2">Touchez Associer l\'appareil avec un code d\'association</string>
+    <string name="device_setup_step_pair_3">Saisissez le code dans la notification Pastiera</string>
+    <string name="device_setup_open_about">Ouvrir À propos du téléphone</string>
+    <string name="device_setup_open_wireless">Ouvrir le débogage sans fil</string>
+    <string name="device_setup_open_pairing">Ouvrir le débogage sans fil</string>
+    <string name="device_setup_dnd_on">Ne pas déranger est activé et peut masquer le code d\'appairage. Désactivez-le jusqu\'à l\'appairage.</string>
+    <string name="device_setup_needs_notifications">Autorisez d\'abord les notifications Pastiera : le code d\'appairage arrive sous cette forme.</string>
 </resources>

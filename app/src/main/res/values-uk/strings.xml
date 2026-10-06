@@ -862,4 +862,34 @@ Ctrl-ярлики застосунків із урахуванням розкл�
     <string name="settings_link_with_description">З описом</string>
     <string name="settings_link_copied_toast">Посилання скопійовано</string>
     <string name="settings_link_unavailable_toast">Цей параметр недоступний</string>
+
+    <!-- djb/broker: embedded wireless-ADB broker, pairing service, Titan 2 Elite tools screen -->
+    <string name="notification_channel_adb_pairing">Сполучення ADB</string>
+    <string name="notification_adb_pairing_searching_for_service_title">Пошук служби сполучення…</string>
+    <string name="notification_adb_pairing_service_found_title">Службу сполучення знайдено</string>
+    <string name="notification_adb_pairing_working_title">Сполучення…</string>
+    <string name="notification_adb_pairing_succeed_title">Сполучення успішне</string>
+    <string name="notification_adb_pairing_succeed_text">Цей пристрій тепер може підключатися до бездротового налагодження.</string>
+    <string name="notification_adb_pairing_failed_title">Сполучення не вдалося</string>
+    <string name="notification_adb_pairing_stop_searching">Зупинити</string>
+    <string name="notification_adb_pairing_retry">Повторити</string>
+    <string name="notification_adb_pairing_input_paring_code">Введіть код сполучення</string>
+    <string name="dialog_adb_pairing_paring_code">Код сполучення</string>
+    <string name="cannot_connect_port">Не вдалося підключитися до порту сполучення.</string>
+    <string name="paring_code_is_wrong">Код сполучення неправильний.</string>
+    <string name="adb_error_key_store">Не вдалося отримати доступ до сховища ключів ADB.</string>
+    <string name="device_setup_needed_title">Потрібне налаштування</string>
+    <string name="device_setup_ready_title">Сполучено</string>
+    <string name="device_setup_ready_body">Інструменти нижче мають доступ до системи. Зберігається після перезавантаження.</string>
+    <string name="device_setup_step_dev_1">Відкрийте Налаштування → Про телефон</string>
+    <string name="device_setup_step_dev_2">Торкніться «Номер збірки» сім разів</string>
+    <string name="device_setup_step_dev_3">Поверніться сюди</string>
+    <string name="device_setup_step_pair_1">Увімкніть Бездротове налагодження</string>
+    <string name="device_setup_step_pair_2">Торкніться «Підключити пристрій за кодом»</string>
+    <string name="device_setup_step_pair_3">Введіть код у сповіщення Pastiera</string>
+    <string name="device_setup_open_about">Відкрити Про телефон</string>
+    <string name="device_setup_open_wireless">Відкрити Бездротове налагодження</string>
+    <string name="device_setup_open_pairing">Відкрити Бездротове налагодження</string>
+    <string name="device_setup_dnd_on">Увімкнено режим «Не турбувати», який може приховати код сполучення. Вимкніть його, поки не сполучитеся.</string>
+    <string name="device_setup_needs_notifications">Спершу дозвольте сповіщення Pastiera — код сполучення надходить як сповіщення.</string>
 </resources>

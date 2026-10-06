@@ -5,6 +5,8 @@
              SOC calibration. Restored device values remain stale until GATT validates identity. -->
         <include domain="sharedpref" path="."/>
         <exclude domain="sharedpref" path="recent_emojis_prefs.xml"/>
+        <!-- djb/broker: the embedded ADB private key and broker state belong to this phone's pairing -->
+        <exclude domain="sharedpref" path="embedded_adb.xml"/>
         
         <!-- Include custom keyboard layouts directory -->
         <include domain="file" path="keyboard_layouts/"/>
@@ -18,4 +20,27 @@
         <!-- Include default/user dictionary file stored in app-private files -->
         <include domain="file" path="user_defaults.json"/>
     </cloud-backup>
+
+    <device-transfer>
+        <!-- djb/broker: mirrors <cloud-backup>; a missing section would mean "everything transfers".
+             No <cross-platform-transfer> section: it needs an iOS bundleId/teamId (Android 16 QPR2) and Pastiera has no iOS app. -->
+        <!-- Include SharedPreferences for cloud backup, including Clicks snapshots and learned
+             SOC calibration. Restored device values remain stale until GATT validates identity. -->
+        <include domain="sharedpref" path="."/>
+        <exclude domain="sharedpref" path="recent_emojis_prefs.xml"/>
+        <!-- djb/broker: the embedded ADB private key and broker state belong to this phone's pairing -->
+        <exclude domain="sharedpref" path="embedded_adb.xml"/>
+        
+        <!-- Include custom keyboard layouts directory -->
+        <include domain="file" path="keyboard_layouts/"/>
+        
+        <!-- Include nav mode mappings file -->
+        <include domain="file" path="ctrl_key_mappings.json"/>
+        
+        <!-- Include variations file -->
+        <include domain="file" path="variations.json"/>
+
+        <!-- Include default/user dictionary file stored in app-private files -->
+        <include domain="file" path="user_defaults.json"/>
+    </device-transfer>
 </data-extraction-rules>

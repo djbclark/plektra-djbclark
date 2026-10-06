@@ -12,6 +12,8 @@
          Restored device values stay stale until a matching GATT serial is freshly validated. -->
     <include domain="sharedpref" path="."/>
     <exclude domain="sharedpref" path="recent_emojis_prefs.xml"/>
+    <!-- djb/broker: the embedded ADB private key and broker state belong to this phone's pairing -->
+    <exclude domain="sharedpref" path="embedded_adb.xml"/>
     
     <!-- Include custom keyboard layouts directory -->
     <include domain="file" path="keyboard_layouts/"/>

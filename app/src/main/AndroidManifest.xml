@@ -24,6 +24,15 @@
     <!-- Permesso per mostrare finestre overlay (per debug trackpad) -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
+    <!-- djb/broker: embedded wireless-ADB broker. WRITE_SECURE_SETTINGS can only be granted over adb:
+         pm grant <applicationId> android.permission.WRITE_SECURE_SETTINGS (the broker does this itself). -->
+    <uses-permission
+        android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <!-- Query per vedere tutte le app installate che possono essere avviate -->
     <queries>
         <intent>
@@ -245,6 +254,12 @@
             android:taskAffinity=""
             android:noHistory="true"
             android:finishOnTaskLaunch="true" />
+
+        <!-- djb/broker: vendored Shizuku ADB pairing foreground service -->
+        <service
+            android:name="moe.shizuku.manager.adb.AdbPairingService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
 
         <!-- Shizuku provider -->
         <provider

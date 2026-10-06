@@ -862,4 +862,34 @@ Nav Mode использует физическое положение клави
     <string name="settings_link_with_description">С описанием</string>
     <string name="settings_link_copied_toast">Ссылка скопирована</string>
     <string name="settings_link_unavailable_toast">Этот параметр недоступен</string>
+
+    <!-- djb/broker: embedded wireless-ADB broker, pairing service, Titan 2 Elite tools screen -->
+    <string name="notification_channel_adb_pairing">Сопряжение ADB</string>
+    <string name="notification_adb_pairing_searching_for_service_title">Поиск службы сопряжения…</string>
+    <string name="notification_adb_pairing_service_found_title">Служба сопряжения найдена</string>
+    <string name="notification_adb_pairing_working_title">Сопряжение…</string>
+    <string name="notification_adb_pairing_succeed_title">Сопряжение выполнено</string>
+    <string name="notification_adb_pairing_succeed_text">Теперь это устройство может подключаться к отладке по Wi-Fi.</string>
+    <string name="notification_adb_pairing_failed_title">Сопряжение не удалось</string>
+    <string name="notification_adb_pairing_stop_searching">Остановить</string>
+    <string name="notification_adb_pairing_retry">Повторить</string>
+    <string name="notification_adb_pairing_input_paring_code">Введите код сопряжения</string>
+    <string name="dialog_adb_pairing_paring_code">Код сопряжения</string>
+    <string name="cannot_connect_port">Не удалось подключиться к порту сопряжения.</string>
+    <string name="paring_code_is_wrong">Неверный код сопряжения.</string>
+    <string name="adb_error_key_store">Не удалось получить доступ к хранилищу ключей ADB.</string>
+    <string name="device_setup_needed_title">Требуется настройка</string>
+    <string name="device_setup_ready_title">Сопряжено</string>
+    <string name="device_setup_ready_body">Инструменты ниже имеют доступ к системе. Сохраняется после перезагрузки.</string>
+    <string name="device_setup_step_dev_1">Откройте Настройки → О телефоне</string>
+    <string name="device_setup_step_dev_2">Нажмите «Номер сборки» семь раз</string>
+    <string name="device_setup_step_dev_3">Вернитесь сюда</string>
+    <string name="device_setup_step_pair_1">Включите отладку по Wi-Fi</string>
+    <string name="device_setup_step_pair_2">Нажмите «Подключить устройство с помощью кода»</string>
+    <string name="device_setup_step_pair_3">Введите код в уведомление Pastiera</string>
+    <string name="device_setup_open_about">Открыть «О телефоне»</string>
+    <string name="device_setup_open_wireless">Открыть отладку по Wi-Fi</string>
+    <string name="device_setup_open_pairing">Открыть отладку по Wi-Fi</string>
+    <string name="device_setup_dnd_on">Включён режим «Не беспокоить», и он может скрыть код сопряжения. Выключите его до завершения сопряжения.</string>
+    <string name="device_setup_needs_notifications">Сначала разрешите уведомления Pastiera — код сопряжения приходит в виде уведомления.</string>
 </resources>
