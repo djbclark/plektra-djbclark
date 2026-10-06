@@ -238,6 +238,8 @@ internal object BackupPreferenceContract {
             "app_enter_behavior_enabled" to PreferenceValueType.BOOLEAN,
             "app_enter_behavior_preset" to PreferenceValueType.STRING,
             "app_enter_behavior_overrides" to PreferenceValueType.STRING,
+            // djb/exact-typing: per-app Exact Typing packages
+            "app_raw_mode_packages" to PreferenceValueType.STRING_SET,
             "keyboard_theme_hardware" to PreferenceValueType.STRING,
             "keyboard_theme_software" to PreferenceValueType.STRING,
             "keyboard_theme_saved_themes" to PreferenceValueType.STRING,
