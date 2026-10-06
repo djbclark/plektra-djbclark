@@ -1005,4 +1005,14 @@ Mỗi phím có thể cấu hình là Keycode, Action, Native Ctrl hoặc None. 
     <string name="device_setup_open_pairing">Mở Gỡ lỗi không dây</string>
     <string name="device_setup_dnd_on">Không làm phiền đang bật và có thể ẩn mã ghép nối. Hãy tắt cho tới khi ghép nối xong.</string>
     <string name="device_setup_needs_notifications">Cho phép thông báo của Pastiera trước — mã ghép nối được gửi dưới dạng thông báo.</string>
+
+    <!-- djb/backlight: carried from PhysiBoard, unchanged strings only -->
+    <string name="smart_backlight_title">Đèn nền bàn phím thông minh</string>
+    <string name="smart_backlight_row_description">Giữ bàn phím sáng trong bóng tối, vượt giới hạn 30 giây</string>
+    <string name="smart_backlight_enable_title">Đèn nền thông minh</string>
+    <string name="smart_backlight_setup_ready">Luôn bật — thiết lập một lần, vẫn còn sau khi khởi động lại.</string>
+    <string name="smart_backlight_blocked_wireless_debugging">Gỡ lỗi không dây đang tắt nên không thể áp dụng cài đặt đèn nền. Android tắt nó sau khi khởi động lại — hãy bật lại trong Tùy chọn nhà phát triển.</string>
+    <string name="smart_backlight_last_error">Lần thử gần nhất thất bại: %1$s</string>
+    <string name="backlight_tile_label">Đèn bàn phím</string>
+    <string name="backlight_tile_no_permission_subtitle">Cần cấp quyền qua ADB</string>
 </resources>

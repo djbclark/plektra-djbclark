@@ -1930,4 +1930,19 @@ Each key can be configured as Keycode, Action, Native Ctrl, or None. Use overrid
     <string name="broker_repair">Re-pair</string>
     <string name="kw_main_titan2_elite_tools">titan, elite, t2e, device setup, broker, adb, wireless debugging, pairing, privileged</string>
     <string name="kw_titan2_elite_tools_device_setup">adb, wireless debugging, pair, pairing, broker, shizuku, grant, secure settings</string>
+
+    <!-- djb/backlight: smart keyboard backlight and its Quick Settings tile -->
+    <string name="smart_backlight_title">Smart keyboard backlight</string>
+    <string name="smart_backlight_row_description">Keep the keyboard lit in the dark, past the 30s limit</string>
+    <string name="smart_backlight_enable_title">Smart backlight</string>
+    <string name="smart_backlight_setup_ready">Always on — set up once, survives reboots.</string>
+    <string name="smart_backlight_blocked_wireless_debugging">Wireless debugging is off, so the backlight setting cannot be applied. Android turns it off after a restart — turn it back on in Developer options.</string>
+    <string name="smart_backlight_last_error">Last attempt failed: %1$s</string>
+    <string name="backlight_tile_label">Keyboard light</string>
+    <string name="backlight_tile_no_permission_subtitle">Needs ADB grant</string>
+    <string name="smart_backlight_enable_description">Keeps the keyboard backlight on whenever the screen is on. Needs the device setup above once, and survives reboots.</string>
+    <string name="smart_backlight_not_on_device">Your phone is no longer holding the always-on setting — a system update or another app reset it. The backlight will time out until it is applied again.</string>
+    <string name="smart_backlight_reapply">Apply again</string>
+    <string name="backlight_tile_permission_missing">The keyboard light tile needs a permission that the device setup grants. Open Titan 2 Elite tools in Pastiera settings and finish the device setup.</string>
+    <string name="kw_titan2_elite_tools_smart_backlight">keyboard backlight, keyboard light, led, backlight, dark, timeout, 30 seconds, always on, tile, quick settings</string>
 </resources>

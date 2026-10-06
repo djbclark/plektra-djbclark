@@ -1586,4 +1586,14 @@ Jede Taste kann als Keycode, Aktion, Native Ctrl oder Keine konfiguriert werden.
     <string name="device_setup_open_pairing">Drahtloses Debugging öffnen</string>
     <string name="device_setup_dnd_on">„Bitte nicht stören“ ist an und kann den Kopplungscode verbergen. Schalte es aus, bis du gekoppelt bist.</string>
     <string name="device_setup_needs_notifications">Erlaube zuerst Pastiera-Benachrichtigungen – der Kopplungscode kommt als eine solche an.</string>
+
+    <!-- djb/backlight: carried from PhysiBoard, unchanged strings only -->
+    <string name="smart_backlight_title">Smarte Tastaturbeleuchtung</string>
+    <string name="smart_backlight_row_description">Tastatur im Dunkeln beleuchtet lassen, über das 30-s-Limit hinaus</string>
+    <string name="smart_backlight_enable_title">Smarte Beleuchtung</string>
+    <string name="smart_backlight_setup_ready">Immer an – einmal eingerichtet, übersteht Neustarts.</string>
+    <string name="smart_backlight_blocked_wireless_debugging">Drahtlos-Debugging ist aus, daher lässt sich die Tastenbeleuchtung nicht einstellen. Android schaltet es nach einem Neustart ab — aktiviere es wieder in den Entwickleroptionen.</string>
+    <string name="smart_backlight_last_error">Letzter Versuch fehlgeschlagen: %1$s</string>
+    <string name="backlight_tile_label">Tastaturlicht</string>
+    <string name="backlight_tile_no_permission_subtitle">Braucht ADB-Freigabe</string>
 </resources>

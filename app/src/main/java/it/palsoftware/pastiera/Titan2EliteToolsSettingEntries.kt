@@ -28,6 +28,15 @@ internal fun titan2EliteToolsSettingEntries(): List<SettingEntry> = listOf(
         route = SettingRoute(SettingsDestination.Titan2EliteTools),
         availabilityCheck = titan2EliteOnly,
         unavailableFallbackId = SettingLinkIds.MAIN_ADVANCED
+    ),
+    // djb/backlight: smart keyboard backlight
+    SettingEntry(
+        id = SettingLinkIds.TITAN2_ELITE_TOOLS_SMART_BACKLIGHT,
+        titleRes = R.string.smart_backlight_title,
+        summaryRes = R.string.smart_backlight_row_description,
+        route = SettingRoute(SettingsDestination.Titan2EliteTools),
+        availabilityCheck = titan2EliteOnly,
+        unavailableFallbackId = SettingLinkIds.MAIN_ADVANCED
     )
 )
 

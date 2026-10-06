@@ -295,6 +295,18 @@
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
 
+        <!-- djb/backlight: Quick Settings tile for the Titan 2 Elite keyboard backlight -->
+        <service
+            android:name="it.palsoftware.pastiera.KeyboardBacklightTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_lightbulb_24"
+            android:label="@string/backlight_tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
         <!-- Shizuku provider -->
         <provider
             android:name="rikka.shizuku.ShizukuProvider"

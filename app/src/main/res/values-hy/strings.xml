@@ -1005,4 +1005,14 @@ Nav Mode-ը օգտագործում է ստեղնի ֆիզիկական դիրքը
     <string name="device_setup_open_pairing">Բացել անլար վրիպազերծումը</string>
     <string name="device_setup_dnd_on">«Չանհանգստացնել» ռեժիմը միացված է և կարող է թաքցնել զուգակցման կոդը։ Անջատեք այն մինչև զուգակցվելը։</string>
     <string name="device_setup_needs_notifications">Նախ թույլատրեք Pastiera-ի ծանուցումները՝ զուգակցման կոդը հասնում է որպես ծանուցում։</string>
+
+    <!-- djb/backlight: carried from PhysiBoard, unchanged strings only -->
+    <string name="smart_backlight_title">Ստեղնաշարի խելացի լուսավորում</string>
+    <string name="smart_backlight_row_description">Պահել ստեղնաշարը լուսավորված մթության մեջ՝ 30 վրկ սահմանից հետո էլ</string>
+    <string name="smart_backlight_enable_title">Խելացի լուսավորում</string>
+    <string name="smart_backlight_setup_ready">Միշտ միացած՝ մեկ անգամ կարգաբերված, պահպանվում է վերագործարկումներից հետո։</string>
+    <string name="smart_backlight_blocked_wireless_debugging">Անլար վրիպազերծումն անջատված է, ուստի ստեղնաշարի լուսավորության կարգավորումը հնարավոր չէ կիրառել։ Android-ը այն անջատում է վերագործարկումից հետո — միացրեք այն կրկին մշակողի ընտրանքներում։</string>
+    <string name="smart_backlight_last_error">Վերջին փորձը ձախողվեց՝ %1$s</string>
+    <string name="backlight_tile_label">Ստեղնաշարի լույս</string>
+    <string name="backlight_tile_no_permission_subtitle">Պահանջում է ADB թույլտվություն</string>
 </resources>

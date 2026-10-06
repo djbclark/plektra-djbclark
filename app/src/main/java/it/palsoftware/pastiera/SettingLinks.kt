@@ -28,6 +28,8 @@ object SettingLinkIds {
     // djb/broker: Titan 2 Elite tools screen and its rows (see Titan2EliteToolsSettingEntries.kt)
     const val MAIN_TITAN2_ELITE_TOOLS = "main.titan2_elite_tools"
     const val TITAN2_ELITE_TOOLS_DEVICE_SETUP = "titan2_elite_tools.device_setup"
+    // djb/backlight: smart keyboard backlight row on the Titan 2 Elite tools screen
+    const val TITAN2_ELITE_TOOLS_SMART_BACKLIGHT = "titan2_elite_tools.smart_backlight"
 
     // Text input screen
     const val TEXT_INPUT_TEXT_EXPANSION = "text_input.text_expansion"
@@ -1027,6 +1029,8 @@ object SettingLinkRegistry {
         // djb/broker: Titan 2 Elite tools keywords
         SettingLinkIds.MAIN_TITAN2_ELITE_TOOLS to R.string.kw_main_titan2_elite_tools,
         SettingLinkIds.TITAN2_ELITE_TOOLS_DEVICE_SETUP to R.string.kw_titan2_elite_tools_device_setup,
+        // djb/backlight: smart keyboard backlight keywords
+        SettingLinkIds.TITAN2_ELITE_TOOLS_SMART_BACKLIGHT to R.string.kw_titan2_elite_tools_smart_backlight,
         SettingLinkIds.TEXT_INPUT_AUTO_SPACE_PUNCTUATION to R.string.kw_text_input_auto_space_punctuation,
         SettingLinkIds.TEXT_INPUT_SPACED_HYPHEN_TO_EN_DASH to R.string.kw_text_input_spaced_hyphen,
         SettingLinkIds.TEXT_INPUT_SMART_QUOTES to R.string.kw_text_input_smart_quotes,
