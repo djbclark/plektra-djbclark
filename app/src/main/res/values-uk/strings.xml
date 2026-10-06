@@ -892,4 +892,14 @@ Ctrl-ярлики застосунків із урахуванням розкл�
     <string name="device_setup_open_pairing">Відкрити Бездротове налагодження</string>
     <string name="device_setup_dnd_on">Увімкнено режим «Не турбувати», який може приховати код сполучення. Вимкніть його, поки не сполучитеся.</string>
     <string name="device_setup_needs_notifications">Спершу дозвольте сповіщення Pastiera — код сполучення надходить як сповіщення.</string>
+
+    <!-- djb/backlight: carried from PhysiBoard, unchanged strings only -->
+    <string name="smart_backlight_title">Розумне підсвічування клавіатури</string>
+    <string name="smart_backlight_row_description">Тримати клавіатуру підсвіченою в темряві довше за ліміт у 30 с</string>
+    <string name="smart_backlight_enable_title">Розумне підсвічування</string>
+    <string name="smart_backlight_setup_ready">Завжди увімкнено — налаштовано один раз, зберігається після перезавантаження.</string>
+    <string name="smart_backlight_blocked_wireless_debugging">Бездротове налагодження вимкнено, тому налаштування підсвічування не застосувати. Android вимикає його після перезавантаження — увімкніть його знову в параметрах розробника.</string>
+    <string name="smart_backlight_last_error">Остання спроба не вдалася: %1$s</string>
+    <string name="backlight_tile_label">Підсвічування клавіатури</string>
+    <string name="backlight_tile_no_permission_subtitle">Потрібен дозвіл через ADB</string>
 </resources>

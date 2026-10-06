@@ -6278,4 +6278,21 @@ object SettingsManager {
             else -> ENTER_ADDITIONAL_SEND_SHORTCUT_NONE
         }
     }
+
+    // djb/backlight: smart keyboard backlight (Titan 2 Elite). The matching "written to the phone"
+    // state is device state, not a setting, so it lives in PrivilegedDiagnostics (backup-excluded).
+    private const val KEY_SMART_BACKLIGHT_ENABLED = "smart_backlight_enabled"
+    private const val DEFAULT_SMART_BACKLIGHT_ENABLED = false
+
+    /**
+     * Smart keyboard backlight: keep the keyboard lit past the vendor's 30 s limit. Needs the
+     * embedded ADB broker once, to write the vendor timeout.
+     */
+    fun getSmartBacklightEnabled(context: Context): Boolean {
+        return getPreferences(context).getBoolean(KEY_SMART_BACKLIGHT_ENABLED, DEFAULT_SMART_BACKLIGHT_ENABLED)
+    }
+
+    fun setSmartBacklightEnabled(context: Context, enabled: Boolean) {
+        getPreferences(context).edit().putBoolean(KEY_SMART_BACKLIGHT_ENABLED, enabled).apply()
+    }
 }

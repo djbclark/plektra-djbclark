@@ -381,6 +381,7 @@ internal object BackupPreferenceContract {
             "custom_input_styles" to PreferenceValueType.STRING,
             "titan2_layout_enabled" to PreferenceValueType.BOOLEAN,
             "titan2_elite_rounded_corner_insets" to PreferenceValueType.BOOLEAN,
+            "smart_backlight_enabled" to PreferenceValueType.BOOLEAN, // djb/backlight
             "titan2_elite_fill_bottom_corners" to PreferenceValueType.BOOLEAN,
             "titan2_elite_top_corner_multiplier" to PreferenceValueType.INT,
             "titan2_elite_max_icon_shrink" to PreferenceValueType.INT,
