@@ -6,6 +6,7 @@ import android.util.Log
 import android.widget.Toast
 import it.palsoftware.pastiera.inputmethod.DeviceSpecific
 import it.palsoftware.pastiera.inputmethod.KeyboardBacklightManager
+import it.palsoftware.pastiera.ring.RingBacklight
 
 /**
  * Quick Settings tile that toggles the Unihertz keyboard backlight
@@ -18,11 +19,8 @@ import it.palsoftware.pastiera.inputmethod.KeyboardBacklightManager
  *
  * Only offered on the Titan 2 Elite, where the vendor row exists.
  *
- * djb/backlight: two other groups hook in here. The ring group's "keyboard dark while the ring is
- * lit" may have the switch turned off when the user taps, and should hand the tile the value the
- * user actually had (see [KeyboardBacklightManager.writeKeyboardLightSwitch]); the toolbox group's
- * "reset to stock" may want the original value captured before the first write. Neither exists in
- * this tree yet, so the tile toggles the live value.
+ * The ring's "keyboard dark while lit" may hold the switch at 0 when the user taps; the tile then
+ * toggles from the value the user really had ([RingBacklight.takeUserValueIfSuppressed]).
  */
 class KeyboardBacklightTileService : TileService() {
 
@@ -46,7 +44,12 @@ class KeyboardBacklightTileService : TileService() {
             updateTile()
             return
         }
-        val newValue = if (readBacklightEnabled()) {
+        // While the ring holds the keyboard dark, the switch reads 0; toggle from the value the
+        // user really had, and take the switch back from the ring so it does not undo this write.
+        val userValue = RingBacklight.takeUserValueIfSuppressed(this)
+        val currentlyLit = userValue?.let { it == KeyboardBacklightManager.KEYBOARD_LIGHT_ON }
+            ?: readBacklightEnabled()
+        val newValue = if (currentlyLit) {
             KeyboardBacklightManager.KEYBOARD_LIGHT_OFF
         } else {
             KeyboardBacklightManager.KEYBOARD_LIGHT_ON
