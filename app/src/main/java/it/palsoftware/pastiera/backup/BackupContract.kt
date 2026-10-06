@@ -362,6 +362,12 @@ internal object BackupPreferenceContract {
             "trackpad_delete_swipe_threshold" to PreferenceValueType.FLOAT,
             "trackpad_provider" to PreferenceValueType.STRING,
             "trackpad_shizuku_device" to PreferenceValueType.STRING,
+            // djb/screen-trackpad: screen trackpad prefs
+            "screen_trackpad_enabled" to PreferenceValueType.BOOLEAN,
+            "screen_trackpad_trigger_key" to PreferenceValueType.STRING,
+            "screen_trackpad_activation" to PreferenceValueType.STRING,
+            "screen_trackpad_step_px" to PreferenceValueType.INT,
+            "screen_trackpad_show_hint" to PreferenceValueType.BOOLEAN,
             "pastierina_mode_override" to PreferenceValueType.STRING,
             "software_keyboard_mode" to PreferenceValueType.STRING,
             "physical_keyboard_profile_override" to PreferenceValueType.STRING,

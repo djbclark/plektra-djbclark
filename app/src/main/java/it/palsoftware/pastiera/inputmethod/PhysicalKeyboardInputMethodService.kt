@@ -323,6 +323,9 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
     private val clicksPowerButtonEventMapper = ClicksPowerButtonEventMapper()
     private var dispatchingClicksAccessibilityKeyEvent = false
     private var replayingProtectedNumberKey = false
+    // djb/screen-trackpad: a replayed trigger key bypasses the key filters that already saw it
+    private var screenTrackpadReplaying = false
+    private lateinit var screenTrackpadController: ScreenTrackpadController
     private val uiHandler = Handler(Looper.getMainLooper())
     private var inputManager: InputManager? = null
     private var lastObservedAutoSoftwareKeyboardMode: SettingsManager.SoftwareKeyboardMode? = null
@@ -1684,6 +1687,14 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         inputEventRouter = InputEventRouter(this, navModeController).apply {
             onCommitText = { markSelectionUpdateSkipAfterCommit() }
         }
+        // djb/screen-trackpad: overlay trackpad controller
+        screenTrackpadController = ScreenTrackpadController(
+            service = this,
+            handler = uiHandler,
+            inputConnectionProvider = { currentInputConnection },
+            isShiftActive = { isShiftModifierActive(null) },
+            replayKey = { keyCode, downEvent, upEvent -> replayScreenTrackpadTriggerKey(keyCode, downEvent, upEvent) }
+        )
         typingSoundPlayer = TypingSoundPlayer(this).apply { reload() }
         textInputController = TextInputController(
             context = this,
@@ -2758,6 +2769,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
     }
     
     override fun onDestroy() {
+        if (::screenTrackpadController.isInitialized) screenTrackpadController.deactivate() // djb/screen-trackpad
         ClicksAccessibilityKeyBridge.unregister(this)
         clicksPowerShiftTapFilter.reset()
         accidentalKeyPressFilter.reset()
@@ -4058,6 +4070,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         pendingKeyboardSurfaceTransition?.let(uiHandler::removeCallbacks)
         pendingKeyboardSurfaceTransition = null
         super.onWindowHidden()
+        if (::screenTrackpadController.isInitialized) screenTrackpadController.deactivate() // djb/screen-trackpad
         if (::candidatesBarController.isInitialized) {
             candidatesBarController.dismissEmojiPickerPopups()
         }
@@ -4305,6 +4318,29 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         )
     }
 
+    // djb/screen-trackpad: re-dispatch a swallowed trigger key that turned out to be a tap or a chord
+    /**
+     * Re-dispatches a trigger key that the screen trackpad swallowed but that turned out to be a
+     * plain tap (or a chord), so it gets its normal behaviour. [upEvent] is null when only the
+     * down must be replayed (the real up will follow through the normal path).
+     */
+    private fun replayScreenTrackpadTriggerKey(keyCode: Int, downEvent: KeyEvent, upEvent: KeyEvent?) {
+        screenTrackpadReplaying = true
+        try {
+            val downHandled = onKeyDown(keyCode, downEvent)
+            if (downHandled) {
+                if (upEvent != null) onKeyUp(keyCode, upEvent)
+            } else {
+                currentInputConnection?.let { inputConnection ->
+                    inputConnection.sendKeyEvent(downEvent)
+                    if (upEvent != null) inputConnection.sendKeyEvent(upEvent)
+                }
+            }
+        } finally {
+            screenTrackpadReplaying = false
+        }
+    }
+
     private fun replayProtectedNumberKey(
         keyCode: Int,
         replay: AccidentalKeyPressFilter.KeyUpResult.ReplayTap
@@ -4365,7 +4401,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
     override fun onKeyDown(keyCode_: Int, event_: KeyEvent?): Boolean {
         val perfStart = ImePerfLogger.mark()
         try {
-        if (!replayingProtectedNumberKey) {
+        if (!replayingProtectedNumberKey && !screenTrackpadReplaying) {
             val accidentalInput = accidentalKeyInput(keyCode_, event_)
             accidentalKeyPressFilter.shouldConsumeKeyDown(
                 keyCode = keyCode_,
@@ -4390,7 +4426,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         }
         val keyCode = remapped.keyCode
         val event = remapped.event
-        clicksPowerShiftTapFilter.shouldConsumeKeyDown(
+        if (!screenTrackpadReplaying) clicksPowerShiftTapFilter.shouldConsumeKeyDown(
             isClicksPowerKeyboard = DeviceSpecific.resolveInputProfile(
                 event,
                 physicalKeyboardProfileOverride
@@ -4407,7 +4443,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             )
             return true
         }
-        bounceKeyFilter.shouldConsumeKeyDown(this, keyCode, event)?.let { suppressed ->
+        if (!screenTrackpadReplaying) bounceKeyFilter.shouldConsumeKeyDown(this, keyCode, event)?.let { suppressed ->
             notifyDebugKeyEvent(
                 keyCode = keyCode,
                 event = event,
@@ -4415,6 +4451,12 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
                 origin = "bounce_keys",
                 outputKeyCodeName = suppressed.debugOutput()
             )
+            return true
+        }
+        // djb/screen-trackpad: trigger key handling (hold / tap activation)
+        if (!screenTrackpadReplaying && ::screenTrackpadController.isInitialized &&
+            screenTrackpadController.onKeyDown(keyCode, event, keyCode_, event_)
+        ) {
             return true
         }
 
@@ -5085,7 +5127,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
     }
 
     override fun onKeyUp(keyCode_: Int, event_: KeyEvent?): Boolean {
-        if (!replayingProtectedNumberKey) {
+        if (!replayingProtectedNumberKey && !screenTrackpadReplaying) {
             when (val result = accidentalKeyPressFilter.onKeyUp(keyCode_, event_)) {
                 is AccidentalKeyPressFilter.KeyUpResult.Suppressed -> {
                     notifyDebugKeyEvent(
@@ -5112,7 +5154,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             consumeAltEnterUntilKeyUp = false
             return true
         }
-        clicksPowerShiftTapFilter.shouldConsumeKeyUp(keyCode, event)?.let { suppressed ->
+        if (!screenTrackpadReplaying) clicksPowerShiftTapFilter.shouldConsumeKeyUp(keyCode, event)?.let { suppressed ->
             notifyDebugKeyEvent(
                 keyCode = keyCode,
                 event = event,
@@ -5122,7 +5164,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             )
             return true
         }
-        bounceKeyFilter.shouldConsumeKeyUp(keyCode, event)?.let { suppressed ->
+        if (!screenTrackpadReplaying) bounceKeyFilter.shouldConsumeKeyUp(keyCode, event)?.let { suppressed ->
             notifyDebugKeyEvent(
                 keyCode = keyCode,
                 event = event,
@@ -5130,6 +5172,12 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
                 origin = "bounce_keys",
                 outputKeyCodeName = suppressed.debugOutput()
             )
+            return true
+        }
+        // djb/screen-trackpad: trigger key release (replays a plain tap)
+        if (!screenTrackpadReplaying && ::screenTrackpadController.isInitialized &&
+            screenTrackpadController.onKeyUp(keyCode, event, keyCode_, event_)
+        ) {
             return true
         }
 

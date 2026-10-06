@@ -877,4 +877,33 @@ Ctrl-ярлики застосунків із урахуванням розкл�
     <string name="app_raw_mode_row_description">Для терміналів, SSH і коду: що ввели, те й потрапляє в поле, без виправлень і великих літер</string>
     <string name="app_raw_mode_description">У вибраних тут застосунках Pastiera надсилає кожне натискання як є: без пропозицій, без автокорекції, без великої літери на початку рядка, без крапки від подвійного пробілу. Призначено для терміналів, SSH-клієнтів, редакторів коду й усього іншого, де корисне виправлення перетворює команду на помилку — `ls -la` ніколи не має ставати `Ls -la.`</string>
     <string name="app_raw_mode_webapk_note">Вебзастосунок — вводить усередині %1$s, тож %1$s також виключено</string>
+    <!-- djb/screen-trackpad: screen trackpad strings -->
+    <string name="screen_trackpad_title">Екранний трекпад</string>
+    <string name="screen_trackpad_description">Утримуйте клавішу й проводьте будь-де по екрану, щоб переміщати курсор</string>
+    <string name="screen_trackpad_enabled_title">Увімкнути екранний трекпад</string>
+    <string name="screen_trackpad_enabled_description">Перетворює весь дисплей на трекпад для курсора, поки активна клавіша-тригер</string>
+    <string name="screen_trackpad_permission_title">Показ поверх інших застосунків</string>
+    <string name="screen_trackpad_permission_description">Потрібно, щоб трекпад міг перехоплювати свайпи поверх поточного застосунку</string>
+    <string name="screen_trackpad_permission_granted">Дозвіл надано</string>
+    <string name="screen_trackpad_permission_missing">Дозвіл не надано — торкніться, щоб відкрити системні налаштування</string>
+    <string name="screen_trackpad_permission_toast">Екранному трекпаду потрібен дозвіл “Показ поверх інших застосунків”. Увімкніть його в налаштуваннях Pastiera.</string>
+    <string name="screen_trackpad_trigger_key_title">Клавіша-тригер</string>
+    <string name="screen_trackpad_trigger_space">Пробіл</string>
+    <string name="screen_trackpad_trigger_shift_left">Лівий Shift</string>
+    <string name="screen_trackpad_trigger_shift_right">Правий Shift</string>
+    <string name="screen_trackpad_trigger_shift_either">Будь-який Shift</string>
+    <string name="screen_trackpad_trigger_sym">Sym</string>
+    <string name="screen_trackpad_activation_title">Активація</string>
+    <string name="screen_trackpad_activation_hold">Утримання (активний, поки утримується)</string>
+    <string name="screen_trackpad_activation_double_tap">Подвійне натискання (активний до повторного натискання)</string>
+    <string name="screen_trackpad_activation_single_tap">Одне натискання (активний до повторного натискання)</string>
+    <string name="screen_trackpad_activation_hold_note">Швидке натискання все одно вводить клавішу як зазвичай. Утримуйте Shift під час свайпу, щоб виділяти текст.</string>
+    <string name="screen_trackpad_activation_sticky_note">Натисніть клавішу-тригер, клавішу Назад або екранну «пігулку», щоб вийти. Одне натискання повністю перехоплює клавішу — використовуйте лише з клавішею, якою не друкуєте.</string>
+    <string name="screen_trackpad_sensitivity_title">Чутливість</string>
+    <string name="screen_trackpad_sensitivity_description">Пікселів свайпу на крок курсора — менше означає швидше</string>
+    <string name="screen_trackpad_hint_enabled_title">Показувати екранну підказку</string>
+    <string name="screen_trackpad_hint_enabled_description">Маленька «пігулка» вгорі екрана, поки трекпад активний</string>
+    <string name="screen_trackpad_hint_cursor">✥ Курсор</string>
+    <string name="screen_trackpad_hint_select">⇧ Виділення</string>
+    <string name="screen_trackpad_hint_sticky">✥ Курсор · торкніться, щоб вийти</string>
 </resources>
