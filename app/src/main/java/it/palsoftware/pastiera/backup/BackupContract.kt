@@ -251,6 +251,10 @@ internal object BackupPreferenceContract {
             "keyboard_theme_layout_overrides_hardware" to PreferenceValueType.STRING,
             "keyboard_theme_layout_overrides_software" to PreferenceValueType.STRING,
             "modifier_indicator_mode" to PreferenceValueType.STRING,
+            // djb/caret-badge: modifier badge beside the text cursor
+            "caret_modifier_badge" to PreferenceValueType.BOOLEAN,
+            "caret_badge_armed_color" to PreferenceValueType.INT,
+            "caret_badge_locked_color" to PreferenceValueType.INT,
             "auto_show_keyboard" to PreferenceValueType.BOOLEAN,
             "accessibility_live_announcements_enabled" to PreferenceValueType.BOOLEAN,
             "accessibility_read_second_row_enabled" to PreferenceValueType.BOOLEAN,

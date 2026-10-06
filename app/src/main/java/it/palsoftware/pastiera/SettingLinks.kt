@@ -148,6 +148,11 @@ object SettingLinkIds {
     const val MODIFIERS_INDICATOR_BOTTOM_STRIP = "modifiers.indicator_bottom_strip"
     const val MODIFIERS_INDICATOR_MENU_BAR = "modifiers.indicator_menu_bar"
     const val MODIFIERS_INDICATOR_STATUS_BAR = "modifiers.indicator_status_bar"
+
+    // djb/caret-badge: modifier badge beside the text cursor (rendered on the modifiers screen)
+    const val MODIFIERS_CARET_BADGE = "modifiers.caret_badge"
+    const val MODIFIERS_CARET_BADGE_ARMED_COLOR = "modifiers.caret_badge_armed_color"
+    const val MODIFIERS_CARET_BADGE_LOCKED_COLOR = "modifiers.caret_badge_locked_color"
 }
 
 /**
@@ -905,6 +910,26 @@ object SettingLinkRegistry {
             R.string.modifier_indicators_status_bar,
             R.string.modifier_indicators_status_bar_description,
             destination = SettingsDestination.Modifiers
+        ),
+
+        // djb/caret-badge: modifier badge beside the text cursor (rendered on the modifiers screen)
+        entry(
+            SettingLinkIds.MODIFIERS_CARET_BADGE,
+            R.string.caret_modifier_badge_title,
+            R.string.caret_modifier_badge_description,
+            destination = SettingsDestination.Modifiers
+        ),
+        entry(
+            SettingLinkIds.MODIFIERS_CARET_BADGE_ARMED_COLOR,
+            R.string.caret_badge_color_armed,
+            R.string.caret_badge_color_armed_description,
+            destination = SettingsDestination.Modifiers
+        ),
+        entry(
+            SettingLinkIds.MODIFIERS_CARET_BADGE_LOCKED_COLOR,
+            R.string.caret_badge_color_locked,
+            R.string.caret_badge_color_locked_description,
+            destination = SettingsDestination.Modifiers
         )
     ) + customizationSettingEntries() + inputDeviceSettingEntries() + systemSettingEntries()
 
@@ -961,7 +986,9 @@ object SettingLinkRegistry {
         SettingLinkIds.KEYBOARD_THEME_LED_COLORS to R.string.kw_theme_led_colors,
         SettingLinkIds.MODIFIERS_INDICATOR_BOTTOM_STRIP to R.string.kw_indicator_bottom_strip,
         SettingLinkIds.MODIFIERS_INDICATOR_MENU_BAR to R.string.kw_indicator_menu_bar,
-        SettingLinkIds.MODIFIERS_INDICATOR_STATUS_BAR to R.string.kw_indicator_status_bar
+        SettingLinkIds.MODIFIERS_INDICATOR_STATUS_BAR to R.string.kw_indicator_status_bar,
+        // djb/caret-badge
+        SettingLinkIds.MODIFIERS_CARET_BADGE to R.string.kw_caret_modifier_badge
     )
 
     fun byId(id: String): SettingEntry? = entriesById[id]
