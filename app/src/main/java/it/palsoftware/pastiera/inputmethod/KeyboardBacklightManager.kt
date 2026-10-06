@@ -100,31 +100,55 @@ object KeyboardBacklightManager {
             )
             return
         }
-        PrivilegedShell.runAsync {
-            val result = PrivilegedShell.run(appContext, PrivilegedCommand.WriteBacklightTimeout(timeout))
-            if (result.ok) {
-                PrivilegedDiagnostics.setBacklightApplied(
-                    appContext,
-                    timeout == PrivilegedCommand.BacklightTimeout.ALWAYS_ON
-                )
-                // Already off the main thread and already past the broker, so ask the phone what it
-                // holds now rather than assuming the write took.
-                PrivilegedDiagnostics.recordObservedBacklightValue(
-                    appContext,
-                    runCatching { readAppliedValue(appContext) }.getOrNull()
-                )
-            }
+        PrivilegedShell.runAsync { writeTimeoutNow(appContext, timeout) }
+    }
+
+    /**
+     * [revertToDefault] for a caller that needs the answer ("Reset to stock"): writes the stock 30 s
+     * timeout on the calling thread and reports how it went, with the same bookkeeping as the
+     * queued write. BLOCKING on the broker; call off the main thread, never from the IME's key path.
+     * There is no local API for this vendor row, so the broker's own result is all there is to
+     * report; the readback it records is informational.
+     */
+    internal fun revertToDefaultNow(context: Context): PrivilegedResult {
+        val appContext = context.applicationContext
+        PrivilegedDiagnostics.brokerBlocker(appContext)?.let { blocker ->
             PrivilegedDiagnostics.record(
+                appContext, PrivilegedDiagnostics.Step.BACKLIGHT, ok = false, reason = blocker
+            )
+            return PrivilegedResult(ok = false, output = null, failure = blocker)
+        }
+        return writeTimeoutNow(appContext, PrivilegedCommand.BacklightTimeout.STOCK)
+    }
+
+    private fun writeTimeoutNow(
+        appContext: Context,
+        timeout: PrivilegedCommand.BacklightTimeout
+    ): PrivilegedResult {
+        val result = PrivilegedShell.run(appContext, PrivilegedCommand.WriteBacklightTimeout(timeout))
+        if (result.ok) {
+            PrivilegedDiagnostics.setBacklightApplied(
                 appContext,
-                PrivilegedDiagnostics.Step.BACKLIGHT,
-                ok = result.ok,
-                reason = if (result.ok) {
-                    PrivilegedDiagnostics.REASON_OK
-                } else {
-                    result.failure ?: PrivilegedDiagnostics.REASON_SHELL_FAILED
-                }
+                timeout == PrivilegedCommand.BacklightTimeout.ALWAYS_ON
+            )
+            // Already off the main thread and already past the broker, so ask the phone what it
+            // holds now rather than assuming the write took.
+            PrivilegedDiagnostics.recordObservedBacklightValue(
+                appContext,
+                runCatching { readAppliedValue(appContext) }.getOrNull()
             )
         }
+        PrivilegedDiagnostics.record(
+            appContext,
+            PrivilegedDiagnostics.Step.BACKLIGHT,
+            ok = result.ok,
+            reason = if (result.ok) {
+                PrivilegedDiagnostics.REASON_OK
+            } else {
+                result.failure ?: PrivilegedDiagnostics.REASON_SHELL_FAILED
+            }
+        )
+        return result
     }
 
     // ---- the vendor on/off switch, in-process ---------------------------------------------------

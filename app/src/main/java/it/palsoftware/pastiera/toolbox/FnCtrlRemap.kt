@@ -5,6 +5,7 @@ import android.provider.Settings
 import android.util.Log
 import it.palsoftware.pastiera.inputmethod.EmbeddedAdbShell
 import it.palsoftware.pastiera.inputmethod.PrivilegedCommand
+import it.palsoftware.pastiera.inputmethod.PrivilegedSetup
 import it.palsoftware.pastiera.inputmethod.PrivilegedShell
 import moe.shizuku.manager.adb.EmbeddedAdbInit
 
@@ -15,8 +16,8 @@ import moe.shizuku.manager.adb.EmbeddedAdbInit
  * is INFERRED to mean Ctrl from a Titan 2 Elite that had Fn=Ctrl set; it may differ on other
  * firmware, and a reboot may be needed for it to take effect.
  *
- * The write goes through `Settings.System` when "Modify system settings" is granted, and
- * otherwise through the broker's typed [PrivilegedCommand.SetFnProgrammableKey]. Either way the
+ * The write goes through `Settings.System` when "Modify system settings" or WRITE_SECURE_SETTINGS is
+ * held (and the paired broker's typed [PrivilegedCommand.SetFnProgrammableKey] when that write did not take or neither is held). Either way the
  * result is confirmed by reading the two rows back through the Settings API, never from shell
  * output. The device's ORIGINAL values are captured once, before the first overwrite, so a reset
  * restores the exact prior state. The capture lives in the broker's preferences file
@@ -77,12 +78,15 @@ object FnCtrlRemap {
     }
 
     private fun write(context: Context, enable: Int, function: Int): Result {
-        if (Settings.System.canWrite(context)) {
+        // Either grant lets the app write the rows itself, with no broker round trip. A direct write
+        // that did not take falls through to the broker when one is paired, instead of failing.
+        if (PrivilegedSetup.canWriteSystemSettings(context)) {
             val ok = runCatching {
                 Settings.System.putInt(context.contentResolver, FN_KEY_ENABLE, enable)
                 Settings.System.putInt(context.contentResolver, FN_KEY_FUNCTION, function)
             }.getOrDefault(false)
-            return if (ok && readPair(context) == (enable to function)) Result.SUCCESS else Result.FAILED
+            if (ok && readPair(context) == (enable to function)) return Result.SUCCESS
+            if (!EmbeddedAdbShell.isPaired(context)) return Result.FAILED
         }
         if (EmbeddedAdbShell.isPaired(context)) {
             if (enable !in 0..PrivilegedCommand.SetFnProgrammableKey.MAX_VALUE ||

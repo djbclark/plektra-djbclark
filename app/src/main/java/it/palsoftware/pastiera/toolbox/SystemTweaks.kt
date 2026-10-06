@@ -5,7 +5,9 @@ import android.provider.Settings
 import android.util.Log
 import it.palsoftware.pastiera.inputmethod.EmbeddedAdbShell
 import it.palsoftware.pastiera.inputmethod.PrivilegedCommand
+import it.palsoftware.pastiera.inputmethod.PrivilegedResult
 import it.palsoftware.pastiera.inputmethod.PrivilegedShell
+import moe.shizuku.manager.adb.EmbeddedAdbInit
 
 /**
  * Small system settings that Android supports but this ROM never surfaces.
@@ -86,6 +88,9 @@ object SystemTweaks {
 
     fun setAnimationSpeed(context: Context, speed: AnimationSpeed): Boolean {
         if (!PrivilegedShell.run(context, PrivilegedCommand.SetAnimationSpeed(speed)).ok) return false
+        // Normal speed is the stock value; only a different one is a change to remember. Recorded
+        // before the readback below, which can reject a write that did land.
+        if (speed != AnimationSpeed.NORMAL) markChanged(context, true)
         // Public API, so this is a real second opinion rather than the shell agreeing with itself.
         val seen = runCatching {
             Settings.Global.getFloat(context.contentResolver, ANIMATION_KEYS.first())
@@ -104,10 +109,73 @@ object SystemTweaks {
      * Not read back: the key is a hidden setting this app may not be allowed to read, and an
      * unreadable key looks exactly like an unset one.
      */
-    fun setToggle(context: Context, toggle: Toggle, enabled: Boolean): Boolean =
-        PrivilegedShell.run(context, PrivilegedCommand.SetTweak(toggle, enabled)).ok
+    fun setToggle(context: Context, toggle: Toggle, enabled: Boolean): Boolean {
+        val ok = PrivilegedShell.run(context, PrivilegedCommand.SetTweak(toggle, enabled)).ok
+        // Off deletes the key, which is the shipped state; only turning one on is a change.
+        if (ok && enabled) markChanged(context, true)
+        return ok
+    }
 
     /** Everything on this screen back to how the phone shipped. */
-    fun resetAll(context: Context): Boolean =
-        PrivilegedShell.run(context, PrivilegedCommand.ResetSystemTweaks).ok
+    fun resetAll(context: Context): Boolean = resetAllWithReason(context).ok
+
+    /**
+     * [resetAll] with the reason it did not work. After the command the animation scales are read
+     * back through the Settings API (the toggles are hidden keys this app may not read, so they
+     * rest on the broker's own result). BLOCKING; off the main thread.
+     */
+    internal fun resetAllWithReason(context: Context): PrivilegedResult {
+        val result = PrivilegedShell.run(context, PrivilegedCommand.ResetSystemTweaks)
+        if (!result.ok) return result
+        if (localAnimationScales(context).any { it != null && kotlin.math.abs(it - 1f) > ANIMATION_TOLERANCE }) {
+            Log.w(TAG, "Animation scales still differ from stock after the reset")
+            return PrivilegedResult(ok = false, output = null, failure = "The phone did not report the change")
+        }
+        markChanged(context, false)
+        return result
+    }
+
+    // What "Reset to stock" asks. Local reads only, no broker: the animation scales are public
+    // globals; the two toggles are hidden keys, so a refused or empty read is "unknown", and the
+    // marker set by this app's own writes covers them.
+
+    /** True when a tweak this app made is, or may still be, in effect. */
+    fun isChanged(context: Context): Boolean = looksChanged(
+        animationScales = localAnimationScales(context),
+        toggleValues = Toggle.entries.map { localToggleValue(context, it) },
+        touchedByApp = EmbeddedAdbInit.prefs(context.applicationContext).getBoolean(KEY_CHANGED, false)
+    )
+
+    /**
+     * The decision behind [isChanged]: a marker from this app's own write, an animation scale away
+     * from 1.0, or a toggle that reads as on. Null reads are unknown and decide nothing.
+     */
+    internal fun looksChanged(
+        animationScales: List<Float?>,
+        toggleValues: List<String?>,
+        touchedByApp: Boolean
+    ): Boolean = touchedByApp ||
+        animationScales.any { it != null && kotlin.math.abs(it - 1f) > ANIMATION_TOLERANCE } ||
+        toggleValues.any { it == "1" }
+
+    private const val ANIMATION_TOLERANCE = 0.01f
+    private const val KEY_CHANGED = "toolbox_tweaks_changed"
+
+    internal fun markChanged(context: Context, changed: Boolean) {
+        EmbeddedAdbInit.prefs(context.applicationContext).edit().putBoolean(KEY_CHANGED, changed).apply()
+    }
+
+    private fun localAnimationScales(context: Context): List<Float?> = ANIMATION_KEYS.map { key ->
+        runCatching { Settings.Global.getFloat(context.contentResolver, key) }.getOrNull()
+    }
+
+    private fun localToggleValue(context: Context, toggle: Toggle): String? = runCatching {
+        val cr = context.contentResolver
+        when (toggle.namespace) {
+            "secure" -> Settings.Secure.getString(cr, toggle.key)
+            "global" -> Settings.Global.getString(cr, toggle.key)
+            "system" -> Settings.System.getString(cr, toggle.key)
+            else -> null
+        }
+    }.getOrNull()
 }

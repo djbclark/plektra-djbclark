@@ -5,7 +5,10 @@ import android.content.res.Resources
 import android.util.Log
 import it.palsoftware.pastiera.inputmethod.EmbeddedAdbShell
 import it.palsoftware.pastiera.inputmethod.PrivilegedCommand
+import it.palsoftware.pastiera.inputmethod.PrivilegedDiagnostics
+import it.palsoftware.pastiera.inputmethod.PrivilegedResult
 import it.palsoftware.pastiera.inputmethod.PrivilegedShell
+import moe.shizuku.manager.adb.EmbeddedAdbInit
 
 /**
  * Screen density, the most-asked-for Android tweak there is.
@@ -78,14 +81,43 @@ object DisplayDensity {
             Log.w(TAG, "Refusing density $density outside $allowed")
             return RevertibleChange.Outcome.Failed("Outside the safe range")
         }
-        return RevertibleChange.apply(context, RevertibleChange.Kind.DENSITY, PrivilegedCommand.SetDensity(density))
+        // Recorded before the command, like the revert itself: a change the app made but forgot is
+        // one "Reset to stock" could never offer to undo.
+        val alreadyChanged = isChangedByApp(context)
+        markChanged(context, true)
+        val outcome = RevertibleChange.apply(context, RevertibleChange.Kind.DENSITY, PrivilegedCommand.SetDensity(density))
+        if (outcome !is RevertibleChange.Outcome.Applied && !alreadyChanged) markChanged(context, false)
+        return outcome
     }
 
     /** Back to the panel's own density, with no confirmation window — this is always safe. */
-    fun reset(context: Context): Boolean {
-        if (!EmbeddedAdbShell.isPaired(context)) return false
-        val ok = PrivilegedShell.run(context, PrivilegedCommand.ResetDensity).ok
-        if (ok) RevertibleChange.keep(context)
-        return ok
+    fun reset(context: Context): Boolean = resetWithReason(context).ok
+
+    /** [reset] with the reason it did not work. BLOCKING; off the main thread. */
+    internal fun resetWithReason(context: Context): PrivilegedResult {
+        if (!EmbeddedAdbShell.isPaired(context)) {
+            return PrivilegedResult(ok = false, output = null, failure = PrivilegedDiagnostics.REASON_NOT_PAIRED)
+        }
+        val result = PrivilegedShell.run(context, PrivilegedCommand.ResetDensity)
+        if (result.ok) {
+            RevertibleChange.keep(context)
+            markChanged(context, false)
+        }
+        return result
     }
+
+    /**
+     * True while this app has applied a density override and not taken it back. The density itself
+     * cannot be compared to the panel's stock value without the broker, so "Reset to stock" asks
+     * this instead. Kept in the broker's backup-excluded preferences: it describes this phone.
+     */
+    fun isChangedByApp(context: Context): Boolean =
+        EmbeddedAdbInit.prefs(context.applicationContext).getBoolean(KEY_CHANGED, false)
+
+    /** Records that a density override is in force (true) or was put back (false). */
+    internal fun markChanged(context: Context, changed: Boolean) {
+        EmbeddedAdbInit.prefs(context.applicationContext).edit().putBoolean(KEY_CHANGED, changed).apply()
+    }
+
+    private const val KEY_CHANGED = "toolbox_density_changed"
 }
