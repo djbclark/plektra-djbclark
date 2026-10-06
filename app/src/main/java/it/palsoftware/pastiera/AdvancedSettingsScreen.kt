@@ -828,5 +828,12 @@ private val TRACKPAD_SETTING_LINK_IDS = setOf(
     SettingLinkIds.TRACKPAD_SENSITIVITY,
     SettingLinkIds.TRACKPAD_SUGGESTION_SWIPE_THRESHOLD,
     SettingLinkIds.TRACKPAD_DELETE_SWIPE_THRESHOLD,
-    SettingLinkIds.TRACKPAD_DEBUG
+    SettingLinkIds.TRACKPAD_DEBUG,
+    // djb/screen-trackpad: child page ids
+    SettingLinkIds.TRACKPAD_SCREEN_TRACKPAD,
+    SettingLinkIds.SCREEN_TRACKPAD_ENABLED,
+    SettingLinkIds.SCREEN_TRACKPAD_TRIGGER_KEY,
+    SettingLinkIds.SCREEN_TRACKPAD_ACTIVATION,
+    SettingLinkIds.SCREEN_TRACKPAD_SENSITIVITY,
+    SettingLinkIds.SCREEN_TRACKPAD_SHOW_HINT
 )
