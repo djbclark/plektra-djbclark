@@ -794,8 +794,10 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         uiHandler.removeCallbacks(symAssistRunnable)
     }
 
-    // Hook: djb/screen-trackpad makes this true while Sym is the screen trackpad trigger.
-    private fun symHoldClaimedByOtherFeature(): Boolean = false
+    // Sym is already claimed while it is the screen trackpad's trigger key.
+    private fun symHoldClaimedByOtherFeature(): Boolean =
+        SettingsManager.isScreenTrackpadEnabled(this) &&
+            SettingsManager.getScreenTrackpadTriggerKey(this) == SettingsManager.SCREEN_TRACKPAD_TRIGGER_SYM
 
     /**
      * Bumped on every onStartInput, so a deferred "the editor is gone" check can tell a real
