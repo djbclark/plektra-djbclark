@@ -27,6 +27,9 @@
     <!-- djb/sym-shortcuts: open the notification shade / quick settings from a key command -->
     <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
 
+    <!-- djb/voice: lets the orange side key's long-press slot (Settings.System func1_*) be pointed at the assistant trigger -->
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" tools:ignore="ProtectedPermissions" />
+
     <!-- Query per vedere tutte le app installate che possono essere avviate -->
     <queries>
         <intent>
@@ -45,6 +48,21 @@
         <package android:name="net.dinglisch.android.taskerm" />
         <package android:name="io.homeassistant.companion.android" />
         <package android:name="com.clicks.companionapp" />
+
+        <!-- djb/voice: dictation engine picker lists every installed speech recognition service -->
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <!-- djb/voice: hold Sym for the assistant resolves whichever voice-interaction intent it honours -->
+        <intent>
+            <action android:name="android.intent.action.VOICE_COMMAND" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.ASSIST" />
+        </intent>
+        <intent>
+            <action android:name="android.speech.action.VOICE_SEARCH_HANDS_FREE" />
+        </intent>
     </queries>
 
     <application
@@ -91,6 +109,19 @@
             </intent-filter>
         </activity>
         
+        <!-- djb/voice: the orange side key can only be aimed at an activity, so this is the address the
+             vendor layer launches; it starts the assistant listening and finishes. -->
+        <activity
+            android:name=".inputmethod.AssistantTriggerActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:finishOnTaskLaunch="true"
+            android:label="@string/side_key_assistant_title"
+            android:launchMode="singleInstance"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Pastiera.Trampoline" />
+
         <!-- Activity per la personalizzazione SYM -->
         <activity
             android:name=".SymCustomizationActivity"
