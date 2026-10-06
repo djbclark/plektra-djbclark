@@ -5,6 +5,7 @@ import android.content.Context
 import android.provider.Settings
 import android.util.Log
 import it.palsoftware.pastiera.inputmethod.AssistantTriggerActivity
+import it.palsoftware.pastiera.inputmethod.PrivilegedSetup
 
 /**
  * The Titan's orange side key ("func1").
@@ -121,7 +122,7 @@ object VendorSideKeyManager {
             Log.w(TAG, "Refusing to write an unsafe side-key value")
             return Outcome.FAILED
         }
-        if (Settings.System.canWrite(context)) {
+        if (PrivilegedSetup.canWriteSystemSettings(context)) {
             val ok = runCatching {
                 values.forEach { (key, value) ->
                     Settings.System.putString(context.contentResolver, key, value)
