@@ -892,4 +892,14 @@ Nav Mode использует физическое положение клави
     <string name="device_setup_open_pairing">Открыть отладку по Wi-Fi</string>
     <string name="device_setup_dnd_on">Включён режим «Не беспокоить», и он может скрыть код сопряжения. Выключите его до завершения сопряжения.</string>
     <string name="device_setup_needs_notifications">Сначала разрешите уведомления Plektra — код сопряжения приходит в виде уведомления.</string>
+
+    <!-- djb/backlight: carried from PhysiBoard, unchanged strings only -->
+    <string name="smart_backlight_title">Умная подсветка клавиатуры</string>
+    <string name="smart_backlight_row_description">Держать клавиатуру подсвеченной в темноте дольше 30-секундного лимита</string>
+    <string name="smart_backlight_enable_title">Умная подсветка</string>
+    <string name="smart_backlight_setup_ready">Всегда включена — настроено один раз, сохраняется после перезагрузки.</string>
+    <string name="smart_backlight_blocked_wireless_debugging">Беспроводная отладка выключена, поэтому настройку подсветки применить нельзя. Android отключает её после перезагрузки — включите её снова в параметрах разработчика.</string>
+    <string name="smart_backlight_last_error">Последняя попытка не удалась: %1$s</string>
+    <string name="backlight_tile_label">Подсветка клавиатуры</string>
+    <string name="backlight_tile_no_permission_subtitle">Нужно разрешение через ADB</string>
 </resources>

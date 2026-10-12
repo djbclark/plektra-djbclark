@@ -87,6 +87,9 @@ fun Titan2EliteToolsScreen(
             // djb/broker: add one section per feature below, each a composable in its own file
             // (backlight, ring, toolbox, ...). Register its settings in
             // Titan2EliteToolsSettingEntries.kt so search and deep links reach it.
+
+            // djb/backlight: smart keyboard backlight
+            SmartBacklightSection(modifier = Modifier.settingRow(SettingLinkIds.TITAN2_ELITE_TOOLS_SMART_BACKLIGHT))
         }
     }
 }

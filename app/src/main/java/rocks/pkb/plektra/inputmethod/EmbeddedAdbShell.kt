@@ -109,6 +109,17 @@ object EmbeddedAdbShell {
     }
 
     /**
+     * djb/backlight: [runShell], but returns the command's output (null when it did not run
+     * cleanly), read inside the broker lock so another caller cannot replace [lastResult] between
+     * the run and the read. Same rule as [runShell]: `internal`, and called only from
+     * [PrivilegedShell], which takes a typed [PrivilegedCommand] and never a free string.
+     */
+    internal fun runShellCapturing(context: Context, command: String): String? =
+        synchronized(brokerLock) {
+            if (runShellLocked(context, command)) lastResult.orEmpty() else null
+        }
+
+    /**
      * Serializes discovery + shell across callers: overlapping NsdManager discoveries for the
      * same service type fail silently, so two privileged steps started together (backlight
      * and overlay grant at IME start) would both see "no service found".
