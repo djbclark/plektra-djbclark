@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext // djb/toolbox
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -39,6 +40,14 @@ fun Titan2EliteToolsScreen(
     modifier: Modifier = Modifier,
     onBack: () -> Unit
 ) {
+    // djb/toolbox: a toolbox page opens as a child settings activity (ToolboxSection.kt) and
+    // replaces this list while it is showing.
+    val toolboxPage = ToolboxPage.fromChild(settingsChild(LocalContext.current, ToolboxPage.SECTION))
+    if (toolboxPage != null) {
+        ToolboxPageHost(page = toolboxPage, modifier = modifier, onBack = onBack)
+        return
+    }
+
     Scaffold(
         topBar = {
             Surface(
@@ -83,6 +92,9 @@ fun Titan2EliteToolsScreen(
             )
 
             DeviceSetupCard(modifier = Modifier.settingRow(SettingLinkIds.TITAN2_ELITE_TOOLS_DEVICE_SETUP))
+
+            // djb/toolbox: bloat remover, density, system tweaks, key mapping, Fn -> Ctrl, status bar, reset
+            ToolboxSection()
 
             // djb/broker: add one section per feature below, each a composable in its own file
             // (backlight, ring, toolbox, ...). Register its settings in
