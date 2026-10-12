@@ -56,6 +56,8 @@ fun TrackpadGestureSettingsScreen(
     }
     var showTutorialDialog by remember { mutableStateOf(false) }
     var showSensitivitySettings by remember { mutableStateOf(settingsChild(context, "trackpad") == "sensitivity") }
+    // child page (hold a key, swipe anywhere on the screen to move the cursor)
+    var showScreenTrackpadSettings by remember { mutableStateOf(settingsChild(context, "trackpad") == "screen") }
     var shizukuStatus by remember { mutableStateOf(ShizukuStatus.NotConnected) }
     var trackpadProvider by remember { mutableStateOf(SettingsManager.getTrackpadProvider(context)) }
     var providerMenuExpanded by remember { mutableStateOf(false) }
@@ -89,7 +91,18 @@ fun TrackpadGestureSettingsScreen(
             SettingLinkIds.TRACKPAD_PROVIDER,
             SettingLinkIds.TRACKPAD_SHIZUKU_DEVICE,
             SettingLinkIds.TRACKPAD_SENSITIVITY,
+            SettingLinkIds.TRACKPAD_SCREEN_TRACKPAD,
             SettingLinkIds.TRACKPAD_DEBUG -> showSensitivitySettings = false
+        }
+    }
+    // deep links to the child page's rows open it in place
+    LaunchedEffect(highlightedSettingId) {
+        when (highlightedSettingId) {
+            SettingLinkIds.SCREEN_TRACKPAD_ENABLED,
+            SettingLinkIds.SCREEN_TRACKPAD_TRIGGER_KEY,
+            SettingLinkIds.SCREEN_TRACKPAD_ACTIVATION,
+            SettingLinkIds.SCREEN_TRACKPAD_SENSITIVITY,
+            SettingLinkIds.SCREEN_TRACKPAD_SHOW_HINT -> showScreenTrackpadSettings = true
         }
     }
     LaunchedEffect(Unit) {
@@ -113,6 +126,15 @@ fun TrackpadGestureSettingsScreen(
                     shizukuDeviceDiscoveryFailed = true
                 }
         }
+    }
+
+    // the child page brings its own top bar
+    if (showScreenTrackpadSettings) {
+        ScreenTrackpadSettingsScreen(
+            modifier = modifier,
+            onBack = { context.settingsActivity().finish() }
+        )
+        return
     }
 
     Scaffold(
@@ -382,6 +404,15 @@ fun TrackpadGestureSettingsScreen(
                 linkId = SettingLinkIds.TRACKPAD_SENSITIVITY,
                 onClick = { openSettingsChild(context, "trackpad", "sensitivity") },
                 trailing = { SettingsValueText("${suggestionSwipeThreshold.toInt()} / ${deleteSwipeThreshold.toInt()}") }
+            )
+
+            // row opening the screen trackpad child page
+            SettingsNavigationRow(
+                title = stringResource(R.string.screen_trackpad_title),
+                description = stringResource(R.string.screen_trackpad_description),
+                icon = Icons.Filled.OpenWith,
+                linkId = SettingLinkIds.TRACKPAD_SCREEN_TRACKPAD,
+                onClick = { openSettingsChild(context, "trackpad", "screen") }
             )
 
             SettingsNavigationRow(
