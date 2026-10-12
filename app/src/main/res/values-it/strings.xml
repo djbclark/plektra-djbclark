@@ -1067,4 +1067,8 @@ Ogni tasto può essere configurato come Keycode, Azione, Native Ctrl o Nessuno. 
     <string name="device_setup_open_pairing">Apri Debug wireless</string>
     <string name="device_setup_dnd_on">Non disturbare è attivo e potrebbe nascondere il codice di associazione. Disattivalo finché l\'associazione non è completata.</string>
     <string name="device_setup_needs_notifications">Consenti prima le notifiche di Plektra: il codice di associazione arriva come notifica.</string>
+    <string name="app_raw_mode_title">Digitazione esatta</string>
+    <string name="app_raw_mode_row_description">Per terminali, SSH e codice: ciò che digiti è ciò che entra, senza correzioni né maiuscole</string>
+    <string name="app_raw_mode_description">Nelle app che scegli qui, Plektra invia ogni tasto così com\'è: niente suggerimenti, niente correzione automatica, niente maiuscola a inizio riga, niente punto dal doppio spazio. Pensato per terminali, client SSH, editor di codice e tutto ciò in cui una correzione ben intenzionata trasforma un comando in un errore: `ls -la` non deve mai diventare `Ls -la.`</string>
+    <string name="app_raw_mode_webapk_note">Web app: scrive dentro %1$s, quindi anche %1$s è escluso</string>
 </resources>

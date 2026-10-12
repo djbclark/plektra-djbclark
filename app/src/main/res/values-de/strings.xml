@@ -1639,4 +1639,8 @@ Jede Taste kann als Keycode, Aktion, Native Ctrl oder Keine konfiguriert werden.
     <string name="device_setup_open_pairing">Drahtloses Debugging öffnen</string>
     <string name="device_setup_dnd_on">„Bitte nicht stören“ ist an und kann den Kopplungscode verbergen. Schalte es aus, bis du gekoppelt bist.</string>
     <string name="device_setup_needs_notifications">Erlaube zuerst Plektra-Benachrichtigungen – der Kopplungscode kommt als eine solche an.</string>
+    <string name="app_raw_mode_title">Exaktes Tippen</string>
+    <string name="app_raw_mode_row_description">Für Terminals, SSH und Code: Was du tippst, kommt an – nichts wird korrigiert oder großgeschrieben</string>
+    <string name="app_raw_mode_description">In den hier ausgewählten Apps sendet Plektra jeden Tastendruck unverändert: keine Vorschläge, keine automatische Korrektur, kein Großbuchstabe am Zeilenanfang, kein Punkt durch doppeltes Leerzeichen. Gedacht für Terminals, SSH-Clients, Code-Editoren und alles andere, wo eine hilfreiche Korrektur aus einem Befehl einen Tippfehler macht – `ls -la` darf nie zu `Ls -la.` werden</string>
+    <string name="app_raw_mode_webapk_note">Web-App – tippt innerhalb von %1$s, daher ist %1$s ebenfalls ausgeschlossen</string>
 </resources>

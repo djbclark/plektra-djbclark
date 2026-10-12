@@ -892,4 +892,8 @@ Mỗi phím có thể cấu hình là Keycode, Action, Native Ctrl hoặc None. 
     <string name="device_setup_open_pairing">Mở Gỡ lỗi không dây</string>
     <string name="device_setup_dnd_on">Không làm phiền đang bật và có thể ẩn mã ghép nối. Hãy tắt cho tới khi ghép nối xong.</string>
     <string name="device_setup_needs_notifications">Cho phép thông báo của Plektra trước — mã ghép nối được gửi dưới dạng thông báo.</string>
+    <string name="app_raw_mode_title">Gõ chính xác</string>
+    <string name="app_raw_mode_row_description">Cho terminal, SSH và mã nguồn: gõ gì vào nấy, không sửa hay viết hoa</string>
+    <string name="app_raw_mode_description">Trong các ứng dụng bạn chọn ở đây, Plektra gửi nguyên từng phím bấm: không gợi ý, không sửa tự động, không viết hoa đầu dòng, không dấu chấm khi nhấn đúp dấu cách. Dành cho terminal, ứng dụng SSH, trình soạn mã và bất cứ nơi nào một sửa lỗi “hữu ích” biến lệnh thành lỗi gõ — `ls -la` không bao giờ được thành `Ls -la.`</string>
+    <string name="app_raw_mode_webapk_note">Ứng dụng web — gõ bên trong %1$s, nên %1$s cũng được loại trừ</string>
 </resources>
