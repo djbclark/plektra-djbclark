@@ -250,6 +250,12 @@ android {
     }
 
     buildTypes {
+        // djbclark private build: a debug build installs beside the official signed app.
+        debug {
+            applicationIdSuffix = ".djb"
+            manifestPlaceholders["appLabel"] = "Plektra djb"
+            manifestPlaceholders["imeLabel"] = "Plektra djb"
+        }
         release {
             isMinifyEnabled = true
             proguardFiles(
