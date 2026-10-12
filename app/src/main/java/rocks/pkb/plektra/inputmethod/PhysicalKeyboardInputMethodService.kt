@@ -2217,6 +2217,11 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             override fun onClipMoved(oldPosition: Int, newPosition: Int) {
                 postClipboardBadgeUpdate()
             }
+
+            // djb/small-fixes: clipboard history now loads off the main thread
+            override fun onHistoryLoaded() {
+                postClipboardBadgeUpdate()
+            }
         })
         clipboardHistoryManager.addAccessStateListener {
             uiHandler.post {
