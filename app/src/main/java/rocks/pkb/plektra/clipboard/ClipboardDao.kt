@@ -6,6 +6,7 @@ import android.os.SystemClock
 import android.util.Log
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Data Access Object for clipboard history.
@@ -108,15 +109,15 @@ class ClipboardDao private constructor(private val db: ClipboardDatabase) {
             }
             listener?.onClipMoved(oldPos, newPos)
 
-            val entryId = existing.id
             val cvSnapshot = ContentValues().apply {
                 put(COLUMN_TIMESTAMP, existing.timeStamp)
                 put(COLUMN_SENSITIVE, existing.isSensitive)
                 put(COLUMN_PINNED, existing.isPinned)
             }
             dbExecutor.execute {
-                if (entryId == PENDING_ID) return@execute
-                db.writableDatabase.update(TABLE, cvSnapshot, "$COLUMN_ID = ?", arrayOf(entryId.toString()))
+                val rowId = existing.rowId
+                if (rowId == PENDING_ID) return@execute
+                db.writableDatabase.update(TABLE, cvSnapshot, "$COLUMN_ID = ?", arrayOf(rowId.toString()))
             }
             return
         }
@@ -126,7 +127,7 @@ class ClipboardDao private constructor(private val db: ClipboardDatabase) {
 
     private fun insertNewEntry(timestamp: Long, pinned: Boolean, text: String, sensitive: Boolean) {
         val effectivePinned = pinned && !sensitive
-        val entry = ClipboardHistoryEntry(PENDING_ID, timestamp, effectivePinned, text, sensitive)
+        val entry = ClipboardHistoryEntry(nextPendingId.getAndDecrement(), timestamp, effectivePinned, text, sensitive)
         val position = synchronized(cache) {
             cache.add(entry)
             cache.sort()
@@ -141,7 +142,7 @@ class ClipboardDao private constructor(private val db: ClipboardDatabase) {
                 put(COLUMN_TEXT, text)
                 put(COLUMN_SENSITIVE, sensitive)
             }
-            entry.id = db.writableDatabase.insert(TABLE, null, cv)
+            entry.rowId = db.writableDatabase.insert(TABLE, null, cv)
         }
     }
 
@@ -173,14 +174,14 @@ class ClipboardDao private constructor(private val db: ClipboardDatabase) {
 
         val pinned = entry.isPinned
         val timestamp = entry.timeStamp
-        val entryId = entry.id
         dbExecutor.execute {
-            if (entryId == PENDING_ID) return@execute
+            val rowId = entry.rowId
+            if (rowId == PENDING_ID) return@execute
             val cv = ContentValues(2).apply {
                 put(COLUMN_PINNED, pinned)
                 put(COLUMN_TIMESTAMP, timestamp)
             }
-            db.writableDatabase.update(TABLE, cv, "$COLUMN_ID = $entryId", null)
+            db.writableDatabase.update(TABLE, cv, "$COLUMN_ID = $rowId", null)
         }
     }
 
@@ -188,10 +189,10 @@ class ClipboardDao private constructor(private val db: ClipboardDatabase) {
         val entry = synchronized(cache) {
             cache.getOrNull(index)?.also { cache.removeAt(index) }
         } ?: return
-        val entryId = entry.id
         dbExecutor.execute {
-            if (entryId == PENDING_ID) return@execute
-            db.writableDatabase.delete(TABLE, "$COLUMN_ID = $entryId", null)
+            val rowId = entry.rowId
+            if (rowId == PENDING_ID) return@execute
+            db.writableDatabase.delete(TABLE, "$COLUMN_ID = $rowId", null)
         }
     }
 
@@ -215,7 +216,7 @@ class ClipboardDao private constructor(private val db: ClipboardDatabase) {
         val normalCutoff = if (retentionMinutes > 0) currentTime - retentionMinutes * 60_000L else Long.MIN_VALUE
         val sensitiveCutoff = currentTime - sensitiveRetentionMinutes.coerceIn(1, 120) * 60_000L
 
-        val removed: List<Pair<Int, Long>>
+        val removed: List<Pair<Int, ClipboardHistoryEntry>>
         synchronized(cache) {
             val expired = cache.indices.filter { index ->
                 val clip = cache[index]
@@ -233,7 +234,7 @@ class ClipboardDao private constructor(private val db: ClipboardDatabase) {
                 return
             }
             removed = expired.asReversed().map { index ->
-                index to cache.removeAt(index).id
+                index to cache.removeAt(index)
             }
             nextExpiry = cache.minOfOrNull { clip ->
                 when {
@@ -245,9 +246,10 @@ class ClipboardDao private constructor(private val db: ClipboardDatabase) {
         }
         removed.forEach { (index, _) -> listener?.onClipsRemoved(index, 1) }
         dbExecutor.execute {
-            removed.forEach { (_, id) ->
-                if (id != PENDING_ID) {
-                    db.writableDatabase.delete(TABLE, "$COLUMN_ID = ?", arrayOf(id.toString()))
+            removed.forEach { (_, entry) ->
+                val rowId = entry.rowId
+                if (rowId != PENDING_ID) {
+                    db.writableDatabase.delete(TABLE, "$COLUMN_ID = ?", arrayOf(rowId.toString()))
                 }
             }
         }
@@ -282,6 +284,10 @@ class ClipboardDao private constructor(private val db: ClipboardDatabase) {
     companion object {
         private const val TAG = "ClipboardDao"
         const val PENDING_ID = -1L
+
+        // Handles for entries not yet stored. Each is unique, so a lookup by id can never
+        // reach a different pending entry (paste or pin the wrong, possibly sensitive, clip).
+        private val nextPendingId = AtomicLong(-2L)
 
         private val dbWorker = Executors.newSingleThreadExecutor()
 
