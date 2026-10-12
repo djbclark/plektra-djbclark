@@ -862,4 +862,34 @@ Nav Mode-ը օգտագործում է ստեղնի ֆիզիկական դիրքը
     <string name="settings_link_with_description">Նկարագրությամբ</string>
     <string name="settings_link_copied_toast">Հղումը պատճենվեց</string>
     <string name="settings_link_unavailable_toast">Այս կարգավորումը հասանելի չէ</string>
+
+    <!-- djb/broker: embedded wireless-ADB broker, pairing service, Titan 2 Elite tools screen -->
+    <string name="notification_channel_adb_pairing">ADB զուգակցում</string>
+    <string name="notification_adb_pairing_searching_for_service_title">Զուգակցման ծառայության որոնում…</string>
+    <string name="notification_adb_pairing_service_found_title">Զուգակցման ծառայությունը գտնվեց</string>
+    <string name="notification_adb_pairing_working_title">Զուգակցում…</string>
+    <string name="notification_adb_pairing_succeed_title">Զուգակցումը հաջողվեց</string>
+    <string name="notification_adb_pairing_succeed_text">Այս սարքն այժմ կարող է միանալ անլար վրիպազերծմանը։</string>
+    <string name="notification_adb_pairing_failed_title">Զուգակցումը ձախողվեց</string>
+    <string name="notification_adb_pairing_stop_searching">Կանգնեցնել</string>
+    <string name="notification_adb_pairing_retry">Կրկին փորձել</string>
+    <string name="notification_adb_pairing_input_paring_code">Մուտքագրեք զուգակցման կոդը</string>
+    <string name="dialog_adb_pairing_paring_code">Զուգակցման կոդ</string>
+    <string name="cannot_connect_port">Չհաջողվեց միանալ զուգակցման պորտին։</string>
+    <string name="paring_code_is_wrong">Զուգակցման կոդը սխալ է։</string>
+    <string name="adb_error_key_store">Չհաջողվեց մուտք գործել ADB բանալիների պահոց։</string>
+    <string name="device_setup_needed_title">Պահանջվում է կարգավորում</string>
+    <string name="device_setup_ready_title">Զուգակցված է</string>
+    <string name="device_setup_ready_body">Ստորև գործիքները կարող են հասնել համակարգին։ Պահպանվում է վերաբեռնումներից հետո։</string>
+    <string name="device_setup_step_dev_1">Բացեք Կարգավորումներ → Հեռախոսի մասին</string>
+    <string name="device_setup_step_dev_2">Յոթ անգամ հպեք Կառուցման համարին</string>
+    <string name="device_setup_step_dev_3">Վերադարձեք այստեղ</string>
+    <string name="device_setup_step_pair_1">Միացրեք անլար վրիպազերծումը</string>
+    <string name="device_setup_step_pair_2">Հպեք «Զուգակցել սարքը զուգակցման կոդով»</string>
+    <string name="device_setup_step_pair_3">Մուտքագրեք կոդը Plektra-ի ծանուցման մեջ</string>
+    <string name="device_setup_open_about">Բացել «Հեռախոսի մասին»</string>
+    <string name="device_setup_open_wireless">Բացել անլար վրիպազերծումը</string>
+    <string name="device_setup_open_pairing">Բացել անլար վրիպազերծումը</string>
+    <string name="device_setup_dnd_on">«Չանհանգստացնել» ռեժիմը միացված է և կարող է թաքցնել զուգակցման կոդը։ Անջատեք այն մինչև զուգակցվելը։</string>
+    <string name="device_setup_needs_notifications">Նախ թույլատրեք Plektra-ի ծանուցումները՝ զուգակցման կոդը հասնում է որպես ծանուցում։</string>
 </resources>
