@@ -90,5 +90,11 @@ object PrivilegedSetup {
                 }
             )
         }
+        // djb/ring: the notification ring's grants (notification access, full-screen intent, posting,
+        // and WRITE_SECURE_SETTINGS when "keep the keyboard dark" is on), in one broker connection.
+        // Only when the user turned the ring on; each grant that is already held is skipped.
+        if (rocks.pkb.plektra.SettingsManager.isNotificationRingEnabled(appContext)) {
+            rocks.pkb.plektra.ring.NotificationRingSetup.grantViaBroker(appContext)
+        }
     }
 }

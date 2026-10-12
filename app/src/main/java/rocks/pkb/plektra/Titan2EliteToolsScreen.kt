@@ -18,8 +18,15 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalContext // djb/toolbox
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -39,6 +46,32 @@ fun Titan2EliteToolsScreen(
     modifier: Modifier = Modifier,
     onBack: () -> Unit
 ) {
+    // djb/ring: the notification ring has its own page, shown instead of this screen. It opens as a
+    // settings child (the section row below), or here when a deep link or search hit names one of
+    // its rows.
+    val context = LocalContext.current
+    val openedAsRingChild = remember { settingsChild(context, T2E_TOOLS_CHILD_SECTION) == T2E_TOOLS_RING_PAGE }
+    var showRing by remember { mutableStateOf(openedAsRingChild) }
+    val highlightedSettingId = LocalSettingHighlightId.current
+    LaunchedEffect(highlightedSettingId) {
+        if (highlightedSettingId in notificationRingPageRowIds) showRing = true
+    }
+    if (showRing) {
+        NotificationRingScreen(
+            modifier = modifier,
+            onBack = { if (openedAsRingChild) context.settingsActivity().finish() else showRing = false }
+        )
+        return
+    }
+
+    // djb/toolbox: a toolbox page opens as a child settings activity (ToolboxSection.kt) and
+    // replaces this list while it is showing.
+    val toolboxPage = ToolboxPage.fromChild(settingsChild(LocalContext.current, ToolboxPage.SECTION))
+    if (toolboxPage != null) {
+        ToolboxPageHost(page = toolboxPage, modifier = modifier, onBack = onBack)
+        return
+    }
+
     Scaffold(
         topBar = {
             Surface(
@@ -84,12 +117,18 @@ fun Titan2EliteToolsScreen(
 
             DeviceSetupCard(modifier = Modifier.settingRow(SettingLinkIds.TITAN2_ELITE_TOOLS_DEVICE_SETUP))
 
+            // djb/toolbox: bloat remover, density, system tweaks, key mapping, Fn -> Ctrl, status bar, reset
+            ToolboxSection()
+
             // djb/broker: add one section per feature below, each a composable in its own file
             // (backlight, ring, toolbox, ...). Register its settings in
             // Titan2EliteToolsSettingEntries.kt so search and deep links reach it.
 
             // djb/backlight: smart keyboard backlight
             SmartBacklightSection(modifier = Modifier.settingRow(SettingLinkIds.TITAN2_ELITE_TOOLS_SMART_BACKLIGHT))
+
+            // djb/ring: notification ring around the camera hole (opens its own page)
+            NotificationRingSection()
         }
     }
 }

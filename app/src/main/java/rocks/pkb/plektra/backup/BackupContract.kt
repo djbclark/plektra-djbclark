@@ -426,6 +426,19 @@ internal object BackupPreferenceContract {
             "clicks_charging_automation" to PreferenceValueType.BOOLEAN,
             "clicks_charging_start_percent" to PreferenceValueType.INT,
             "clicks_charging_stop_percent" to PreferenceValueType.INT,
+            // djb/ring: notification ring
+            "notification_ring_enabled" to PreferenceValueType.BOOLEAN,
+            "notification_ring_minutes" to PreferenceValueType.INT,
+            "notification_ring_brightness" to PreferenceValueType.STRING,
+            "notification_ring_icons" to PreferenceValueType.BOOLEAN,
+            "notification_ring_cx" to PreferenceValueType.FLOAT,
+            "notification_ring_cy" to PreferenceValueType.FLOAT,
+            "notification_ring_radius" to PreferenceValueType.FLOAT,
+            "notification_ring_stroke" to PreferenceValueType.FLOAT,
+            "notification_ring_app_colors" to PreferenceValueType.STRING,
+            "notification_ring_default_color" to PreferenceValueType.INT,
+            "notification_ring_keyboard_dark" to PreferenceValueType.BOOLEAN,
+            // djb/ring: end
             "toast_on_layout_switch" to PreferenceValueType.BOOLEAN,
             "software_keyboard_mode_toggle_toasts" to PreferenceValueType.BOOLEAN,
             "alt_enter_layout_switch" to PreferenceValueType.BOOLEAN,
@@ -471,6 +484,10 @@ internal object BackupPreferenceContract {
         "keyboard_layout_auto_mapping_updated" to "mapping refresh marker",
         "legacy_german_qwertz_default_migrated" to "migration marker",
         "titan2_elite_rounded_corners_enforced_v1" to "migration marker",
+        // djb/ring: what the vendor keyboard-light switch was before a ring turned it off. Restoring
+        // another phone's record could put a stale value back on this one.
+        "ring_backlight_prev_captured" to "transient runtime state",
+        "ring_backlight_prev" to "transient runtime state",
         "last_seen_whats_new_version" to "release UI state",
         "nav_mode_default_mappings_version" to "default-migration marker",
         "nav_mode_mappings_updated" to "runtime refresh marker",
