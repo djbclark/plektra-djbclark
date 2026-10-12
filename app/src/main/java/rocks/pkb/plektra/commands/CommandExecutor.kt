@@ -113,6 +113,8 @@ class CommandExecutor(
             DeviceControlCommandSource.ACTION_VOLUME_MUTE -> adjustVolume(AudioManager.ADJUST_TOGGLE_MUTE)
             DeviceControlCommandSource.ACTION_BRIGHTNESS_UP -> sendShellKeyEvent(KeyEvent.KEYCODE_BRIGHTNESS_UP)
             DeviceControlCommandSource.ACTION_BRIGHTNESS_DOWN -> sendShellKeyEvent(KeyEvent.KEYCODE_BRIGHTNESS_DOWN)
+            DeviceControlCommandSource.ACTION_EXPAND_NOTIFICATIONS -> expandShade(quickSettings = false)
+            DeviceControlCommandSource.ACTION_EXPAND_QUICK_SETTINGS -> expandShade(quickSettings = true)
             else -> fail("Unknown action")
         }
     }
@@ -161,6 +163,49 @@ class CommandExecutor(
             ?: return fail("Audio unavailable")
         audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, direction, AudioManager.FLAG_SHOW_UI)
         return CommandExecutionResult.Success
+    }
+
+    /**
+     * Pull the shade down from a key. StatusBarManager's expand calls are hidden but reachable
+     * with the EXPAND_STATUS_BAR permission, which is a normal one; when the platform refuses
+     * the reflection, Shizuku's `cmd statusbar` does the same thing.
+     */
+    private fun expandShade(quickSettings: Boolean): CommandExecutionResult {
+        val method = if (quickSettings) "expandSettingsPanel" else "expandNotificationsPanel"
+        val direct = runCatching {
+            val manager = context.getSystemService("statusbar") ?: return@runCatching false
+            manager.javaClass.getMethod(method).invoke(manager)
+            true
+        }.getOrDefault(false)
+        if (direct) return CommandExecutionResult.Success
+        val verb = if (quickSettings) "expand-settings" else "expand-notifications"
+        return runShizukuCommand(arrayOf("cmd", "statusbar", verb), unavailableReason = "Shade unavailable")
+    }
+
+    private fun runShizukuCommand(command: Array<String>, unavailableReason: String): CommandExecutionResult {
+        return try {
+            val shizukuAvailable = Shizuku.pingBinder() &&
+                Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+            if (!shizukuAvailable) {
+                return fail(unavailableReason)
+            }
+            val newProcessMethod = Shizuku::class.java.getDeclaredMethod(
+                "newProcess",
+                Array<String>::class.java,
+                Array<String>::class.java,
+                String::class.java
+            )
+            newProcessMethod.isAccessible = true
+            val process = newProcessMethod.invoke(null, command, null, null) as Process
+            if (process.waitFor() == 0) {
+                CommandExecutionResult.Success
+            } else {
+                fail("Command failed")
+            }
+        } catch (error: Exception) {
+            Log.e(TAG, "Failed to run ${command.joinToString(" ")} through Shizuku", error)
+            fail("Command failed")
+        }
     }
 
     /**
