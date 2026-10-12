@@ -102,7 +102,11 @@ object RevertibleChange {
         val appContext = context.applicationContext
         val pending = pending(appContext) ?: return true
         val ok = PrivilegedShell.run(appContext, pending.kind.revert).ok
-        if (ok) disarm(appContext)
+        if (ok) {
+            disarm(appContext)
+            // The revert is `wm density reset`: nothing is overridden any more.
+            if (pending.kind == Kind.DENSITY) DisplayDensity.markChanged(appContext, false)
+        }
         return ok
     }
 

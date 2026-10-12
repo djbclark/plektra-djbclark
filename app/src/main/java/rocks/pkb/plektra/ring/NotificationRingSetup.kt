@@ -8,6 +8,7 @@ import android.provider.Settings
 import android.util.Log
 import rocks.pkb.plektra.SettingsManager
 import rocks.pkb.plektra.inputmethod.PrivilegedCommand
+import rocks.pkb.plektra.inputmethod.PrivilegedResult
 import rocks.pkb.plektra.inputmethod.PrivilegedShell
 
 /**
@@ -86,15 +87,20 @@ object NotificationRingSetup {
     }
 
     /**
-     * Take the grants back. For a "reset device settings to stock" action (the toolbox group's):
+     * Take the grants back, for "Reset device settings to stock" ([rocks.pkb.plektra.SystemChangeManager]):
      * notification access is the one thing here that outlives an uninstall in a way the user could
-     * not see. BLOCKING — call off the main thread. Returns true when nothing remains granted.
-     * Not called by anything in the ring group.
+     * not see. BLOCKING — call off the main thread. The result is [PrivilegedResult.ok] when
+     * notification access is no longer granted, read from the platform and never from the shell's
+     * output; [PrivilegedResult.failure] says why it is still there. The full-screen permission is
+     * handed back to its default in the same command; the platform cannot tell a default from an
+     * explicit allow, so it is not part of the verdict.
      */
-    fun revokeViaBroker(context: Context): Boolean {
+    internal fun revokeViaBroker(context: Context): PrivilegedResult {
         val appContext = context.applicationContext
-        if (!isListenerGranted(appContext) && !canUseFullScreenIntent(appContext)) return true
-        PrivilegedShell.run(
+        if (!isListenerGranted(appContext) && !canUseFullScreenIntent(appContext)) {
+            return PrivilegedResult(ok = true, output = null, failure = null)
+        }
+        val shell = PrivilegedShell.run(
             appContext,
             PrivilegedCommand.RingGrants(
                 listOf(
@@ -103,7 +109,12 @@ object NotificationRingSetup {
                 )
             )
         )
-        return !isListenerGranted(appContext)
+        val revoked = !isListenerGranted(appContext)
+        return PrivilegedResult(
+            ok = revoked,
+            output = null,
+            failure = if (revoked) null else shell.failure ?: "Notification access is still granted"
+        )
     }
 
     fun listenerSettingsIntent(): Intent =

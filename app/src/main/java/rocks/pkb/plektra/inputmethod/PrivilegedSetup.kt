@@ -57,6 +57,16 @@ object PrivilegedSetup {
     }.getOrDefault(false)
 
     /**
+     * True when this app can write `Settings.System` itself: through the "Modify system settings"
+     * grant, or through WRITE_SECURE_SETTINGS (the settings provider lets a holder of that
+     * permission skip the app-op check). Asked of Android, never of the shell. Callers still read
+     * the value back, so a write that did not take is caught.
+     */
+    fun canWriteSystemSettings(context: Context): Boolean = runCatching {
+        android.provider.Settings.System.canWrite(context)
+    }.getOrDefault(false) || hasWriteSecureSettings(context)
+
+    /**
      * Take WRITE_SECURE_SETTINGS from the paired broker, once. Idempotent: a no-op when already
      * held. Best-effort, off-thread, never throws. The outcome is decided by
      * [hasWriteSecureSettings] afterwards, never by what the shell printed: `pm grant` is silent on

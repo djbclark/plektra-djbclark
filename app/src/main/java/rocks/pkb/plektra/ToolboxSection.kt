@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -44,6 +43,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -55,6 +55,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
+import rocks.pkb.plektra.inputmethod.PrivilegedDiagnostics
+import rocks.pkb.plektra.toolbox.BloatCatalog
 import rocks.pkb.plektra.toolbox.FnCtrlRemap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -395,18 +398,56 @@ private fun FnCtrlCard(modifier: Modifier) {
     }
 }
 
-/** "Reset device settings to stock": undoes what survives an uninstall, so it comes before one. */
+/** Where the reset flow is: the row, the confirm dialog, the running dialog. */
+private sealed interface ResetStage {
+    data object Idle : ResetStage
+    data object Preparing : ResetStage
+    data class Confirm(val plan: SystemChangeManager.Plan) : ResetStage
+    data class Running(val entries: List<ResetPlan.Entry>, val finished: Boolean) : ResetStage
+}
+
+/**
+ * "Reset device settings to stock": undoes what survives an uninstall, so it comes before one.
+ *
+ * Tapping it reads what is actually changed on the phone right now (off the main thread), lists
+ * exactly that in a confirm dialog, and then runs those steps off the main thread while the same
+ * dialog shows each step's result as it ends: done, failed with the reason, or nothing to do.
+ */
 @Composable
 private fun ResetToStockRow(modifier: Modifier) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var showDialog by remember { mutableStateOf(false) }
-    var inProgress by remember { mutableStateOf(false) }
+    var stage by remember { mutableStateOf<ResetStage>(ResetStage.Idle) }
+    val results = remember { mutableStateMapOf<ResetPlan.Item, ResetPlan.StepResult>() }
+    val busy = stage is ResetStage.Preparing || (stage as? ResetStage.Running)?.finished == false
+
+    fun prepare() {
+        if (stage != ResetStage.Idle) return
+        stage = ResetStage.Preparing
+        scope.launch {
+            val plan = withContext(Dispatchers.IO) { SystemChangeManager.plan(context) }
+            stage = ResetStage.Confirm(plan)
+        }
+    }
+
+    fun start(plan: SystemChangeManager.Plan) {
+        results.clear()
+        stage = ResetStage.Running(plan.entries, finished = false)
+        scope.launch {
+            // Each step reports as it ends; writes to Compose state are safe from any thread.
+            withContext(Dispatchers.IO) {
+                SystemChangeManager.resetToStock(context, plan.entries) { entry, result ->
+                    results[entry.item] = result
+                }
+            }
+            stage = ResetStage.Running(plan.entries, finished = true)
+        }
+    }
 
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .settingRow(null) { if (!inProgress) showDialog = true }
+            .settingRow(null) { prepare() }
     ) {
         Row(
             modifier = Modifier
@@ -434,7 +475,7 @@ private fun ResetToStockRow(modifier: Modifier) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            if (inProgress) {
+            if (busy) {
                 CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
             } else {
                 Icon(
@@ -446,32 +487,197 @@ private fun ResetToStockRow(modifier: Modifier) {
         }
     }
 
-    if (showDialog) {
-        AlertDialog(
-            onDismissRequest = { showDialog = false },
-            title = { Text(stringResource(R.string.reset_to_stock_confirm_title)) },
-            text = { Text(stringResource(R.string.reset_to_stock_confirm_message)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    showDialog = false
-                    inProgress = true
-                    scope.launch {
-                        val result = withContext(Dispatchers.IO) { SystemChangeManager.resetToStock(context) }
-                        inProgress = false
-                        val message = when {
-                            result.allSucceeded -> R.string.reset_to_stock_result_success
-                            result.needsPermission -> R.string.reset_to_stock_result_needs_permission
-                            else -> R.string.reset_to_stock_result_partial
-                        }
-                        Toast.makeText(context, context.getString(message), Toast.LENGTH_LONG).show()
+    when (val current = stage) {
+        is ResetStage.Confirm -> if (current.plan.isEmpty) {
+            AlertDialog(
+                onDismissRequest = { stage = ResetStage.Idle },
+                title = { Text(stringResource(R.string.reset_to_stock_confirm_title)) },
+                text = { Text(stringResource(R.string.reset_to_stock_nothing)) },
+                confirmButton = {
+                    TextButton(onClick = { stage = ResetStage.Idle }) {
+                        Text(stringResource(R.string.reset_to_stock_close))
                     }
-                }) { Text(stringResource(R.string.reset_to_stock_confirm_action)) }
+                }
+            )
+        } else {
+            AlertDialog(
+                onDismissRequest = { stage = ResetStage.Idle },
+                title = { Text(stringResource(R.string.reset_to_stock_confirm_title)) },
+                text = {
+                    Column(
+                        modifier = Modifier.verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(stringResource(R.string.reset_to_stock_confirm_message))
+                        current.plan.entries.forEach { entry -> ResetEntryLines(entry, result = null, showResult = false) }
+                        current.plan.brokerBlocker?.let { blocker ->
+                            Text(
+                                text = stringResource(R.string.reset_to_stock_broker_blocked, resetReasonText(blocker)),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                        Text(
+                            text = stringResource(R.string.reset_to_stock_confirm_footer),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { start(current.plan) }) {
+                        Text(stringResource(R.string.reset_to_stock_confirm_action))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { stage = ResetStage.Idle }) {
+                        Text(stringResource(R.string.reset_to_stock_confirm_cancel))
+                    }
+                }
+            )
+        }
+        is ResetStage.Running -> AlertDialog(
+            // Not dismissable while it runs: the steps keep going either way, and the results are
+            // the only place their outcome is shown.
+            onDismissRequest = {},
+            properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false),
+            title = {
+                Text(
+                    stringResource(
+                        if (current.finished) R.string.reset_to_stock_finished_title
+                        else R.string.reset_to_stock_running_title
+                    )
+                )
             },
-            dismissButton = {
-                TextButton(onClick = { showDialog = false }) {
-                    Text(stringResource(R.string.reset_to_stock_confirm_cancel))
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // The first step with no result yet is the one running.
+                    val runningItem = current.entries.firstOrNull { results[it.item] == null }?.item
+                    current.entries.forEach { entry ->
+                        ResetEntryLines(
+                            entry,
+                            result = results[entry.item],
+                            showResult = true,
+                            running = !current.finished && entry.item == runningItem
+                        )
+                    }
+                    if (current.finished) {
+                        val allOk = current.entries.none { results[it.item]?.status != ResetPlan.StepResult.Status.DONE &&
+                            results[it.item]?.status != ResetPlan.StepResult.Status.NOTHING_TO_DO }
+                        Text(
+                            text = stringResource(
+                                if (allOk) R.string.reset_to_stock_result_success
+                                else R.string.reset_to_stock_result_some_failed
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                if (current.finished) {
+                    TextButton(onClick = { stage = ResetStage.Idle }) {
+                        Text(stringResource(R.string.reset_to_stock_close))
+                    }
                 }
             }
         )
+        else -> Unit
+    }
+}
+
+/** One plan entry: its label, the packages for the apps step, and (once running) its result. */
+@Composable
+private fun ResetEntryLines(
+    entry: ResetPlan.Entry,
+    result: ResetPlan.StepResult?,
+    showResult: Boolean,
+    running: Boolean = false
+) {
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (!showResult) Text("•", style = MaterialTheme.typography.bodyMedium)
+            Text(
+                text = resetItemLabel(entry),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        if (entry.item == ResetPlan.Item.REMOVED_APPS) {
+            val names = remember(entry.packages) { entry.packages.map(::packageDisplayName) }
+            Text(
+                text = names.joinToString(", "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = if (showResult) 0.dp else 16.dp)
+            )
+        }
+        if (showResult) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (running) CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                Text(
+                    text = resetStatusText(result),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = if (result?.status == ResetPlan.StepResult.Status.FAILED) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                )
+            }
+        }
+    }
+}
+
+/** The bloat catalog's name for a package, or the package name when the catalog does not know it. */
+private fun packageDisplayName(packageName: String): String =
+    BloatCatalog.entries().firstOrNull { it.packageName == packageName }?.label ?: packageName
+
+@Composable
+private fun resetItemLabel(entry: ResetPlan.Entry): String = when (entry.item) {
+    ResetPlan.Item.FN_CTRL -> stringResource(R.string.reset_item_fn_ctrl)
+    ResetPlan.Item.DISPLAY_DENSITY -> stringResource(R.string.reset_item_density)
+    ResetPlan.Item.SYSTEM_TWEAKS -> stringResource(R.string.reset_item_tweaks)
+    ResetPlan.Item.REMOVED_APPS -> stringResource(R.string.reset_item_apps, entry.packages.size)
+    ResetPlan.Item.RING_OFF -> stringResource(R.string.reset_item_ring_off)
+    ResetPlan.Item.RING_GRANTS -> stringResource(R.string.reset_item_ring_grants)
+    ResetPlan.Item.KEYBOARD_TIMEOUT -> stringResource(R.string.reset_item_timeout)
+    ResetPlan.Item.KEYBOARD_LIGHT_HELD -> stringResource(R.string.reset_item_light_held)
+    ResetPlan.Item.SIDE_KEY -> stringResource(R.string.reset_item_side_key)
+}
+
+/** A reason code as words; a reason that is not a known code is already a message. */
+@Composable
+private fun resetReasonText(reason: String): String {
+    val res = when (reason) {
+        PrivilegedDiagnostics.REASON_NOT_PAIRED -> R.string.reset_reason_not_paired
+        PrivilegedDiagnostics.REASON_WIRELESS_DEBUGGING_OFF -> R.string.reset_reason_wireless_debugging_off
+        PrivilegedDiagnostics.REASON_SHELL_FAILED -> R.string.reset_reason_shell_failed
+        SystemChangeManager.REASON_NEEDS_PERMISSION -> R.string.reset_reason_needs_permission
+        SystemChangeManager.REASON_NEEDS_SECURE_SETTINGS -> R.string.reset_reason_needs_secure_settings
+        SystemChangeManager.REASON_NOT_APPLIED -> R.string.reset_reason_not_applied
+        else -> null
+    }
+    return if (res != null) stringResource(res) else reason
+}
+
+/** done / failed with the reason / nothing to do; "waiting" while a step has not ended yet. */
+@Composable
+private fun resetStatusText(result: ResetPlan.StepResult?): String {
+    if (result == null) return stringResource(R.string.reset_status_waiting)
+    val counts = if (result.total > 0) stringResource(R.string.reset_apps_count, result.count, result.total) else null
+    return when (result.status) {
+        ResetPlan.StepResult.Status.DONE -> counts ?: stringResource(R.string.reset_status_done)
+        ResetPlan.StepResult.Status.NOTHING_TO_DO -> stringResource(R.string.reset_status_nothing)
+        ResetPlan.StepResult.Status.FAILED -> {
+            val base = result.reason?.let { stringResource(R.string.reset_status_failed_reason, resetReasonText(it)) }
+                ?: stringResource(R.string.reset_status_failed)
+            if (counts != null) "$base ($counts)" else base
+        }
     }
 }
