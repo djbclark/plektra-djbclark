@@ -1784,4 +1784,12 @@ Jede Taste kann als Keycode, Aktion, Native Ctrl oder Keine konfiguriert werden.
     <string name="reset_to_stock_result_partial">Einige Einstellungen wurden wiederhergestellt. Ein Neustart kann nötig sein, damit die Änderungen vollständig greifen.</string>
     <string name="reset_to_stock_result_needs_permission">Erlaube Plektra \"Systemeinstellungen ändern\" oder kopple das drahtlose Debugging und versuche es dann erneut.</string>
     <string name="show_status_bar_title">Statusleiste anzeigen</string>
+    <string name="long_press_cycle_next_title">Weiter gedrückt halten für</string>
+    <string name="long_press_cycle_next_description">Nach dem ersten langen Druck weiter halten, um zu einem zweiten Zeichen zu wechseln – so gehen Großbuchstaben und Symbole mit einer Hand.</string>
+    <string name="long_press_cycle_next_off">Nichts (aus)</string>
+    <string name="long_press_cycle_end_title">Nach dem letzten Schritt</string>
+    <string name="long_press_cycle_end_stop">Letztes Zeichen behalten</string>
+    <string name="long_press_cycle_end_original">Zurück zum getippten Zeichen</string>
+    <string name="long_press_cycle_end_loop">Weiter wechseln, solange gehalten</string>
+    <string name="kw_modifiers_long_press_cycle">langer Druck, halten, wechseln, einhändig, Shift, Symbole</string>
 </resources>

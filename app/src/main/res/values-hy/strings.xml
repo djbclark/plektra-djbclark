@@ -1086,4 +1086,12 @@ Nav Mode-ը օգտագործում է ստեղնի ֆիզիկական դիրքը
     <string name="reset_to_stock_result_partial">Որոշ կարգավորումներ վերականգնվեցին։ Փոփոխությունների ամբողջական կիրառման համար կարող է վերաբեռնում պահանջվել։</string>
     <string name="reset_to_stock_result_needs_permission">Տրամադրեք Plektra-ին \"Փոփոխել համակարգային կարգավորումները\" թույլտվությունը կամ զուգակցեք անլար վրիպազերծումը, ապա փորձեք կրկին։</string>
     <string name="show_status_bar_title">Ցուցադրել կարգավիճակի գոտին</string>
+    <string name="long_press_cycle_next_title">Շարունակել պահել՝</string>
+    <string name="long_press_cycle_next_description">Առաջին երկար սեղմումից հետո շարունակեք պահել՝ երկրորդ նիշին անցնելու համար, որպեսզի մեծատառերն ու նշանները պահանջեն միայն մեկ ձեռք։</string>
+    <string name="long_press_cycle_next_off">Ոչինչ (անջատված)</string>
+    <string name="long_press_cycle_end_title">Վերջին քայլից հետո</string>
+    <string name="long_press_cycle_end_stop">Պահել վերջին նիշը</string>
+    <string name="long_press_cycle_end_original">Վերադառնալ մուտքագրված նիշին</string>
+    <string name="long_press_cycle_end_loop">Շարունակել փոխել, քանի դեռ պահվում է</string>
+    <string name="kw_modifiers_long_press_cycle">երկար սեղմում, պահել, փոխել, մեկ ձեռք, shift, նշաններ</string>
 </resources>

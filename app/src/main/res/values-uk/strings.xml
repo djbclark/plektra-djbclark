@@ -1086,4 +1086,12 @@ Ctrl-ярлики застосунків із урахуванням розкл�
     <string name="reset_to_stock_result_partial">Деякі налаштування відновлено. Для повного застосування змін може знадобитися перезавантаження.</string>
     <string name="reset_to_stock_result_needs_permission">Надайте Plektra дозвіл \"Змінювати системні налаштування\" або сполучіть бездротове налагодження, а потім спробуйте знову.</string>
     <string name="show_status_bar_title">Показувати панель стану</string>
+    <string name="long_press_cycle_next_title">Утримувати довше для</string>
+    <string name="long_press_cycle_next_description">Утримуйте після першого довгого натискання, щоб перейти до другого символу, — великі літери й символи однією рукою.</string>
+    <string name="long_press_cycle_next_off">Нічого (вимк.)</string>
+    <string name="long_press_cycle_end_title">Після останнього кроку</string>
+    <string name="long_press_cycle_end_stop">Залишити останній символ</string>
+    <string name="long_press_cycle_end_original">Повернутися до набраного символу</string>
+    <string name="long_press_cycle_end_loop">Перемикати далі, доки утримується</string>
+    <string name="kw_modifiers_long_press_cycle">довге натискання, утримання, перемикання, однією рукою, shift, символи</string>
 </resources>

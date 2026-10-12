@@ -1086,4 +1086,12 @@ Cada tecla puede configurarse como Keycode, Acción, Native Ctrl o Ninguno. Usa 
     <string name="reset_to_stock_result_partial">Se restauraron algunos ajustes. Puede hacer falta reiniciar para que los cambios se apliquen del todo.</string>
     <string name="reset_to_stock_result_needs_permission">Conceda \"Modificar ajustes del sistema\" a Plektra, o empareje la depuración inalámbrica, y vuelva a intentarlo.</string>
     <string name="show_status_bar_title">Mostrar barra de estado</string>
+    <string name="long_press_cycle_next_title">Seguir manteniendo para</string>
+    <string name="long_press_cycle_next_description">Mantén pulsado tras la primera pulsación larga para pasar a un segundo carácter, así las mayúsculas y los símbolos necesitan una sola mano.</string>
+    <string name="long_press_cycle_next_off">Nada (desactivado)</string>
+    <string name="long_press_cycle_end_title">Tras el último paso</string>
+    <string name="long_press_cycle_end_stop">Mantener el último carácter</string>
+    <string name="long_press_cycle_end_original">Volver al carácter escrito</string>
+    <string name="long_press_cycle_end_loop">Seguir alternando mientras se mantiene</string>
+    <string name="kw_modifiers_long_press_cycle">pulsación larga, mantener, alternar, una mano, shift, símbolos</string>
 </resources>

@@ -1086,4 +1086,12 @@ Mỗi phím có thể cấu hình là Keycode, Action, Native Ctrl hoặc None. 
     <string name="reset_to_stock_result_partial">Một số cài đặt đã được khôi phục. Có thể cần khởi động lại để áp dụng hoàn toàn.</string>
     <string name="reset_to_stock_result_needs_permission">Cấp cho Plektra \"Sửa đổi cài đặt hệ thống\", hoặc ghép nối gỡ lỗi không dây, rồi thử lại.</string>
     <string name="show_status_bar_title">Hiện thanh trạng thái</string>
+    <string name="long_press_cycle_next_title">Tiếp tục giữ để</string>
+    <string name="long_press_cycle_next_description">Giữ tiếp sau lần nhấn giữ đầu tiên để chuyển sang ký tự thứ hai, giúp gõ chữ hoa và ký hiệu chỉ bằng một tay.</string>
+    <string name="long_press_cycle_next_off">Không (tắt)</string>
+    <string name="long_press_cycle_end_title">Sau bước cuối</string>
+    <string name="long_press_cycle_end_stop">Giữ ký tự cuối</string>
+    <string name="long_press_cycle_end_original">Quay lại ký tự đã gõ</string>
+    <string name="long_press_cycle_end_loop">Tiếp tục xoay vòng khi còn giữ</string>
+    <string name="kw_modifiers_long_press_cycle">nhấn giữ, giữ, xoay vòng, một tay, shift, ký hiệu</string>
 </resources>
