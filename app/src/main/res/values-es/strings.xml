@@ -896,4 +896,14 @@ Cada tecla puede configurarse como Keycode, Acción, Native Ctrl o Ninguno. Usa 
     <string name="app_raw_mode_row_description">Para terminales, SSH y código: lo que escribe es lo que entra, sin corregir ni poner mayúsculas</string>
     <string name="app_raw_mode_description">En las aplicaciones que elija aquí, Plektra envía cada pulsación tal cual: sin sugerencias, sin corrección automática, sin mayúscula al inicio de línea, sin punto por doble espacio. Pensado para terminales, clientes SSH, editores de código y cualquier otro sitio donde una corrección bienintencionada convierte un comando en un error: `ls -la` nunca debería convertirse en `Ls -la.`</string>
     <string name="app_raw_mode_webapk_note">Aplicación web: escribe dentro de %1$s, así que %1$s también queda excluida</string>
+    <!-- djb/caret-badge: modifier badge beside the text cursor -->
+    <string name="caret_modifier_badge_title">Mostrar modificadores junto al cursor</string>
+    <string name="caret_modifier_badge_description">Shift, Alt, Ctrl y Sym aparecen junto al cursor de texto siempre que estén activos. Solo funciona en aplicaciones que informan de dónde está el cursor.</string>
+    <string name="caret_modifier_badge_needs_overlay">Dibujar junto al cursor implica dibujar sobre la aplicación en la que escribe, así que Android necesita permiso primero.</string>
+    <string name="caret_modifier_badge_grant_overlay">Permitir dibujar sobre aplicaciones</string>
+    <string name="caret_badge_color_armed">Color de una pulsación</string>
+    <string name="caret_badge_color_armed_description">Shift, Alt o Ctrl armados solo para la siguiente tecla</string>
+    <string name="caret_badge_color_locked">Color de bloqueo</string>
+    <string name="caret_badge_color_locked_description">Bloq Mayús, bloqueo de Alt y bloqueo de Ctrl, que permanecen activos hasta que los desactive</string>
+    <string name="caret_badge_color_pick">Un modificador mantenido pulsado se muestra en una versión atenuada de estos.</string>
 </resources>

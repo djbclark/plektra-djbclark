@@ -896,4 +896,14 @@ Chaque touche peut être configurée comme Keycode, Action, Native Ctrl ou Aucun
     <string name="app_raw_mode_row_description">Pour les terminaux, SSH et le code : ce que vous tapez est envoyé tel quel, sans correction ni majuscule</string>
     <string name="app_raw_mode_description">Dans les applications choisies ici, Plektra envoie chaque frappe telle quelle : pas de suggestions, pas de correction automatique, pas de majuscule en début de ligne, pas de point après un double espace. Prévu pour les terminaux, clients SSH, éditeurs de code et tout ce où une correction bien intentionnée transforme une commande en faute : `ls -la` ne doit jamais devenir `Ls -la.`</string>
     <string name="app_raw_mode_webapk_note">Application web : tape dans %1$s, donc %1$s est aussi exclu</string>
+    <!-- djb/caret-badge: modifier badge beside the text cursor -->
+    <string name="caret_modifier_badge_title">Afficher les modificateurs au curseur</string>
+    <string name="caret_modifier_badge_description">Shift, Alt, Ctrl et Sym apparaissent à côté du curseur de texte quand ils sont actifs. Ne fonctionne que dans les applications qui indiquent la position du curseur.</string>
+    <string name="caret_modifier_badge_needs_overlay">Dessiner à côté du curseur signifie dessiner par-dessus l\'application où vous tapez, Android a donc besoin d\'une permission d\'abord.</string>
+    <string name="caret_modifier_badge_grant_overlay">Autoriser le dessin par-dessus les applications</string>
+    <string name="caret_badge_color_armed">Couleur d\'appui unique</string>
+    <string name="caret_badge_color_armed_description">Shift, Alt ou Ctrl armé pour la prochaine touche seulement</string>
+    <string name="caret_badge_color_locked">Couleur verrouillée</string>
+    <string name="caret_badge_color_locked_description">Verrouillage majuscules, Alt et Ctrl, qui restent actifs jusqu\'à ce que vous les désactiviez</string>
+    <string name="caret_badge_color_pick">Un modificateur maintenu enfoncé est affiché dans une version atténuée de ces couleurs.</string>
 </resources>

@@ -896,4 +896,14 @@ Nav Mode использует физическое положение клави
     <string name="app_raw_mode_row_description">Для терминалов, SSH и кода: что набрали, то и вводится, без исправлений и заглавных</string>
     <string name="app_raw_mode_description">В выбранных здесь приложениях Plektra отправляет каждое нажатие как есть: без подсказок, без автоисправления, без заглавной в начале строки, без точки от двойного пробела. Предназначено для терминалов, SSH-клиентов, редакторов кода и всего прочего, где полезное исправление превращает команду в опечатку — `ls -la` никогда не должно стать `Ls -la.`</string>
     <string name="app_raw_mode_webapk_note">Веб-приложение — вводит внутри %1$s, поэтому %1$s тоже исключено</string>
+    <!-- djb/caret-badge: modifier badge beside the text cursor -->
+    <string name="caret_modifier_badge_title">Показывать модификаторы у курсора</string>
+    <string name="caret_modifier_badge_description">Shift, Alt, Ctrl и Sym появляются рядом с текстовым курсором, когда включены. Работает только в приложениях, сообщающих положение курсора.</string>
+    <string name="caret_modifier_badge_needs_overlay">Рисовать рядом с курсором — значит рисовать поверх приложения, в котором вы печатаете, поэтому Android сначала требует разрешение.</string>
+    <string name="caret_modifier_badge_grant_overlay">Разрешить рисовать поверх приложений</string>
+    <string name="caret_badge_color_armed">Цвет одного нажатия</string>
+    <string name="caret_badge_color_armed_description">Shift, Alt или Ctrl, взведённые только для следующей клавиши</string>
+    <string name="caret_badge_color_locked">Цвет фиксации</string>
+    <string name="caret_badge_color_locked_description">Caps Lock, фиксация Alt и Ctrl, которые остаются включёнными, пока вы их не выключите</string>
+    <string name="caret_badge_color_pick">Удерживаемый модификатор показывается приглушённой версией этих цветов.</string>
 </resources>

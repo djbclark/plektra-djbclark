@@ -896,4 +896,14 @@ Mỗi phím có thể cấu hình là Keycode, Action, Native Ctrl hoặc None. 
     <string name="app_raw_mode_row_description">Cho terminal, SSH và mã nguồn: gõ gì vào nấy, không sửa hay viết hoa</string>
     <string name="app_raw_mode_description">Trong các ứng dụng bạn chọn ở đây, Plektra gửi nguyên từng phím bấm: không gợi ý, không sửa tự động, không viết hoa đầu dòng, không dấu chấm khi nhấn đúp dấu cách. Dành cho terminal, ứng dụng SSH, trình soạn mã và bất cứ nơi nào một sửa lỗi “hữu ích” biến lệnh thành lỗi gõ — `ls -la` không bao giờ được thành `Ls -la.`</string>
     <string name="app_raw_mode_webapk_note">Ứng dụng web — gõ bên trong %1$s, nên %1$s cũng được loại trừ</string>
+    <!-- djb/caret-badge: modifier badge beside the text cursor -->
+    <string name="caret_modifier_badge_title">Hiện phím bổ trợ tại con trỏ</string>
+    <string name="caret_modifier_badge_description">Shift, Alt, Ctrl và Sym hiện cạnh con trỏ văn bản mỗi khi đang bật. Chỉ hoạt động trong ứng dụng báo vị trí con trỏ.</string>
+    <string name="caret_modifier_badge_needs_overlay">Vẽ cạnh con trỏ nghĩa là vẽ đè lên ứng dụng bạn đang gõ, nên Android cần cấp quyền trước.</string>
+    <string name="caret_modifier_badge_grant_overlay">Cho phép vẽ đè lên ứng dụng</string>
+    <string name="caret_badge_color_armed">Màu khi nhấn một lần</string>
+    <string name="caret_badge_color_armed_description">Shift, Alt hoặc Ctrl chỉ sẵn sàng cho phím tiếp theo</string>
+    <string name="caret_badge_color_locked">Màu khi khóa</string>
+    <string name="caret_badge_color_locked_description">Khóa hoa, khóa Alt và khóa Ctrl, giữ bật cho tới khi bạn tắt</string>
+    <string name="caret_badge_color_pick">Phím bổ trợ đang được giữ hiện bằng phiên bản mờ của các màu này.</string>
 </resources>

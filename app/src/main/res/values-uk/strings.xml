@@ -896,4 +896,14 @@ Ctrl-ярлики застосунків із урахуванням розкл�
     <string name="app_raw_mode_row_description">Для терміналів, SSH і коду: що ввели, те й потрапляє в поле, без виправлень і великих літер</string>
     <string name="app_raw_mode_description">У вибраних тут застосунках Plektra надсилає кожне натискання як є: без пропозицій, без автокорекції, без великої літери на початку рядка, без крапки від подвійного пробілу. Призначено для терміналів, SSH-клієнтів, редакторів коду й усього іншого, де корисне виправлення перетворює команду на помилку — `ls -la` ніколи не має ставати `Ls -la.`</string>
     <string name="app_raw_mode_webapk_note">Вебзастосунок — вводить усередині %1$s, тож %1$s також виключено</string>
+    <!-- djb/caret-badge: modifier badge beside the text cursor -->
+    <string name="caret_modifier_badge_title">Показувати модифікатори біля курсора</string>
+    <string name="caret_modifier_badge_description">Shift, Alt, Ctrl і Sym з\'являються поруч із текстовим курсором, коли вони увімкнені. Працює лише в застосунках, які повідомляють, де курсор.</string>
+    <string name="caret_modifier_badge_needs_overlay">Малювання біля курсора означає малювання поверх застосунку, в якому ви друкуєте, тож Android спершу потребує дозволу.</string>
+    <string name="caret_modifier_badge_grant_overlay">Дозволити малювання поверх застосунків</string>
+    <string name="caret_badge_color_armed">Колір одноразового натискання</string>
+    <string name="caret_badge_color_armed_description">Shift, Alt або Ctrl, активовані лише для наступної клавіші</string>
+    <string name="caret_badge_color_locked">Колір фіксації</string>
+    <string name="caret_badge_color_locked_description">Caps Lock, фіксація Alt і Ctrl, які залишаються увімкненими, поки ви їх не вимкнете</string>
+    <string name="caret_badge_color_pick">Утримуваний модифікатор показується блідішою версією цих кольорів.</string>
 </resources>

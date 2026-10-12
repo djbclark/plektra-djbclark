@@ -896,4 +896,14 @@ Nav Mode-ը օգտագործում է ստեղնի ֆիզիկական դիրքը
     <string name="app_raw_mode_row_description">Տերմինալների, SSH-ի և կոդի համար՝ ինչ մուտքագրում եք, այն էլ մտնում է, առանց ուղղումների ու մեծատառերի</string>
     <string name="app_raw_mode_description">Այստեղ ընտրված հավելվածներում Plektra-ը ուղարկում է յուրաքանչյուր ստեղնի սեղմումն այնպես, ինչպես կա՝ առանց առաջարկների, առանց ավտոմատ ուղղման, առանց տողի սկզբի մեծատառի, առանց կրկնակի բացատից ստացվող կետի։ Նախատեսված է տերմինալների, SSH հաճախորդների, կոդի խմբագրիչների և այն ամենի համար, որտեղ «օգտակար» ուղղումը հրահանգը վերածում է սխալի՝ `ls -la`-ն երբեք չպետք է դառնա `Ls -la.`</string>
     <string name="app_raw_mode_webapk_note">Վեբ հավելված՝ մուտքագրում է %1$s-ի ներսում, ուստի %1$s-ը նույնպես բացառված է</string>
+    <!-- djb/caret-badge: modifier badge beside the text cursor -->
+    <string name="caret_modifier_badge_title">Ցուցադրել ձևափոխիչները կուրսորի մոտ</string>
+    <string name="caret_modifier_badge_description">Shift-ը, Alt-ը, Ctrl-ը և Sym-ը հայտնվում են տեքստի կուրսորի կողքին, երբ միացված են։ Աշխատում է միայն այն հավելվածներում, որոնք հաղորդում են կուրսորի դիրքը։</string>
+    <string name="caret_modifier_badge_needs_overlay">Կուրսորի կողքին նկարելը նշանակում է նկարել այն հավելվածի վրա, որտեղ մուտքագրում եք, ուստի Android-ը նախ թույլտվություն է պահանջում։</string>
+    <string name="caret_modifier_badge_grant_overlay">Թույլատրել նկարել հավելվածների վրա</string>
+    <string name="caret_badge_color_armed">Մեկ սեղմման գույն</string>
+    <string name="caret_badge_color_armed_description">Shift-ը, Alt-ը կամ Ctrl-ը պատրաստված են միայն հաջորդ ստեղնի համար</string>
+    <string name="caret_badge_color_locked">Կողպված գույն</string>
+    <string name="caret_badge_color_locked_description">Caps lock, Alt lock և Ctrl lock, որոնք մնում են միացված, մինչև դրանք անջատեք</string>
+    <string name="caret_badge_color_pick">Պահվող ձևափոխիչը ցուցադրվում է սրանց խամրած տարբերակով։</string>
 </resources>
