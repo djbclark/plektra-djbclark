@@ -1157,4 +1157,12 @@ Ogni tasto può essere configurato come Keycode, Azione, Native Ctrl o Nessuno. 
     <string name="keyboard_backlight_outcome_record_failed">Impossibile aggiornare il tempo salvato.</string>
     <string name="keyboard_backlight_outcome_write_failed">Il dispositivo non ha accettato la modifica.</string>
     <string name="keyboard_backlight_outcome_uncertain">Impossibile confermare la modifica, che potrebbe ancora avere effetto. Il tempo precedente resta salvato. Riavvia il telefono prima di un’altra modifica.</string>
+    <string name="long_press_cycle_next_title">Continua a tenere premuto per</string>
+    <string name="long_press_cycle_next_description">Tieni premuto oltre la prima pressione lunga per passare a un secondo carattere, così maiuscole e simboli richiedono una sola mano.</string>
+    <string name="long_press_cycle_next_off">Niente (disattivato)</string>
+    <string name="long_press_cycle_end_title">Dopo l\'ultimo passo</string>
+    <string name="long_press_cycle_end_stop">Mantieni l\'ultimo carattere</string>
+    <string name="long_press_cycle_end_original">Torna al carattere digitato</string>
+    <string name="long_press_cycle_end_loop">Continua a ciclare finché tieni premuto</string>
+    <string name="kw_modifiers_long_press_cycle">pressione lunga, tieni premuto, ciclo, una mano, shift, simboli</string>
 </resources>

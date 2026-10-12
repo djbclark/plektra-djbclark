@@ -2015,4 +2015,12 @@ Jede Taste kann als Keycode, Aktion, Native Ctrl oder Keine konfiguriert werden.
     <string name="app_appearance_settings_fullscreen_description">Blendet in den Einstellungen und Notizen die Statusleiste aus. Seitentitel und Aktionen nutzen die oberste Zeile. Vom oberen Rand nach unten wischen zeigt die Statusleiste kurz an.</string>
     <string name="kw_app_appearance_settings_fullscreen">Vollbild, Statusleiste, ausblenden, immersiv, Kopfzeile, oberste Zeile, Notch, Kameraaussparung</string>
     <string name="settings_search_close">Suche schließen</string>
+    <string name="long_press_cycle_next_title">Weiter gedrückt halten für</string>
+    <string name="long_press_cycle_next_description">Nach dem ersten langen Druck weiter halten, um zu einem zweiten Zeichen zu wechseln – so gehen Großbuchstaben und Symbole mit einer Hand.</string>
+    <string name="long_press_cycle_next_off">Nichts (aus)</string>
+    <string name="long_press_cycle_end_title">Nach dem letzten Schritt</string>
+    <string name="long_press_cycle_end_stop">Letztes Zeichen behalten</string>
+    <string name="long_press_cycle_end_original">Zurück zum getippten Zeichen</string>
+    <string name="long_press_cycle_end_loop">Weiter wechseln, solange gehalten</string>
+    <string name="kw_modifiers_long_press_cycle">langer Druck, halten, wechseln, einhändig, Shift, Symbole</string>
 </resources>

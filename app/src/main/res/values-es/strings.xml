@@ -979,4 +979,12 @@ Cada tecla puede configurarse como Keycode, Acción, Native Ctrl o Ninguno. Usa 
     <string name="keyboard_backlight_outcome_record_failed">No se pudo actualizar el tiempo guardado.</string>
     <string name="keyboard_backlight_outcome_write_failed">El dispositivo no aceptó el cambio.</string>
     <string name="keyboard_backlight_outcome_uncertain">No se pudo confirmar el cambio y aún puede aplicarse. El tiempo anterior sigue guardado. Reinicia el teléfono antes de realizar otro cambio.</string>
+    <string name="long_press_cycle_next_title">Seguir manteniendo para</string>
+    <string name="long_press_cycle_next_description">Mantén pulsado tras la primera pulsación larga para pasar a un segundo carácter, así las mayúsculas y los símbolos necesitan una sola mano.</string>
+    <string name="long_press_cycle_next_off">Nada (desactivado)</string>
+    <string name="long_press_cycle_end_title">Tras el último paso</string>
+    <string name="long_press_cycle_end_stop">Mantener el último carácter</string>
+    <string name="long_press_cycle_end_original">Volver al carácter escrito</string>
+    <string name="long_press_cycle_end_loop">Seguir alternando mientras se mantiene</string>
+    <string name="kw_modifiers_long_press_cycle">pulsación larga, mantener, alternar, una mano, shift, símbolos</string>
 </resources>
