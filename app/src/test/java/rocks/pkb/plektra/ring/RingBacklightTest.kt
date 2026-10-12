@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.provider.Settings
 import rocks.pkb.plektra.SettingsManager
+import rocks.pkb.plektra.inputmethod.KeyboardBacklightManager
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -29,10 +30,10 @@ class RingBacklightTest {
     private fun prefs() = SettingsManager.getPreferences(context)
 
     private fun switchValue(): Int =
-        Settings.Global.getInt(context.contentResolver, DirectKeyboardLightSwitch.SETTING, -1)
+        Settings.Global.getInt(context.contentResolver, KeyboardBacklightManager.KEYBOARD_LIGHT_SWITCH, -1)
 
     private fun setSwitch(value: Int) {
-        Settings.Global.putInt(context.contentResolver, DirectKeyboardLightSwitch.SETTING, value)
+        Settings.Global.putInt(context.contentResolver, KeyboardBacklightManager.KEYBOARD_LIGHT_SWITCH, value)
     }
 
     @Before

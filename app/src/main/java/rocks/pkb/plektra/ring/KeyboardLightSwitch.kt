@@ -1,9 +1,7 @@
 package rocks.pkb.plektra.ring
 
-import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager
-import android.provider.Settings
+import rocks.pkb.plektra.inputmethod.KeyboardBacklightManager
 
 /**
  * The vendor's keyboard-light master switch (`Settings.Global.agui_keyboard_background_light`,
@@ -11,12 +9,10 @@ import android.provider.Settings
  *
  * The backlight group owns this switch (`KeyboardBacklightManager`, with the same three operations
  * as `canWriteKeyboardLightSwitch`, `readKeyboardLightSwitch` and `writeKeyboardLightSwitch`), but
- * that class is not in the ring branch. [RingBacklight] therefore talks to this interface, and
- * [DirectKeyboardLightSwitch] does the same in-process settings access until the two branches meet.
+ * [RingBacklight] talks to this interface so tests can substitute it.
  *
- * After the merge, replace the body of [DirectKeyboardLightSwitch] with three one-line calls to
- * `KeyboardBacklightManager` (or point [RingBacklight.switch] at an adapter). Nothing here uses the
- * ADB broker; the switch needs only the `WRITE_SECURE_SETTINGS` grant.
+ * [DirectKeyboardLightSwitch] delegates to `KeyboardBacklightManager`. Nothing here uses the ADB
+ * broker; the switch needs only the `WRITE_SECURE_SETTINGS` grant.
  */
 interface KeyboardLightSwitch {
     /** Whether the app may write the switch (it holds WRITE_SECURE_SETTINGS). */
@@ -34,23 +30,14 @@ interface KeyboardLightSwitch {
     }
 }
 
-/** In-process access to the vendor row, used until the backlight group's manager is merged. */
+/** The vendor switch through the backlight group's [KeyboardBacklightManager], which owns it. */
 object DirectKeyboardLightSwitch : KeyboardLightSwitch {
-    const val SETTING = "agui_keyboard_background_light"
+    override fun canWrite(context: Context): Boolean =
+        KeyboardBacklightManager.canWriteKeyboardLightSwitch(context)
 
-    override fun canWrite(context: Context): Boolean = runCatching {
-        context.checkSelfPermission(Manifest.permission.WRITE_SECURE_SETTINGS) ==
-            PackageManager.PERMISSION_GRANTED
-    }.getOrDefault(false)
+    override fun read(context: Context, default: Int): Int =
+        KeyboardBacklightManager.readKeyboardLightSwitch(context, default)
 
-    override fun read(context: Context, default: Int): Int = runCatching {
-        Settings.Global.getInt(context.contentResolver, SETTING, default)
-    }.getOrDefault(default)
-
-    override fun write(context: Context, value: Int): Boolean {
-        if (value != KeyboardLightSwitch.DARK && value != KeyboardLightSwitch.LIT) return false
-        return runCatching {
-            Settings.Global.putInt(context.contentResolver, SETTING, value)
-        }.getOrDefault(false)
-    }
+    override fun write(context: Context, value: Int): Boolean =
+        KeyboardBacklightManager.writeKeyboardLightSwitch(context, value)
 }
