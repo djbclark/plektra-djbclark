@@ -944,4 +944,14 @@ Cada tecla puede configurarse como Keycode, Acción, Native Ctrl o Ninguno. Usa 
     <string name="screen_trackpad_hint_cursor">✥ Cursor</string>
     <string name="screen_trackpad_hint_select">⇧ Seleccionar</string>
     <string name="screen_trackpad_hint_sticky">✥ Cursor · toque para salir</string>
+
+    <!-- djb/backlight: carried from PhysiBoard, unchanged strings only -->
+    <string name="smart_backlight_title">Retroiluminación inteligente del teclado</string>
+    <string name="smart_backlight_row_description">Mantiene el teclado iluminado en la oscuridad, más allá del límite de 30 s</string>
+    <string name="smart_backlight_enable_title">Retroiluminación inteligente</string>
+    <string name="smart_backlight_setup_ready">Siempre encendida: se configura una vez y sobrevive a los reinicios.</string>
+    <string name="smart_backlight_blocked_wireless_debugging">La depuración inalámbrica está desactivada, así que no se puede aplicar el ajuste de retroiluminación. Android la desactiva tras reiniciar: vuelve a activarla en Opciones de desarrollador.</string>
+    <string name="smart_backlight_last_error">El último intento falló: %1$s</string>
+    <string name="backlight_tile_label">Luz del teclado</string>
+    <string name="backlight_tile_no_permission_subtitle">Requiere concesión por ADB</string>
 </resources>

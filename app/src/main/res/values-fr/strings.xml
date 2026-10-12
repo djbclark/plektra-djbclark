@@ -944,4 +944,14 @@ Chaque touche peut être configurée comme Keycode, Action, Native Ctrl ou Aucun
     <string name="screen_trackpad_hint_cursor">✥ Curseur</string>
     <string name="screen_trackpad_hint_select">⇧ Sélection</string>
     <string name="screen_trackpad_hint_sticky">✥ Curseur · toucher pour quitter</string>
+
+    <!-- djb/backlight: carried from PhysiBoard, unchanged strings only -->
+    <string name="smart_backlight_title">Rétroéclairage intelligent du clavier</string>
+    <string name="smart_backlight_row_description">Garde le clavier éclairé dans le noir, au-delà de la limite de 30 s</string>
+    <string name="smart_backlight_enable_title">Rétroéclairage intelligent</string>
+    <string name="smart_backlight_setup_ready">Toujours allumé : configuré une fois, survit aux redémarrages.</string>
+    <string name="smart_backlight_blocked_wireless_debugging">Le débogage sans fil est désactivé, le réglage du rétroéclairage ne peut pas être appliqué. Android le désactive après un redémarrage — réactivez-le dans les options pour développeurs.</string>
+    <string name="smart_backlight_last_error">Dernière tentative échouée : %1$s</string>
+    <string name="backlight_tile_label">Éclairage clavier</string>
+    <string name="backlight_tile_no_permission_subtitle">Autorisation ADB requise</string>
 </resources>

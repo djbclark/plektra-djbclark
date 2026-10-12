@@ -18,10 +18,15 @@ import moe.shizuku.manager.adb.EmbeddedAdbInit
 object PrivilegedDiagnostics {
 
     /**
-     * One entry per privileged step that reports through [record]. djb/broker: empty on purpose;
-     * the group that adds a step adds its entry here.
+     * One entry per privileged step that reports through [record]. The group that adds a step
+     * adds its entry here.
      */
-    enum class Step(val key: String)
+    enum class Step(val key: String) {
+        // djb/backlight: the always-on keyboard backlight, and the WRITE_SECURE_SETTINGS grant that
+        // the Quick Settings tile (and the ring group's keyboard-dark switch) write through.
+        BACKLIGHT("backlight"),
+        WRITE_SECURE_SETTINGS("write_secure_settings")
+    }
 
     const val REASON_OK = "ok"
     const val REASON_NOT_PAIRED = "not_paired"
@@ -81,6 +86,40 @@ object PrivilegedDiagnostics {
         return status to at
     }
 
+    // djb/backlight: what the keyboard-backlight step last wrote and read back. Kept in the broker's
+    // own backup-excluded prefs because both describe THIS phone's vendor setting; a value restored
+    // from another phone would be a false claim.
+
+    /**
+     * True once the always-on value has been written successfully (and not reverted since). It
+     * survives reboots, as the value on the phone does, so this, not live Wireless debugging, is
+     * the readiness signal. A one-way latch: [observedBacklightValue] is the check on the phone.
+     */
+    fun backlightApplied(context: Context): Boolean =
+        EmbeddedAdbInit.prefs(context.applicationContext).getBoolean(KEY_BACKLIGHT_APPLIED, false)
+
+    fun setBacklightApplied(context: Context, applied: Boolean) {
+        EmbeddedAdbInit.prefs(context.applicationContext).edit { putBoolean(KEY_BACKLIGHT_APPLIED, applied) }
+    }
+
+    /**
+     * The vendor timeout last read back off the phone, and when. Recorded off-thread after a write,
+     * because reading costs a broker round-trip and must never run on the UI thread.
+     */
+    fun recordObservedBacklightValue(context: Context, value: String?) {
+        EmbeddedAdbInit.prefs(context.applicationContext).edit {
+            putString(KEY_OBSERVED_BACKLIGHT, value)
+            putLong(KEY_OBSERVED_BACKLIGHT_AT, System.currentTimeMillis())
+        }
+    }
+
+    fun observedBacklightValue(context: Context): Pair<String?, Long>? {
+        val prefs = EmbeddedAdbInit.prefs(context.applicationContext)
+        val at = prefs.getLong(KEY_OBSERVED_BACKLIGHT_AT, 0L)
+        if (at == 0L) return null
+        return prefs.getString(KEY_OBSERVED_BACKLIGHT, null) to at
+    }
+
     /**
      * Why the broker cannot run right now, or null when it should work.
      *
@@ -93,6 +132,10 @@ object PrivilegedDiagnostics {
         !EmbeddedAdbShell.isWirelessDebuggingEnabled(context) -> REASON_WIRELESS_DEBUGGING_OFF
         else -> null
     }
+
+    private const val KEY_BACKLIGHT_APPLIED = "privileged_backlight_applied"
+    private const val KEY_OBSERVED_BACKLIGHT = "privileged_backlight_device_value"
+    private const val KEY_OBSERVED_BACKLIGHT_AT = "privileged_backlight_device_value_at"
 
     private const val KEY_BROKER_STATUS = "privileged_broker_status"
     private const val KEY_BROKER_STATUS_AT = "privileged_broker_status_at"

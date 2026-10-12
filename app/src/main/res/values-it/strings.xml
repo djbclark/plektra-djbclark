@@ -1118,4 +1118,14 @@ Ogni tasto può essere configurato come Keycode, Azione, Native Ctrl o Nessuno. 
     <string name="screen_trackpad_hint_cursor">✥ Cursore</string>
     <string name="screen_trackpad_hint_select">⇧ Seleziona</string>
     <string name="screen_trackpad_hint_sticky">✥ Cursore · tocca per uscire</string>
+
+    <!-- djb/backlight: carried from PhysiBoard, unchanged strings only -->
+    <string name="smart_backlight_title">Retroilluminazione intelligente</string>
+    <string name="smart_backlight_row_description">Mantiene la tastiera illuminata al buio, oltre il limite di 30 s</string>
+    <string name="smart_backlight_enable_title">Retroilluminazione intelligente</string>
+    <string name="smart_backlight_setup_ready">Sempre accesa: configurata una volta, sopravvive ai riavvii.</string>
+    <string name="smart_backlight_blocked_wireless_debugging">Il debug wireless è disattivato, quindi l\'impostazione della retroilluminazione non può essere applicata. Android lo disattiva dopo un riavvio: riattivalo nelle Opzioni sviluppatore.</string>
+    <string name="smart_backlight_last_error">Ultimo tentativo non riuscito: %1$s</string>
+    <string name="backlight_tile_label">Luce tastiera</string>
+    <string name="backlight_tile_no_permission_subtitle">Richiede concessione via ADB</string>
 </resources>

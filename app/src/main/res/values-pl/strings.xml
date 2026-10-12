@@ -944,4 +944,14 @@ Każdy klawisz można skonfigurować jako Keycode, Akcja, Native Ctrl lub Brak. 
     <string name="screen_trackpad_hint_cursor">✥ Kursor</string>
     <string name="screen_trackpad_hint_select">⇧ Zaznaczanie</string>
     <string name="screen_trackpad_hint_sticky">✥ Kursor · dotknij, aby wyjść</string>
+
+    <!-- djb/backlight: carried from PhysiBoard, unchanged strings only -->
+    <string name="smart_backlight_title">Inteligentne podświetlenie klawiatury</string>
+    <string name="smart_backlight_row_description">Utrzymuj podświetlenie klawiatury w ciemności, dłużej niż limit 30 s</string>
+    <string name="smart_backlight_enable_title">Inteligentne podświetlenie</string>
+    <string name="smart_backlight_setup_ready">Zawsze włączone — skonfigurowane raz, działa po ponownym uruchomieniu.</string>
+    <string name="smart_backlight_blocked_wireless_debugging">Debugowanie bezprzewodowe jest wyłączone, więc nie można zastosować ustawienia podświetlenia. Android wyłącza je po ponownym uruchomieniu — włącz je ponownie w opcjach programisty.</string>
+    <string name="smart_backlight_last_error">Ostatnia próba nie powiodła się: %1$s</string>
+    <string name="backlight_tile_label">Podświetlenie klawiatury</string>
+    <string name="backlight_tile_no_permission_subtitle">Wymaga uprawnienia przez ADB</string>
 </resources>
