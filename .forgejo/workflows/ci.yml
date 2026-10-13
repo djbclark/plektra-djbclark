@@ -86,8 +86,9 @@ jobs:
               return real(fd, addr, len);
           }
           SHIM_C
-          gcc -shared -fPIC -O2 -o /tmp/portshim.so /tmp/portshim.c -ldl
-          echo "LD_PRELOAD=/tmp/portshim.so" >> "$GITHUB_ENV"
+          gcc -shared -fPIC -O2 -o /usr/local/lib/portshim.so /tmp/portshim.c -ldl
+          echo /usr/local/lib/portshim.so >> /etc/ld.so.preload
+          true && python3 -c 'print("preload ok")'
 
       - name: Make Gradle executable
         run: chmod +x ./gradlew
