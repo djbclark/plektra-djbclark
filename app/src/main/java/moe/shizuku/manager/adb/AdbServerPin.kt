@@ -25,13 +25,17 @@ private const val TAG = "AdbServerPin"
  *    by the pairing code (SPAKE2 is bound to the TLS exporter), so this cert is genuinely adbd's.
  * 2. The connect pin is the cert accepted on the connect port. Every connect must match it.
  *
- * DECIDED (trust on first use): it is not yet confirmed on a device that adbd presents the same
- * cert on the connect port as on the pairing port. So while no connect pin is stored, the first
- * connect that completes the ADB handshake stores whatever cert it saw. Pairing clears the
- * connect pin and runs the privileged setup straight away, so that first connect happens seconds
- * after an authenticated pairing, which is the only window a fake adbd could win. Installs paired
- * before pinning existed take the same path once. When the connect cert matches the pairing pin
- * the log says so; once that is confirmed on-device, requiring the match closes the window.
+ * The connect port's certificate is adbd's own key, generated at random once per adbd process
+ * (daemon/auth.cpp), while the pairing server runs in system_server, not adbd. So the connect cert
+ * is not the pairing cert, and it changes at every reboot; see [PreferenceAdbServerPinStore].
+ * Requiring the pairing pin on the connect port cannot work.
+ *
+ * DECIDED (trust on first use, per boot): while no connect pin is stored for this boot, the first
+ * connect that completes the ADB handshake stores whatever cert it saw. Pairing clears the connect
+ * pin and runs the privileged setup straight away, so that first connect happens seconds after an
+ * authenticated pairing. After a reboot the first user-started connect pins again; that is the
+ * window a fake adbd could win, and it is open only while Wireless debugging is on and the user
+ * has just tapped something in the broker screen. Within a boot a different cert is refused.
  */
 interface AdbServerPinStore {
     val pairingPin: String?
@@ -45,33 +49,62 @@ interface AdbServerPinStore {
     fun clear()
 }
 
-class PreferenceAdbServerPinStore(private val preference: SharedPreferences) : AdbServerPinStore {
+/**
+ * @param bootId identifies the current boot (Settings.Global.BOOT_COUNT in production), or null
+ *   when unknown. adbd generates its connect-port TLS key at random once per adbd process (AOSP
+ *   packages/modules/adb daemon/auth.cpp, `adbd_auth_tls_handshake`: a static `rsa_pkey` made by
+ *   `CreateRSA2048Key()` on first use), so every reboot brings a new certificate. A connect pin
+ *   stored in an earlier boot is therefore treated as absent and trust on first use runs again;
+ *   within one boot a different certificate is refused. Without this, every reboot would read as
+ *   "adbd's certificate changed".
+ */
+class PreferenceAdbServerPinStore(
+    private val preference: SharedPreferences,
+    private val bootId: () -> String? = { null },
+) : AdbServerPinStore {
 
     override val pairingPin: String? get() = preference.getString(PAIRING_KEY, null)
 
-    override val connectPin: String? get() = preference.getString(CONNECT_KEY, null)
+    override val connectPin: String?
+        get() {
+            val pin = preference.getString(CONNECT_KEY, null) ?: return null
+            val now = bootId() ?: return pin
+            val pinnedIn = preference.getString(CONNECT_BOOT_KEY, null)
+            if (pinnedIn != null && pinnedIn != now) {
+                Log.w(TAG, "connect pin is from boot $pinnedIn, now boot $now: adbd has a new key; pinning again on first use")
+                return null
+            }
+            return pin
+        }
 
     override fun recordPairing(pin: String) {
         preference.edit(commit = true) {
             putString(PAIRING_KEY, pin)
             remove(CONNECT_KEY)
+            remove(CONNECT_BOOT_KEY)
         }
     }
 
     override fun storeConnectPin(pin: String) {
-        preference.edit(commit = true) { putString(CONNECT_KEY, pin) }
+        val boot = bootId()
+        preference.edit(commit = true) {
+            putString(CONNECT_KEY, pin)
+            if (boot != null) putString(CONNECT_BOOT_KEY, boot) else remove(CONNECT_BOOT_KEY)
+        }
     }
 
     override fun clear() {
         preference.edit(commit = true) {
             remove(PAIRING_KEY)
             remove(CONNECT_KEY)
+            remove(CONNECT_BOOT_KEY)
         }
     }
 
     companion object {
         const val PAIRING_KEY = "adb_server_pin_pairing"
         const val CONNECT_KEY = "adb_server_pin_connect"
+        const val CONNECT_BOOT_KEY = "adb_server_pin_connect_boot"
     }
 }
 

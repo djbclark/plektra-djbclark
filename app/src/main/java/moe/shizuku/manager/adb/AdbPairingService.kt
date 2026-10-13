@@ -210,7 +210,7 @@ class AdbPairingService : Service() {
                         // The pairing code just authenticated this server cert as adbd's. Record it
                         // before handleResult, whose privileged setup makes the first connect.
                         val pin = client.serverPin ?: error("adbd presented no certificate")
-                        PreferenceAdbServerPinStore(EmbeddedAdbInit.prefs(this@AdbPairingService))
+                        EmbeddedAdbInit.pinStore(this@AdbPairingService)
                             .recordPairing(pin)
                     }
                     paired

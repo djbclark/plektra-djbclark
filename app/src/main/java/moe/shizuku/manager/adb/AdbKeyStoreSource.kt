@@ -156,6 +156,7 @@ object LegacyAdbKey {
             remove(LEGACY_KEY_PREF)
             remove(PreferenceAdbServerPinStore.PAIRING_KEY)
             remove(PreferenceAdbServerPinStore.CONNECT_KEY)
+            remove(PreferenceAdbServerPinStore.CONNECT_BOOT_KEY)
         }
         runCatching {
             KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(LEGACY_WRAPPING_ALIAS)

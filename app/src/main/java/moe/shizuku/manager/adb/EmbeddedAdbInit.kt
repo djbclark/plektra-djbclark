@@ -65,4 +65,16 @@ object EmbeddedAdbInit {
 
     @JvmStatic
     fun keySource(context: Context): AdbKeySource = keySourceFactory(context.applicationContext)
+
+    /** adbd's certificate pins, the connect pin scoped to the current boot (adbd's key is per boot). */
+    @JvmStatic
+    fun pinStore(context: Context): PreferenceAdbServerPinStore {
+        val app = context.applicationContext
+        return PreferenceAdbServerPinStore(prefs(app)) {
+            runCatching {
+                android.provider.Settings.Global.getInt(app.contentResolver, android.provider.Settings.Global.BOOT_COUNT)
+                    .toString()
+            }.getOrNull()
+        }
+    }
 }

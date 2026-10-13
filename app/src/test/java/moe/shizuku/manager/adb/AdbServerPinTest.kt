@@ -132,4 +132,41 @@ class AdbServerPinTest {
         assertFalse(EmbeddedAdbShell.isVerifyOutput("pastiera_verify\nanything else\n"))
         assertFalse(EmbeddedAdbShell.isVerifyOutput(" pastiera_verify\n"))
     }
+
+    /** adbd makes a new connect-port key per process, so a reboot must not read as an attack. */
+    @Test
+    fun aConnectPinFromAnEarlierBootIsPinnedAgainNotRefused() {
+        var boot = "7"
+        val scoped = PreferenceAdbServerPinStore(EmbeddedAdbInit.prefs(context)) { boot }
+        scoped.storeConnectPin(AdbServerPin.of(adbd))
+        assertEquals(AdbServerPin.of(adbd), scoped.connectPin)
+
+        // Same boot: a different cert is refused.
+        try {
+            PinnedAdbServerTrustManager(scoped).checkServerTrusted(arrayOf(other), "RSA")
+            fail("a different cert within one boot must be refused")
+        } catch (_: CertificateException) {
+        }
+
+        // After a reboot adbd presents a new cert: trust on first use again, then pinned for this boot.
+        boot = "8"
+        assertNull(scoped.connectPin)
+        val tm = PinnedAdbServerTrustManager(scoped)
+        tm.checkServerTrusted(arrayOf(other), "RSA")
+        tm.commitFirstUse()
+        assertEquals(AdbServerPin.of(other), scoped.connectPin)
+        try {
+            PinnedAdbServerTrustManager(scoped).checkServerTrusted(arrayOf(adbd), "RSA")
+            fail("the old cert is not accepted in the new boot")
+        } catch (_: CertificateException) {
+        }
+    }
+
+    @Test
+    fun withoutABootIdThePinNeverExpires() {
+        val unscoped = PreferenceAdbServerPinStore(EmbeddedAdbInit.prefs(context))
+        unscoped.storeConnectPin(AdbServerPin.of(adbd))
+        assertEquals(AdbServerPin.of(adbd), unscoped.connectPin)
+        assertEquals(AdbServerPin.of(adbd), EmbeddedAdbInit.pinStore(context).connectPin)
+    }
 }

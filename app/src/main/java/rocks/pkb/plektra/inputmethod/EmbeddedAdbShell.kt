@@ -12,7 +12,6 @@ import moe.shizuku.manager.adb.AdbMdns
 import moe.shizuku.manager.adb.AdbServerPinMismatchException
 import moe.shizuku.manager.adb.EmbeddedAdbInit
 import moe.shizuku.manager.adb.LegacyAdbKey
-import moe.shizuku.manager.adb.PreferenceAdbServerPinStore
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.TimeUnit
@@ -72,7 +71,7 @@ object EmbeddedAdbShell {
     fun forgetPairing(context: Context) {
         EmbeddedAdbInit.keySource(context).delete()
         LegacyAdbKey.discard(EmbeddedAdbInit.prefs(context))
-        PreferenceAdbServerPinStore(EmbeddedAdbInit.prefs(context)).clear()
+        EmbeddedAdbInit.pinStore(context).clear()
         lastError = null
         lastResult = null
     }
@@ -192,7 +191,7 @@ object EmbeddedAdbShell {
         lines: List<String>,
     ): List<PrivilegedResult> {
         val keyStore = EmbeddedAdbInit.keySource(app)
-        val pins = PreferenceAdbServerPinStore(EmbeddedAdbInit.prefs(app))
+        val pins = EmbeddedAdbInit.pinStore(app)
         val results = ArrayList<PrivilegedResult>(commands.size)
 
         fun failRest(reason: String, status: BrokerStatus?) {
