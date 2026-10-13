@@ -961,7 +961,6 @@ Mỗi phím có thể cấu hình là Keycode, Action, Native Ctrl hoặc None. 
     <string name="fn_ctrl_map_description">Ánh xạ phím Fn thành Ctrl ở cấp hệ thống, để Fn hoạt động như Ctrl ở mọi nơi (khuyên dùng cho Titan 2 Elite). Thử nghiệm và dành riêng cho Titan: ánh xạ Ctrl được suy ra từ một máy đã đặt Fn=Ctrl, nên có thể khác trên firmware khác, và có thể cần khởi động lại.</string>
     <string name="fn_ctrl_map_already_set">Fn đã được đặt thành Ctrl ✓</string>
     <string name="fn_ctrl_map_action">Đặt Fn → Ctrl</string>
-    <string name="fn_ctrl_map_working">Đang áp dụng…</string>
     <string name="fn_ctrl_status_success">Fn giờ là Ctrl — có thể cần khởi động lại để áp dụng hoàn toàn.</string>
     <string name="fn_ctrl_status_needs_permission">Đang mở màn hình cấp quyền ghi cài đặt — cấp \"Sửa đổi cài đặt hệ thống\" cho Plektra, rồi chạm lại.</string>
     <string name="fn_ctrl_map_warning">⚠ Thao tác này thay đổi cài đặt toàn hệ thống, ảnh hưởng mọi bàn phím và còn lại sau khi gỡ Plektra. Bạn có thể hoàn tác ở đây bất cứ lúc nào.</string>

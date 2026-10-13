@@ -2045,7 +2045,6 @@ Each key can be configured as Keycode, Action, Native Ctrl, or None. Use overrid
     <string name="fn_ctrl_map_description">Map the Fn key to Ctrl at the system level, so Fn works as Ctrl everywhere (recommended for Titan 2 Elite). Experimental and Titan-specific: the Ctrl mapping is inferred from a device that had Fn=Ctrl set, so it may behave differently on other firmware, and a reboot may be needed.</string>
     <string name="fn_ctrl_map_already_set">Fn is set to Ctrl ✓</string>
     <string name="fn_ctrl_map_action">Set Fn → Ctrl</string>
-    <string name="fn_ctrl_map_working">Applying…</string>
     <string name="fn_ctrl_status_success">Fn is now Ctrl — you may need to reboot for it to fully apply.</string>
     <string name="fn_ctrl_status_needs_permission">Opening the write-settings screen — grant \"Modify system settings\" for Plektra, then tap again.</string>
     <string name="fn_ctrl_status_failed">Couldn\'t apply the mapping. Grant Plektra \"Modify system settings\", or set up the wireless-debugging pairing at the top of this screen, then try again.</string>

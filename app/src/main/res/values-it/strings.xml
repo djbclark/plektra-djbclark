@@ -1136,7 +1136,6 @@ Ogni tasto può essere configurato come Keycode, Azione, Native Ctrl o Nessuno. 
     <string name="fn_ctrl_map_description">Mappa il tasto Fn su Ctrl a livello di sistema, così Fn funziona come Ctrl ovunque (consigliato per il Titan 2 Elite). Sperimentale e specifico per il Titan: la mappatura Ctrl è dedotta da un dispositivo con Fn=Ctrl impostato, quindi potrebbe comportarsi diversamente su altri firmware, e potrebbe servire un riavvio.</string>
     <string name="fn_ctrl_map_already_set">Fn è impostato su Ctrl ✓</string>
     <string name="fn_ctrl_map_action">Imposta Fn → Ctrl</string>
-    <string name="fn_ctrl_map_working">Applicazione in corso…</string>
     <string name="fn_ctrl_status_success">Fn ora è Ctrl: potrebbe servire un riavvio perché sia applicato del tutto.</string>
     <string name="fn_ctrl_status_needs_permission">Apertura della schermata di modifica delle impostazioni: concedi \"Modifica impostazioni di sistema\" a Plektra, poi tocca di nuovo.</string>
     <string name="fn_ctrl_map_warning">⚠ Questo modifica un\'impostazione di sistema che riguarda ogni tastiera e resta dopo la disinstallazione di Plektra. Puoi annullarla qui in qualsiasi momento.</string>

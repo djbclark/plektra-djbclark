@@ -961,7 +961,6 @@ Ctrl-ярлики застосунків із урахуванням розкл�
     <string name="fn_ctrl_map_description">Призначити клавішу Fn як Ctrl на системному рівні, щоб Fn працювала як Ctrl усюди (рекомендовано для Titan 2 Elite). Експериментально й специфічно для Titan: призначення Ctrl виведено з пристрою, на якому було встановлено Fn=Ctrl, тож на іншій прошивці воно може поводитися інакше, і може знадобитися перезавантаження.</string>
     <string name="fn_ctrl_map_already_set">Fn призначено як Ctrl ✓</string>
     <string name="fn_ctrl_map_action">Призначити Fn → Ctrl</string>
-    <string name="fn_ctrl_map_working">Застосування…</string>
     <string name="fn_ctrl_status_success">Fn тепер Ctrl — для повного застосування може знадобитися перезавантаження.</string>
     <string name="fn_ctrl_status_needs_permission">Відкривається екран дозволу на запис налаштувань — надайте Plektra дозвіл \"Змінювати системні налаштування\", а потім торкніться знову.</string>
     <string name="fn_ctrl_map_warning">⚠ Це змінює загальносистемне налаштування, яке впливає на кожну клавіатуру й залишається після видалення Plektra. Скасувати його можна тут будь-коли.</string>

@@ -961,7 +961,6 @@ Nav Mode-ը օգտագործում է ստեղնի ֆիզիկական դիրքը
     <string name="fn_ctrl_map_description">Համակարգային մակարդակում Fn ստեղնը կապել Ctrl-ի հետ, որպեսզի Fn-ն ամենուր աշխատի որպես Ctrl (խորհուրդ է տրվում Titan 2 Elite-ի համար)։ Փորձարարական և Titan-ին հատուկ. Ctrl-ի կապակցումը ենթադրվել է սարքից, որտեղ Fn=Ctrl սահմանված էր, ուստի այլ որոնվածում կարող է այլ կերպ վարվել, և կարող է վերաբեռնում պահանջվել։</string>
     <string name="fn_ctrl_map_already_set">Fn-ը սահմանված է որպես Ctrl ✓</string>
     <string name="fn_ctrl_map_action">Սահմանել Fn → Ctrl</string>
-    <string name="fn_ctrl_map_working">Կիրառվում է…</string>
     <string name="fn_ctrl_status_success">Fn-ն այժմ Ctrl է. ամբողջությամբ կիրառվելու համար կարող է վերաբեռնում պահանջվել։</string>
     <string name="fn_ctrl_status_needs_permission">Բացվում է կարգավորումների գրման էկրանը. տրամադրեք Plektra-ին \"Փոփոխել համակարգային կարգավորումները\" թույլտվությունը, ապա կրկին հպեք։</string>
     <string name="fn_ctrl_map_warning">⚠ Սա փոխում է համակարգային կարգավորում, որն ազդում է բոլոր ստեղնաշարերի վրա և մնում է Plektra-ը ապատեղադրելուց հետո։ Կարող եք ցանկացած պահի հետարկել այն այստեղից։</string>

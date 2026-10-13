@@ -961,7 +961,6 @@ Nav Mode использует физическое положение клави
     <string name="fn_ctrl_map_description">Сопоставить клавишу Fn с Ctrl на уровне системы, чтобы Fn работала как Ctrl везде (рекомендуется для Titan 2 Elite). Экспериментально и только для Titan: сопоставление Ctrl выведено с устройства, где было задано Fn=Ctrl, поэтому на другой прошивке оно может вести себя иначе, и может потребоваться перезагрузка.</string>
     <string name="fn_ctrl_map_already_set">Fn назначена как Ctrl ✓</string>
     <string name="fn_ctrl_map_action">Назначить Fn → Ctrl</string>
-    <string name="fn_ctrl_map_working">Применение…</string>
     <string name="fn_ctrl_status_success">Fn теперь Ctrl — для полного применения может потребоваться перезагрузка.</string>
     <string name="fn_ctrl_status_needs_permission">Открывается экран разрешений — выдайте Plektra \"Изменение системных настроек\", затем нажмите снова.</string>
     <string name="fn_ctrl_map_warning">⚠ Это меняет общесистемную настройку, которая влияет на все клавиатуры и остаётся после удаления Plektra. Отменить можно здесь в любой момент.</string>
