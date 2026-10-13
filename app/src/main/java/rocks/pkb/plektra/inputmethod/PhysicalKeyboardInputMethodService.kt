@@ -1876,6 +1876,10 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             handler = uiHandler,
             inputConnectionProvider = { currentInputConnection },
             isShiftActive = { isShiftModifierActive(null) },
+            isEditableFieldFocused = {
+                currentInputConnection != null &&
+                    (currentInputEditorInfo?.inputType ?: EditorInfo.TYPE_NULL) != EditorInfo.TYPE_NULL
+            },
             replayKey = { keyCode, downEvent, upEvent -> replayScreenTrackpadTriggerKey(keyCode, downEvent, upEvent) }
         )
         typingSoundPlayer = TypingSoundPlayer(this).apply { reload() }
@@ -3861,6 +3865,8 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         pendingKeyboardSurfaceTransition = null
         super.onFinishInput()
         caretBadgeController.onEditorGone() // djb/caret-badge
+        // The text field session ended: a lost key-up must not leave the overlay up.
+        if (::screenTrackpadController.isInitialized) screenTrackpadController.deactivate()
         if (::textExpansionController.isInitialized) textExpansionController.clear()
         keyboardVisibilityController.cancelPendingSurfaceTransition()
         accidentalKeyPressFilter.reset()

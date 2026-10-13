@@ -13,6 +13,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
@@ -37,6 +38,7 @@ class ScreenTrackpadControllerTest {
             handler = Handler(Looper.getMainLooper()),
             inputConnectionProvider = { null as InputConnection? },
             isShiftActive = { false },
+            isEditableFieldFocused = { true },
             replayKey = { keyCode, down, up -> replays += Replay(keyCode, down, up) }
         )
     }
@@ -123,5 +125,34 @@ class ScreenTrackpadControllerTest {
         assertFalse(controllerDown(KeyEvent.KEYCODE_SPACE))
         assertFalse(controllerUp(KeyEvent.KEYCODE_SPACE))
         assertTrue(replays.isEmpty())
+    }
+
+    @Test
+    fun hintIsAlwaysShownInStickyModes() {
+        assertTrue(ScreenTrackpadController.shouldShowHint(sticky = true, hintSetting = false))
+        assertTrue(ScreenTrackpadController.shouldShowHint(sticky = true, hintSetting = true))
+        assertTrue(ScreenTrackpadController.shouldShowHint(sticky = false, hintSetting = true))
+        assertFalse(ScreenTrackpadController.shouldShowHint(sticky = false, hintSetting = false))
+    }
+
+    @Test
+    fun holdWithoutEditableFieldFallsBackToATypedKeyAndNeverOpensTheOverlay() {
+        val context = RuntimeEnvironment.getApplication()
+        SettingsManager.setScreenTrackpadEnabled(context, true)
+        shadowOf(context).grantPermissions(android.Manifest.permission.SYSTEM_ALERT_WINDOW)
+        val noField = ScreenTrackpadController(
+            service = context,
+            handler = Handler(Looper.getMainLooper()),
+            inputConnectionProvider = { null as InputConnection? },
+            isShiftActive = { false },
+            isEditableFieldFocused = { false },
+            replayKey = { keyCode, down, up -> replays += Replay(keyCode, down, up) },
+        )
+        val d = down(KeyEvent.KEYCODE_SPACE)
+        assertTrue(noField.onKeyDown(KeyEvent.KEYCODE_SPACE, d, KeyEvent.KEYCODE_SPACE, d))
+        shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(500))
+
+        assertFalse(noField.isActive)
+        assertEquals(1, replays.size)
     }
 }
