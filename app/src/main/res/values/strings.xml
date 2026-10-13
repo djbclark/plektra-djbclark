@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="speech_external_enable">Enable FUTO Voice Input in Android keyboard settings</string>
     <string name="speech_external_installed">FUTO Voice Input is installed.</string>
     <string name="speech_external_missing">Install FUTO Voice Input to use this provider.</string>
@@ -1997,7 +1997,7 @@ Each key can be configured as Keycode, Action, Native Ctrl, or None. Use overrid
     <string name="density_title">Screen density</string>
     <string name="density_row_description">Fit more on screen, or make everything bigger</string>
     <string name="density_intro">Lower density fits more on screen; higher makes everything bigger. The Titan\'s screen is short, so a small reduction buys a surprising number of extra lines — and with a physical keyboard, none of that space goes back to an on-screen one.</string>
-    <string name="density_value">%1$d dpi (stock is %2$d)</string>
+    <string name="density_value" tools:ignore="PluralsCandidate">%1$d dpi (stock is %2$d)</string>
     <string name="density_smaller">Everything smaller, more fits on screen</string>
     <string name="density_larger">Everything larger, less fits on screen</string>
     <string name="density_stock">The density this screen shipped with</string>
