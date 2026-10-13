@@ -981,7 +981,7 @@ Ctrl-ярлики застосунків із урахуванням розкл�
     <string name="keyboard_backlight_outcome_write_failed">Пристрій не прийняв зміну.</string>
     <string name="keyboard_backlight_outcome_uncertain">Не вдалося підтвердити зміну, і вона ще може набути чинності. Попередній час збережено. Перезапустіть телефон перед наступною зміною.</string>
     <string name="long_press_cycle_next_title">Утримувати довше для</string>
-    <string name="long_press_cycle_next_description">Утримуйте після першого довгого натискання, щоб перейти до другого символу, — великі літери й символи однією рукою.</string>
+    <string name="long_press_cycle_next_description">Утримуйте після першого довгого натискання, щоб перейти до другого символу (за Shift і Варіантів або SYM — потім до третього, який застосовує обидва), — великі літери й символи однією рукою.</string>
     <string name="long_press_cycle_next_off">Нічого (вимк.)</string>
     <string name="long_press_cycle_end_title">Після останнього кроку</string>
     <string name="long_press_cycle_end_stop">Залишити останній символ</string>

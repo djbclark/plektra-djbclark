@@ -1822,7 +1822,7 @@ QWERTZ σε φυσικό QWERTY
     <string name="keyboard_backlight_outcome_write_failed">Η συσκευή δεν δέχτηκε την αλλαγή.</string>
     <string name="keyboard_backlight_outcome_uncertain">Δεν ήταν δυνατή η επιβεβαίωση της αλλαγής, η οποία μπορεί ακόμη να εφαρμοστεί. Ο προηγούμενος χρόνος παραμένει αποθηκευμένος. Επανεκκινήστε το τηλέφωνο πριν από άλλη αλλαγή.</string>
     <string name="long_press_cycle_next_title">Συνέχεια κρατήματος για</string>
-    <string name="long_press_cycle_next_description">Κρατήστε μετά το πρώτο παρατεταμένο πάτημα για να περάσετε σε δεύτερο χαρακτήρα, ώστε κεφαλαία και σύμβολα να γίνονται με ένα χέρι.</string>
+    <string name="long_press_cycle_next_description">Κρατήστε μετά το πρώτο παρατεταμένο πάτημα για να περάσετε σε δεύτερο χαρακτήρα (με Shift και Παραλλαγές ή SYM, έπειτα σε τρίτο που εφαρμόζει και τα δύο), ώστε κεφαλαία και σύμβολα να γίνονται με ένα χέρι.</string>
     <string name="long_press_cycle_next_off">Τίποτα (ανενεργό)</string>
     <string name="long_press_cycle_end_title">Μετά το τελευταίο βήμα</string>
     <string name="long_press_cycle_end_stop">Διατήρηση του τελευταίου χαρακτήρα</string>

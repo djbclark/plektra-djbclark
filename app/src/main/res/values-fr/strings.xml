@@ -980,7 +980,7 @@ Chaque touche peut être configurée comme Keycode, Action, Native Ctrl ou Aucun
     <string name="keyboard_backlight_outcome_write_failed">L’appareil n’a pas accepté la modification.</string>
     <string name="keyboard_backlight_outcome_uncertain">La modification n’a pas pu être confirmée et peut encore prendre effet. Le délai précédent reste enregistré. Redémarrez le téléphone avant une autre modification.</string>
     <string name="long_press_cycle_next_title">Continuer à maintenir pour</string>
-    <string name="long_press_cycle_next_description">Maintenez après le premier appui long pour passer à un second caractère : majuscules et symboles à une seule main.</string>
+    <string name="long_press_cycle_next_description">Maintenez après le premier appui long pour passer à un second caractère (avec Maj et Variantes ou SYM, puis à un troisième qui applique les deux) : majuscules et symboles à une seule main.</string>
     <string name="long_press_cycle_next_off">Rien (désactivé)</string>
     <string name="long_press_cycle_end_title">Après la dernière étape</string>
     <string name="long_press_cycle_end_stop">Garder le dernier caractère</string>

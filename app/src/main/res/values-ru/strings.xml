@@ -981,7 +981,7 @@ Nav Mode использует физическое положение клави
     <string name="keyboard_backlight_outcome_write_failed">Устройство не приняло изменение.</string>
     <string name="keyboard_backlight_outcome_uncertain">Не удалось подтвердить изменение, и оно ещё может вступить в силу. Прежнее время сохранено. Перезапустите телефон перед следующим изменением.</string>
     <string name="long_press_cycle_next_title">Удерживать дольше для</string>
-    <string name="long_press_cycle_next_description">Удерживайте после первого долгого нажатия, чтобы перейти ко второму символу, — заглавные буквы и символы одной рукой.</string>
+    <string name="long_press_cycle_next_description">Удерживайте после первого долгого нажатия, чтобы перейти ко второму символу (при Shift и Вариантах или SYM — затем к третьему, который применяет оба), — заглавные буквы и символы одной рукой.</string>
     <string name="long_press_cycle_next_off">Ничего (выкл.)</string>
     <string name="long_press_cycle_end_title">После последнего шага</string>
     <string name="long_press_cycle_end_stop">Оставить последний символ</string>

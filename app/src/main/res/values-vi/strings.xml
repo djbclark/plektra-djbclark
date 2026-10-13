@@ -978,7 +978,7 @@ Mỗi phím có thể cấu hình là Keycode, Action, Native Ctrl hoặc None. 
     <string name="keyboard_backlight_outcome_write_failed">Thiết bị không chấp nhận thay đổi.</string>
     <string name="keyboard_backlight_outcome_uncertain">Không thể xác nhận thay đổi và nó vẫn có thể có hiệu lực. Thời gian trước đó vẫn được lưu. Hãy khởi động lại điện thoại trước khi thay đổi tiếp.</string>
     <string name="long_press_cycle_next_title">Tiếp tục giữ để</string>
-    <string name="long_press_cycle_next_description">Giữ tiếp sau lần nhấn giữ đầu tiên để chuyển sang ký tự thứ hai, giúp gõ chữ hoa và ký hiệu chỉ bằng một tay.</string>
+    <string name="long_press_cycle_next_description">Giữ tiếp sau lần nhấn giữ đầu tiên để chuyển sang ký tự thứ hai (với Shift và Biến thể hoặc SYM, rồi sang ký tự thứ ba áp dụng cả hai), giúp gõ chữ hoa và ký hiệu chỉ bằng một tay.</string>
     <string name="long_press_cycle_next_off">Không (tắt)</string>
     <string name="long_press_cycle_end_title">Sau bước cuối</string>
     <string name="long_press_cycle_end_stop">Giữ ký tự cuối</string>

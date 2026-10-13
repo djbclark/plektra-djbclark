@@ -981,7 +981,7 @@ Każdy klawisz można skonfigurować jako Keycode, Akcja, Native Ctrl lub Brak. 
     <string name="keyboard_backlight_outcome_write_failed">Urządzenie nie przyjęło zmiany.</string>
     <string name="keyboard_backlight_outcome_uncertain">Nie udało się potwierdzić zmiany i może ona jeszcze zadziałać. Poprzedni czas pozostaje zapisany. Uruchom telefon ponownie przed kolejną zmianą.</string>
     <string name="long_press_cycle_next_title">Przytrzymaj dłużej dla</string>
-    <string name="long_press_cycle_next_description">Przytrzymaj po pierwszym długim naciśnięciu, aby przejść do drugiego znaku – wielkie litery i symbole jedną ręką.</string>
+    <string name="long_press_cycle_next_description">Przytrzymaj po pierwszym długim naciśnięciu, aby przejść do drugiego znaku (przy Shift i Wariantach lub SYM – potem do trzeciego, który stosuje oba) – wielkie litery i symbole jedną ręką.</string>
     <string name="long_press_cycle_next_off">Nic (wyłączone)</string>
     <string name="long_press_cycle_end_title">Po ostatnim kroku</string>
     <string name="long_press_cycle_end_stop">Zachowaj ostatni znak</string>
