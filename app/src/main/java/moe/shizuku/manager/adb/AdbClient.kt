@@ -86,6 +86,8 @@ class AdbClient(
 
     private var useTls = false
 
+    private var nextLocalId = 1
+
     private lateinit var tlsSocket: SSLSocket
     private lateinit var tlsInputStream: DataInputStream
     private lateinit var tlsOutputStream: DataOutputStream
@@ -120,7 +122,12 @@ class AdbClient(
 
         val trustManager = PinnedAdbServerTrustManager(pins)
         tlsSocket = sslContextFor(trustManager).socketFactory.createSocket(socket, host, port, true) as SSLSocket
-        tlsSocket.startHandshake()
+        try {
+            tlsSocket.startHandshake()
+        } catch (e: IOException) {
+            if (trustManager.mismatchSeen) throw AdbServerPinMismatchException(e)
+            throw e
+        }
         Log.d(TAG, "Handshake succeeded.")
 
         tlsInputStream = DataInputStream(tlsSocket.inputStream)
@@ -141,7 +148,8 @@ class AdbClient(
         maxOutputBytes: Int = MAX_SHELL_OUTPUT_BYTES,
         listener: ((ByteArray) -> Unit)?,
     ) = withinDeadline {
-        val localId = 1
+        // One stream per command, so a broker session can run several commands on one connection.
+        val localId = nextLocalId++
         var outputBytes = 0L
         write(A_OPEN, localId, 0, "shell:$command")
 

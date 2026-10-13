@@ -272,7 +272,9 @@ class AdbClientTest {
             try {
                 adb.connect()
                 fail("connect() must refuse a server cert that does not match the pin")
-            } catch (_: IOException) {
+            } catch (e: IOException) {
+                // A distinct type, so the status can say "adbd's certificate changed".
+                assertTrue(e.toString(), e is AdbServerPinMismatchException)
             }
         }
 
@@ -299,6 +301,44 @@ class AdbClientTest {
         }
 
         assertEquals("pastiera_verify\n", out.toString())
+    }
+
+    // ---- broker sessions: several commands, one connection ---------------------------------
+
+    @Test
+    fun twoCommandsRunOnOneConnectionAsSeparateStreams() {
+        val opened = java.util.Collections.synchronizedList(mutableListOf<Pair<Int, String>>())
+        startPeer { socket ->
+            val tls = tlsHandshake(socket)
+            send(tls.outputStream, A_CNXN, A_VERSION, A_MAXDATA, "device::\u0000".toByteArray())
+            repeat(2) { i ->
+                val open = readMessage(tls.inputStream)
+                assertEquals(A_OPEN, open.command)
+                opened += open.arg0 to String(open.data!!).trimEnd('\u0000')
+                send(tls.outputStream, A_OKAY, REMOTE_ID + i, open.arg0)
+                send(tls.outputStream, A_WRTE, REMOTE_ID + i, open.arg0, "out$i\n".toByteArray())
+                send(tls.outputStream, A_CLSE, REMOTE_ID + i, open.arg0)
+                // The client acknowledges the write, then answers the close.
+                while (readMessage(tls.inputStream).command != A_CLSE) Unit
+            }
+            tls.inputStream.readBytes()
+        }
+        val outputs = mutableListOf<String>()
+
+        tlsClient(MemoryPins()).use { adb ->
+            adb.connect()
+            listOf("echo a", "echo b").forEach { command ->
+                val out = StringBuilder()
+                adb.shellCommand(command) { out.append(String(it)) }
+                outputs += out.toString()
+            }
+        }
+
+        peer!!.join(5_000)
+        assertNull(peerError.get())
+        assertEquals(listOf("out0\n", "out1\n"), outputs)
+        assertEquals(listOf("shell:echo a", "shell:echo b"), opened.map { it.second })
+        assertEquals("each command needs its own local stream id", 2, opened.map { it.first }.toSet().size)
     }
 
     // ---- 1.3d: a key handle with no encoding still authenticates ---------------------------

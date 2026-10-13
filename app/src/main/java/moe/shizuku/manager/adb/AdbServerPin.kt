@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.SharedPreferences
 import android.util.Log
 import androidx.core.content.edit
+import java.io.IOException
 import java.net.Socket
 import java.security.MessageDigest
 import java.security.cert.CertificateException
@@ -74,6 +75,14 @@ class PreferenceAdbServerPinStore(private val preference: SharedPreferences) : A
     }
 }
 
+/**
+ * The connect port presented a certificate that does not match the stored pin: either adbd's
+ * identity changed (a reset, a reflash, data cleared) or something else answered. Either way the
+ * user has to forget the pairing and pair again.
+ */
+class AdbServerPinMismatchException(cause: Throwable) :
+    IOException("adbd's certificate does not match the pinned one", cause)
+
 object AdbServerPin {
 
     /** Lowercase hex SHA-256 of [cert]'s SubjectPublicKeyInfo. */
@@ -94,6 +103,15 @@ class PinnedAdbServerTrustManager(private val pins: AdbServerPinStore) : X509Ext
     @Volatile
     private var firstUsePin: String? = null
 
+    /**
+     * True once a certificate was refused for not matching the pin. AdbClient reads it after a
+     * failed handshake, so the user is told "adbd's certificate changed" rather than a generic
+     * refusal, however the TLS stack wraps the exception.
+     */
+    @Volatile
+    var mismatchSeen = false
+        private set
+
     private fun check(chain: Array<out X509Certificate>?) {
         val leaf = chain?.firstOrNull() ?: throw CertificateException("adbd presented no certificate")
         val seen = AdbServerPin.of(leaf)
@@ -101,6 +119,7 @@ class PinnedAdbServerTrustManager(private val pins: AdbServerPinStore) : X509Ext
         if (expected != null) {
             if (!MessageDigest.isEqual(seen.toByteArray(), expected.toByteArray())) {
                 Log.w(TAG, "adbd certificate does not match the pin (saw $seen); refusing")
+                mismatchSeen = true
                 throw CertificateException("adbd certificate does not match the stored pin")
             }
             return

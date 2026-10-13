@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import rocks.pkb.plektra.inputmethod.BrokerTrigger
 import rocks.pkb.plektra.inputmethod.EmbeddedAdbShell
 import rocks.pkb.plektra.inputmethod.PrivilegedDiagnostics
 import kotlinx.coroutines.Dispatchers
@@ -65,12 +66,14 @@ object BrokerStatusMonitor {
      * Re-check unless a recent verdict can be reused. Suspends while a check is in flight, so a
      * second screen asking at the same moment receives that same answer rather than racing it.
      */
-    suspend fun refresh(context: Context, force: Boolean = false) {
+    suspend fun refresh(context: Context, trigger: BrokerTrigger?, force: Boolean = false) {
         val appContext = context.applicationContext
+        // No trigger (the screen is not resumed): keep the last verdict rather than connect.
+        trigger ?: return
         refreshMutex.withLock {
             val age = System.currentTimeMillis() - lastCheckedAt
             if (!force && lastCheckedAt != 0L && age < FRESH_FOR_MS) return
-            val result = withContext(Dispatchers.IO) { EmbeddedAdbShell.verify(appContext) }
+            val result = withContext(Dispatchers.IO) { EmbeddedAdbShell.verify(appContext, trigger) }
             lastCheckedAt = System.currentTimeMillis()
             PrivilegedDiagnostics.recordBrokerStatus(appContext, result)
             _status.value = result
@@ -111,7 +114,12 @@ fun rememberVerifiedBrokerStatus(refreshKey: Any = Unit): State<EmbeddedAdbShell
     LaunchedEffect(refreshKey, wirelessOn) {
         // Seeding is a side effect, so it belongs here rather than in a remember block.
         BrokerStatusMonitor.seed(context)
-        BrokerStatusMonitor.refresh(context, force = true)
+        // Only while the broker's screen is open and resumed, and only to verify (finding 1.3g).
+        BrokerStatusMonitor.refresh(
+            context,
+            BrokerTrigger.forScreen(context, "broker_screen"),
+            force = true
+        )
     }
     return BrokerStatusMonitor.status.collectAsState()
 }

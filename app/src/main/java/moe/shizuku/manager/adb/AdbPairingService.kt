@@ -18,6 +18,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import rocks.pkb.plektra.R
+import rocks.pkb.plektra.inputmethod.BrokerAuditLog
+import rocks.pkb.plektra.inputmethod.BrokerTrigger
 import rocks.pkb.plektra.inputmethod.PrivilegedSetup
 import rocks.pkb.plektra.ui.BrokerStatusMonitor
 import rocks.pkb.plektra.inputmethod.EmbeddedAdbShell
@@ -185,9 +187,20 @@ class AdbPairingService : Service() {
                 }
             } catch (e: Throwable) {
                 Log.e(tag, "Unable to load ADB key", e)
+                BrokerAuditLog.record(
+                    this@AdbPairingService, BrokerAuditLog.Kind.KEY, "generate", ok = false,
+                    detail = e.javaClass.simpleName
+                )
                 discardUnprovenKey(keyStore, keyExistedBeforeAttempt)
                 handleResult(false, e)
                 return@launch
+            }
+
+            if (!keyExistedBeforeAttempt) {
+                BrokerAuditLog.record(
+                    this@AdbPairingService, BrokerAuditLog.Kind.KEY, "generated", ok = true,
+                    detail = (keyStore as? AndroidKeyStoreAdbKeySource)?.backing
+                )
             }
 
             runCatching {
@@ -239,8 +252,13 @@ class AdbPairingService : Service() {
 
         if (success) {
             Log.i(tag, "Pair succeed")
-            // One pairing, every privileged step: backlight, overlay permission, trackpad.
-            PrivilegedSetup.applyAll(this, reason = "pairing_succeeded")
+            BrokerAuditLog.record(this, BrokerAuditLog.Kind.PAIRING, "paired", ok = true)
+            // One pairing, every privileged step. The user typing the code is the user action.
+            PrivilegedSetup.applyAll(
+                this,
+                reason = "pairing_succeeded",
+                trigger = BrokerTrigger.fromPairingCode(this)
+            )
 
             title = getString(R.string.notification_adb_pairing_succeed_title)
             text = getString(R.string.notification_adb_pairing_succeed_text)
@@ -264,6 +282,10 @@ class AdbPairingService : Service() {
                 }
             }
 
+            BrokerAuditLog.record(
+                this, BrokerAuditLog.Kind.PAIRING, "paired", ok = false,
+                detail = exception?.javaClass?.simpleName
+            )
             if (exception != null) {
                 Log.w(tag, "Pair failed", exception)
             } else {

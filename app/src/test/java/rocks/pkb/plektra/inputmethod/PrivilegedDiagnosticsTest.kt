@@ -36,6 +36,8 @@ class PrivilegedDiagnosticsTest {
         EmbeddedAdbInit.keySourceFactory = savedFactory
     }
 
+    private val tap get() = BrokerTrigger.forTest(BrokerTrigger.Kind.TAP)
+
     private fun storeKey() {
         source.generate()
     }
@@ -88,12 +90,12 @@ class PrivilegedDiagnosticsTest {
 
     @Test
     fun verifyReportsMissingPrerequisitesWithoutTouchingTheNetwork() {
-        assertEquals(EmbeddedAdbShell.BrokerStatus.NOT_PAIRED, EmbeddedAdbShell.verify(context))
+        assertEquals(EmbeddedAdbShell.BrokerStatus.NOT_PAIRED, EmbeddedAdbShell.verify(context, tap))
 
         storeKey()
         assertEquals(
             EmbeddedAdbShell.BrokerStatus.WIRELESS_DEBUGGING_OFF,
-            EmbeddedAdbShell.verify(context)
+            EmbeddedAdbShell.verify(context, tap)
         )
     }
 
@@ -109,8 +111,10 @@ class PrivilegedDiagnosticsTest {
     }
 
     @Test
-    fun runShellFailsGracefullyWhenNotPaired() {
-        assertFalse(EmbeddedAdbShell.runShell(context, "echo hi"))
+    fun executeFailsGracefullyWhenNotPaired() {
+        val result = PrivilegedShell.run(context, PrivilegedCommand.Verify, tap)
+        assertFalse(result.ok)
+        assertEquals(EmbeddedAdbShell.BrokerStatus.NOT_PAIRED, result.status)
         assertTrue(EmbeddedAdbShell.lastError?.contains("Not paired") == true)
     }
 }
