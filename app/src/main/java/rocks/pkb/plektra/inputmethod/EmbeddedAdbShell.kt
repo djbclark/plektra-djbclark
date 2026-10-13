@@ -128,7 +128,8 @@ object EmbeddedAdbShell {
     /**
      * THE door to the broker. Runs [commands] in order on one connection and returns one result
      * per command. Before anything connects it checks, in this one place:
-     * 1. [trigger] is present, fresh and allows every command (finding 1.3g: user action only);
+     * 1. [trigger] is present, fresh and allows every command (finding 1.3g: user action only; a
+     *    [BrokerTrigger.Kind.SCREEN] trigger runs [PrivilegedCommand.readOnly] commands only);
      * 2. a [PrivilegedCommand.terminal] command, if any, comes last;
      * 3. every command line validates (no command runs if one fails).
      * Each command, and each refusal, goes to the [BrokerAuditLog] (finding 1.3h). When a command
@@ -162,6 +163,9 @@ object EmbeddedAdbShell {
         when {
             trigger == null -> return@synchronized refuse(REFUSED_NO_TRIGGER)
             !trigger.isFresh() -> return@synchronized refuse(REFUSED_STALE_TRIGGER)
+            // An open screen may only read ([PrivilegedCommand.readOnly]); every write needs a tap.
+            trigger.kind == BrokerTrigger.Kind.SCREEN && commands.any { !it.readOnly } ->
+                return@synchronized refuse(REFUSED_NOT_ALLOWED)
             commands.any { !trigger.allows(it) } -> return@synchronized refuse(REFUSED_NOT_ALLOWED)
             commands.dropLast(1).any { it.terminal } -> return@synchronized refuse(REFUSED_TERMINAL_NOT_LAST)
         }

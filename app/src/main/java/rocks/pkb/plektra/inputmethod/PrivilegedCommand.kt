@@ -42,11 +42,21 @@ internal sealed class PrivilegedCommand {
      */
     open val terminal: Boolean get() = false
 
+    /**
+     * True for a command that only reads state and changes nothing on the phone. An open,
+     * resumed screen ([BrokerTrigger.Kind.SCREEN]) may run these to show what the phone holds;
+     * everything that writes needs a tap ([BrokerTrigger.Kind.TAP]) or a pairing code. Set it only
+     * on a command whose every line is a read (`echo`, `settings get`, `pm list`, `wm density`
+     * without an argument, a vendor GET).
+     */
+    open val readOnly: Boolean get() = false
+
     // djb/broker: the broker's own commands.
 
     /** Proves the broker reaches a real shell: a real adbd echoes the marker back. */
     object Verify : PrivilegedCommand() {
         override val id = "verify"
+        override val readOnly: Boolean get() = true
         override fun commandLine(appPackage: String): String = "echo ${EmbeddedAdbShell.VERIFY_MARKER}"
     }
 
@@ -126,6 +136,7 @@ internal sealed class PrivilegedCommand {
     /** Reads the vendor keyboard-backlight timeout (`GET` on the vendor binder service). */
     object ReadBacklightTimeout : PrivilegedCommand() {
         override val id = "read_backlight_timeout"
+        override val readOnly: Boolean get() = true
         override fun commandLine(appPackage: String): String =
             "service call $VENDOR_SERVICE $TXN_GET s16 \"$KEY_BACKLIGHT_TIMEOUT\""
     }
@@ -195,6 +206,7 @@ internal sealed class PrivilegedCommand {
     /** Three read-only listings in one round trip: enabled, disabled, and everything. */
     object ListPackageStates : PrivilegedCommand() {
         override val id = "list_package_states"
+        override val readOnly: Boolean get() = true
         override fun commandLine(appPackage: String): String =
             "echo __E__; pm list packages -e; echo __D__; pm list packages -d; echo __U__; pm list packages -u"
     }
@@ -240,6 +252,7 @@ internal sealed class PrivilegedCommand {
 
     object ReadDensity : PrivilegedCommand() {
         override val id = "read_density"
+        override val readOnly: Boolean get() = true
         override fun commandLine(appPackage: String): String = "wm density"
     }
 
@@ -265,6 +278,7 @@ internal sealed class PrivilegedCommand {
     /** One `settings get` per tweak, in the order `SystemTweaks.parse` reads them. */
     object ReadSystemTweaks : PrivilegedCommand() {
         override val id = "read_system_tweaks"
+        override val readOnly: Boolean get() = true
         override fun commandLine(appPackage: String): String = buildList {
             add("settings get global ${SystemTweaks.ANIMATION_KEYS.first()}")
             SystemTweaks.Toggle.entries.forEach { add("settings get ${it.namespace} ${it.key}") }

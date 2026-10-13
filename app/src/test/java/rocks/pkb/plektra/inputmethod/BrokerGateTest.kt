@@ -76,6 +76,55 @@ class BrokerGateTest {
         assertEquals(EmbeddedAdbShell.REFUSED_NOT_ALLOWED, result.failure)
     }
 
+    /** The lead's rule for plk/main: an open screen may read what the phone holds, never write. */
+    @Test
+    fun aScreenTriggerRefusesEveryWritingCommand() {
+        val screen = BrokerTrigger.forTest(BrokerTrigger.Kind.SCREEN)
+        val writes = listOf(
+            PrivilegedCommand.SetDensity(320),
+            PrivilegedCommand.ResetDensity,
+            PrivilegedCommand.WriteBacklightTimeout(PrivilegedCommand.BacklightTimeout.ALWAYS_ON),
+            PrivilegedCommand.SetTweak(rocks.pkb.plektra.toolbox.SystemTweaks.Toggle.entries.first(), true),
+            PrivilegedCommand.SetFnProgrammableKey(1, 1),
+            PrivilegedCommand.InstallExistingPackage("com.agui.factorytest"),
+            PrivilegedCommand.GrantWriteSecureSettings,
+            PrivilegedCommand.DisableWirelessDebugging,
+        )
+        writes.forEach { command ->
+            assertFalse(command.id, command.readOnly)
+            val result = PrivilegedShell.run(context, command, screen)
+            assertFalse(command.id, result.ok)
+            assertEquals(command.id, EmbeddedAdbShell.REFUSED_NOT_ALLOWED, result.failure)
+        }
+        // A read followed by a write is refused as a whole, before anything connects.
+        val mixed = PrivilegedShell.runSession(
+            context, listOf(PrivilegedCommand.ReadDensity, PrivilegedCommand.SetDensity(320)), screen
+        )
+        assertTrue(mixed.all { it.failure == EmbeddedAdbShell.REFUSED_NOT_ALLOWED })
+        // Every refusal is audited (repeats of one id coalesce into one entry).
+        assertEquals((writes.map { it.id } + "read_density").toSet(), refusals().map { it.id }.toSet())
+    }
+
+    @Test
+    fun aScreenTriggerLetsReadOnlyCommandsPastTheGate() {
+        val screen = BrokerTrigger.forTest(BrokerTrigger.Kind.SCREEN)
+        // Wireless debugging off, so a command the gate lets through stops before discovery.
+        Settings.Global.putInt(context.contentResolver, "adb_wifi_enabled", 0)
+        val reads = listOf(
+            PrivilegedCommand.Verify,
+            PrivilegedCommand.ReadDensity,
+            PrivilegedCommand.ReadSystemTweaks,
+            PrivilegedCommand.ListPackageStates,
+            PrivilegedCommand.ReadBacklightTimeout,
+        )
+        reads.forEach { command ->
+            assertTrue(command.id, command.readOnly)
+            val result = PrivilegedShell.run(context, command, screen)
+            assertEquals(command.id, EmbeddedAdbShell.BrokerStatus.WIRELESS_DEBUGGING_OFF, result.status)
+        }
+        assertTrue(refusals().isEmpty())
+    }
+
     @Test
     fun aCommandThatEndsTheSessionMustBeLast() {
         val tap = BrokerTrigger.forTest(BrokerTrigger.Kind.TAP)

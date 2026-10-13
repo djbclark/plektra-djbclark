@@ -109,6 +109,23 @@ class PrivilegedCommandTest {
         assertEquals(setOf("unpair_self", "wireless_debugging_off"), terminal)
     }
 
+    /** A SCREEN trigger runs these and nothing else; each only reads. */
+    @Test
+    fun onlyTheReadsAreReadOnly() {
+        val readOnly = everyCase().filter { it.readOnly }.map { it.id }.toSet()
+        assertEquals(
+            setOf("verify", "read_backlight_timeout", "list_package_states", "read_density", "read_system_tweaks"),
+            readOnly
+        )
+        everyCase().filter { it.readOnly }.forEach { command ->
+            val line = command.commandLine(pkg)
+            listOf("put", "delete", "grant", "revoke", "disable", "enable", "install", "uninstall", "reset", " s16 \"-1\"")
+                .forEach { verb -> assertFalse("${command.id}: $verb", line.contains(" $verb ") || line.endsWith(" $verb")) }
+            assertFalse(command.id, line.contains("service call agui_functional_service 2"))
+            assertFalse(command.id, Regex("wm density \\d").containsMatchIn(line))
+        }
+    }
+
     @Test
     fun everyCaseHasAStableDistinctAuditId() {
         val ids = everyCase().map { it.id }

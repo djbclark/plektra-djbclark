@@ -16,8 +16,8 @@ import moe.shizuku.manager.adb.AdbPairingService
  * 1.3g). [EmbeddedAdbShell.execute] refuses to connect without one.
  *
  * The broker connects only on an explicit user action in the app's own screens: a tap (pair,
- * apply, forget), the broker screen being open (verify only), or a pairing code the user just
- * typed. The IME service is not an Activity, so the input-handling path cannot mint one, and a
+ * apply, forget), one of the app's screens being open (reads only: [PrivilegedCommand.readOnly]),
+ * or a pairing code the user just typed. The IME service is not an Activity, so the input-handling path cannot mint one, and a
  * trigger goes stale after [VALID_FOR_MS], so one cannot be kept for later.
  *
  * This is a design rule made hard to break by accident, not a boundary against code already
@@ -34,7 +34,10 @@ class BrokerTrigger private constructor(
         /** A tap on a button or switch in one of the app's screens. */
         TAP,
 
-        /** The broker's screen is open and resumed. Allows [PrivilegedCommand.Verify] only. */
+        /**
+         * One of the app's screens is open and resumed. Allows [PrivilegedCommand.readOnly]
+         * commands only (verify, and the reads a screen shows); every write needs [TAP].
+         */
         SCREEN,
 
         /** The user typed a pairing code into the pairing notification. */
@@ -45,7 +48,7 @@ class BrokerTrigger private constructor(
         nowMs - mintedAtMs in 0..VALID_FOR_MS
 
     internal fun allows(command: PrivilegedCommand): Boolean =
-        kind != Kind.SCREEN || command is PrivilegedCommand.Verify
+        kind != Kind.SCREEN || command.readOnly
 
     companion object {
         /** Long enough for a reset (two mDNS searches and three commands), short enough not to keep. */
@@ -55,7 +58,7 @@ class BrokerTrigger private constructor(
         fun fromTap(context: Context, source: String): BrokerTrigger? =
             mint(context, Kind.TAP, source)
 
-        /** For a check the broker's own screen runs while it is open. Null unless resumed. */
+        /** For a read a screen runs while it is open (read-only commands). Null unless resumed. */
         fun forScreen(context: Context, source: String): BrokerTrigger? =
             mint(context, Kind.SCREEN, source)
 
