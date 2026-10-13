@@ -23,7 +23,6 @@ import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
-import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * plk/shizuku-backend: the real [ShizukuShell]. Binds [PrivilegedShellService] through
@@ -80,21 +79,11 @@ internal object ShizukuUserServiceShell : ShizukuShell {
     internal const val REASON_SERVICE_STOPPED =
         "Shizuku's shell service stopped while the command was running (Shizuku may have restarted). Try again."
 
-    @Volatile
-    private var service: IPrivilegedShellService? = null
+    /** One lock for the service, the binding, the busy count and the call in flight; see [ServiceBindingState]. */
+    private val bindings = ServiceBindingState<IPrivilegedShellService, Binding>()
 
-    @Volatile
-    private var connecting: CountDownLatch? = null
-
-    @Volatile
-    private var boundArgs: Shizuku.UserServiceArgs? = null
-
-    /** The call a command is waiting on, so a disconnect can end the wait at once. */
-    @Volatile
-    private var inFlight: Future<Bundle>? = null
-
-    /** Commands between "started" and "answered"; the idle unbind never cuts one off. */
-    private val busy = AtomicInteger(0)
+    /** One bind: what [unbind] needs to undo it, with a connection that knows its generation. */
+    internal class Binding(val args: Shizuku.UserServiceArgs, val connection: ServiceConnection)
 
     private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
 
@@ -105,19 +94,19 @@ internal object ShizukuUserServiceShell : ShizukuShell {
         Thread(r, "shizuku-shell-call").apply { isDaemon = true }
     }
 
-    private val connection = object : ServiceConnection {
+    /** A connection for ONE bind; its callbacks are ignored once a newer bind or an unbind replaced it. */
+    private fun connectionFor(gen: Long, latch: CountDownLatch) = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
             if (binder != null && binder.pingBinder()) {
-                service = IPrivilegedShellService.Stub.asInterface(binder)
+                bindings.connected(gen, IPrivilegedShellService.Stub.asInterface(binder))
             }
-            connecting?.countDown()
+            latch.countDown()
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
-            service = null
             // The binder call usually throws DeadObjectException by itself; this makes the wait end
             // even when it does not.
-            inFlight?.cancel(true)
+            bindings.disconnected(gen)
         }
     }
 
@@ -156,23 +145,29 @@ internal object ShizukuUserServiceShell : ShizukuShell {
         if (state(context) != ShizukuState.READY) {
             return ShellRunResult.unavailable("Shizuku is not running or Plektra is not allowed.")
         }
-        busy.incrementAndGet()
+        // Claimed before the service is looked at, under the same lock the idle unbind decides
+        // under: the unbind either ran first (and connect binds afresh) or sees this command.
+        bindings.claim()
         mainHandler.removeCallbacks(idleUnbind)
+        var call: Future<Bundle>? = null
         try {
-            val shell = connect(context.applicationContext)
+            val claimed = connect(context.applicationContext)
                 ?: return ShellRunResult.unavailable("Shizuku did not start Plektra's shell service.")
-            val call = calls.submit<Bundle> { shell.run(argv.toTypedArray(), MAX_SHELL_OUTPUT_BYTES, CLIENT_DEADLINE_MS) }
-            inFlight = call
-            val result = awaitResult(call, CLIENT_DEADLINE_MS + CALL_SLACK_MS) {
-                // A call that never answered leaves a stuck service: kill it, the next call binds again.
-                unbind()
+            val shell = claimed.service
+            val submitted = calls.submit<Bundle> { shell.run(argv.toTypedArray(), MAX_SHELL_OUTPUT_BYTES, CLIENT_DEADLINE_MS) }
+            call = submitted
+            bindings.setInFlight(submitted)
+            val result = awaitResult(submitted, CLIENT_DEADLINE_MS + CALL_SLACK_MS) {
+                // A call that never answered leaves a stuck service: kill it, the next call binds
+                // again. Only this command's own generation; a newer bind is left alone.
+                unbind { bindings.unbindGeneration(claimed.generation, it) }
             }
             // A dead binder means a dead service: forget it so the next call binds a fresh one.
-            if (result.serviceUnavailable) service = null
+            if (result.serviceUnavailable) bindings.dropService(claimed.generation)
             return result
         } finally {
-            inFlight = null
-            if (busy.decrementAndGet() == 0) mainHandler.postDelayed(idleUnbind, IDLE_UNBIND_MS)
+            call?.let { bindings.clearInFlight(it) }
+            if (bindings.release()) mainHandler.postDelayed(idleUnbind, IDLE_UNBIND_MS)
         }
     }
 
@@ -209,7 +204,8 @@ internal object ShizukuUserServiceShell : ShizukuShell {
     }
 
     private fun unbindIfIdle() {
-        if (busy.get() == 0) unbind()
+        // Idle check and unbind decision are one step under the state's lock.
+        unbind { bindings.unbindIfIdle(it) }
     }
 
     private fun args(context: Context) = Shizuku.UserServiceArgs(
@@ -221,37 +217,40 @@ internal object ShizukuUserServiceShell : ShizukuShell {
         .version(AIDL_VERSION + BuildConfig.VERSION_CODE)
 
     /** The bound service, binding it first if needed. BLOCKING, up to [BIND_TIMEOUT_MS]. */
-    private fun connect(context: Context): IPrivilegedShellService? {
-        service?.takeIf { it.asBinder().pingBinder() }?.let { return it }
-        service = null
+    private fun connect(context: Context): ServiceBindingState.Claimed<IPrivilegedShellService>? {
+        bindings.current()?.takeIf { it.service.asBinder().pingBinder() }?.let { return it }
         val latch = CountDownLatch(1)
-        connecting = latch
         val args = args(context)
-        boundArgs = args
         // Shizuku delivers the connection on the main thread; bind from there too.
-        mainHandler.post {
-            runCatching { Shizuku.bindUserService(args, connection) }
-                .onFailure {
-                    Log.w(TAG, "bindUserService failed", it)
-                    latch.countDown()
+        val gen = bindings.beginBind(
+            create = { Binding(args, connectionFor(it, latch)) },
+            post = { b ->
+                mainHandler.post {
+                    runCatching { Shizuku.bindUserService(b.args, b.connection) }
+                        .onFailure {
+                            Log.w(TAG, "bindUserService failed", it)
+                            latch.countDown()
+                        }
                 }
-        }
+            },
+        )
         try {
             latch.await(BIND_TIMEOUT_MS, TimeUnit.MILLISECONDS)
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()
         }
-        return service?.takeIf { it.asBinder().pingBinder() }
+        return bindings.current()?.takeIf { it.generation == gen && it.service.asBinder().pingBinder() }
     }
 
-    /** Unbinds and kills the service process (a stuck command dies with it). */
-    private fun unbind() {
-        val args = boundArgs ?: return
-        boundArgs = null
-        service = null
-        val unbind = { runCatching { Shizuku.unbindUserService(args, connection, true) }; Unit }
-        // From the main thread (the idle timer, the hide hook) unbind in the same step as the idle
-        // check, so a command starting meanwhile cannot lose a service it just bound.
-        if (Looper.myLooper() == Looper.getMainLooper()) unbind() else mainHandler.post(unbind)
+    /**
+     * Unbinds and kills the service process (a stuck command dies with it). [take] decides, under
+     * the state's lock, whether there is a binding to undo and hands it to the callback it is given;
+     * the Shizuku call itself is posted to the main thread from inside that lock, so unbinds and
+     * binds reach Shizuku in the order they were decided.
+     */
+    private fun unbind(take: ((Binding) -> Unit) -> Boolean) {
+        take { b ->
+            mainHandler.post { runCatching { Shizuku.unbindUserService(b.args, b.connection, true) } }
+        }
     }
 }

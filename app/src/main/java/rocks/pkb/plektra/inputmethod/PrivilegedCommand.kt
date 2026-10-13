@@ -197,8 +197,6 @@ internal sealed class PrivilegedCommand {
         /** Undo of [ALLOW_FULL_SCREEN_INTENT], for a reset to stock. */
         RESET_FULL_SCREEN_INTENT;
 
-        fun line(appPackage: String): String = shellLine(listOf(argv(appPackage)))
-
         fun argv(appPackage: String): List<String> = when (this) {
             ALLOW_LISTENER -> listOf("cmd", "notification", "allow_listener", "$appPackage/$RING_LISTENER_CLASS")
             ALLOW_FULL_SCREEN_INTENT -> listOf("appops", "set", appPackage, "USE_FULL_SCREEN_INTENT", "allow")

@@ -11,8 +11,14 @@ import java.util.concurrent.atomic.AtomicBoolean
  * `maxOutputBytes` of output (stdout and stderr together, as adbd's shell gives them) and at most
  * `deadlineMs` from start to exit. Past either limit the process is killed and the run fails, as
  * an [moe.shizuku.manager.adb.AdbClient] session would. The program is started from an argv
- * array, never through `sh -c`, so there is no wrapper shell: the process killed at the deadline
- * is the one that was started, with no orphaned child. Plain JVM, so it is tested with a fake
+ * array, never through `sh -c`, so there is no wrapper shell of ours.
+ *
+ * What the kill guarantees, exactly: `Process.destroyForcibly()` ends the process that was
+ * started, and only that one. Java's ProcessBuilder cannot put the child in its own process
+ * group, so a child of that process is NOT killed. On Android `pm`, `settings`, `wm` and
+ * `appops` may be shell scripts that run `cmd` as a child `[INFERENCE: platform files, not in
+ * this repo]`; if so, that `cmd` can outlive the kill and still finish its action. The run is
+ * reported as failed either way, never as success. Plain JVM, so it is tested with a fake
  * process; it runs inside the Shizuku UserService ([PrivilegedShellService]).
  */
 internal object CappedProcessRunner {

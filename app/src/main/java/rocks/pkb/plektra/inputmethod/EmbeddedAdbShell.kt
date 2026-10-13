@@ -295,6 +295,9 @@ object EmbeddedAdbShell {
     private fun runArgvs(shell: ShizukuShell, app: Context, argvs: List<List<String>>): ShellRunResult {
         val output = StringBuilder()
         var last: ShellRunResult? = null
+        // The deadline is per program, not per command: each argv gets its own CLIENT_DEADLINE_MS
+        // in the service, so a command of N programs can hold the broker lock for up to N times
+        // that. (The old one-line route allowed one deadline per line.) Kept as is on purpose.
         for (argv in argvs) {
             val run = runCatching { shell.runArgv(app, argv) }.getOrElse {
                 ShellRunResult(false, null, null, "Shizuku call failed: ${describe(it)}", serviceUnavailable = true)
