@@ -31,6 +31,8 @@ object SettingLinkIds {
     const val TITAN2_ELITE_TOOLS_PRIVILEGED_ACCESS = "titan2_elite_tools.privileged_access"
     // djb/backlight: smart keyboard backlight row on the Titan 2 Elite tools screen
     const val TITAN2_ELITE_TOOLS_SMART_BACKLIGHT = "titan2_elite_tools.smart_backlight"
+    // plk/tile-holder: the keyboard-light tile's own switch in the Smart backlight section
+    const val TITAN2_ELITE_TOOLS_BACKLIGHT_TILE = "titan2_elite_tools.backlight_tile"
     // djb/toolbox: rows of the Titan 2 Elite toolbox (see Titan2EliteToolsSettingEntries.kt)
     const val TITAN2_ELITE_TOOLS_BLOAT = "titan2_elite_tools.bloat_remover"
     const val TITAN2_ELITE_TOOLS_DENSITY = "titan2_elite_tools.display_density"
@@ -1095,6 +1097,7 @@ object SettingLinkRegistry {
         SettingLinkIds.TITAN2_ELITE_TOOLS_PRIVILEGED_ACCESS to R.string.kw_titan2_elite_tools_privileged_access,
         // djb/backlight: smart keyboard backlight keywords
         SettingLinkIds.TITAN2_ELITE_TOOLS_SMART_BACKLIGHT to R.string.kw_titan2_elite_tools_smart_backlight,
+        SettingLinkIds.TITAN2_ELITE_TOOLS_BACKLIGHT_TILE to R.string.kw_titan2_elite_tools_backlight_tile,
         // djb/toolbox: toolbox keywords
         SettingLinkIds.TITAN2_ELITE_TOOLS_BLOAT to R.string.kw_titan2_elite_tools_bloat,
         SettingLinkIds.TITAN2_ELITE_TOOLS_DENSITY to R.string.kw_titan2_elite_tools_density,

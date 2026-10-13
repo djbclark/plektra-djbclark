@@ -55,7 +55,8 @@ import kotlinx.coroutines.withContext
  * Every write goes through a tap (finding 1.3g): the switch, and the "Apply again" button, which
  * also covers a switch turned on before the pairing was ready. The switch is the
  * [WriteSecureSettingsHolders.BACKLIGHT] holder, so the Quick Settings tile can write the vendor
- * keyboard-light row while it is on.
+ * keyboard-light row while it is on. A second switch, "Quick Settings tile", is the tile's own
+ * [WriteSecureSettingsHolders.BACKLIGHT_TILE] holder, for the tile with Smart backlight off.
  */
 @Composable
 fun SmartBacklightSection(modifier: Modifier = Modifier) {
@@ -63,6 +64,9 @@ fun SmartBacklightSection(modifier: Modifier = Modifier) {
     val scope = rememberCoroutineScope()
 
     var enabled by remember { mutableStateOf(SettingsManager.getSmartBacklightEnabled(context)) }
+    // Read (and so settled, see SettingsManager.getBacklightTileEnabled) before either switch can
+    // be flipped, so turning Smart backlight off never revokes from under an upgraded tile.
+    var tileEnabled by remember { mutableStateOf(SettingsManager.getBacklightTileEnabled(context)) }
 
     // Stored state is cheap to read, so it is polled to follow a write that lands while the screen
     // is open (the write itself is queued off-thread).
@@ -213,6 +217,47 @@ fun SmartBacklightSection(modifier: Modifier = Modifier) {
                     modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 12.dp)
                 )
             }
+        }
+
+        // plk/tile-holder: the keyboard-light tile's own hold on WRITE_SECURE_SETTINGS, so the tile
+        // keeps working with Smart backlight off (djbclark, 2026-10-13). Revoked only when no other
+        // holder (Smart backlight, the ring's keep-dark) still needs it.
+        Row(
+            modifier = Modifier
+                .settingRow(SettingLinkIds.TITAN2_ELITE_TOOLS_BACKLIGHT_TILE)
+                .fillMaxWidth()
+                .heightIn(min = 56.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.backlight_tile_holder_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = stringResource(R.string.backlight_tile_holder_description),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = tileEnabled,
+                onCheckedChange = { on ->
+                    tileEnabled = on
+                    SettingsManager.setBacklightTileEnabled(context, on)
+                    val trigger = BrokerTrigger.fromTap(context, "backlight_tile_toggle")
+                    // Grants on the first holder, revokes on the last; the session is audited.
+                    // When it queued one, Wireless debugging goes off after it as usual.
+                    if (PrivilegedSetup.setWriteSecureSettingsNeeded(
+                            context, WriteSecureSettingsHolders.BACKLIGHT_TILE, on, trigger
+                        )
+                    ) {
+                        PrivilegedSetup.queueFinishSetup(context, trigger)
+                    }
+                }
+            )
         }
     }
 }

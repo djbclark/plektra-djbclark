@@ -2138,7 +2138,10 @@ Each key can be configured as Keycode, Action, Native Ctrl, or None. Use overrid
     <string name="smart_backlight_not_applied_yet">The device setup is ready, but the always-on setting has not been written to your phone yet.</string>
     <string name="smart_backlight_apply_now">Apply now</string>
     <string name="density_revert_pending">A display size change was not confirmed, and Plektra could not undo it by itself. Tap Revert to put the display size back.</string>
-    <string name="backlight_tile_permission_missing">The keyboard light tile needs a permission that Plektra holds only while Smart backlight is on. Open Titan 2 Elite tools in Plektra settings, finish the device setup and turn Smart backlight on.</string>
+    <string name="backlight_tile_permission_missing">The keyboard light tile needs a permission that Plektra holds only while you ask for it. Open Titan 2 Elite tools in Plektra settings, finish the device setup and turn on \"Quick Settings tile\" under Smart backlight.</string>
+    <string name="backlight_tile_holder_title">Quick Settings tile</string>
+    <string name="backlight_tile_holder_description">Keep the permission the keyboard-light tile needs, even when Smart backlight is off.</string>
+    <string name="kw_titan2_elite_tools_backlight_tile">keyboard light, keyboard backlight, tile, quick settings, toggle, permission, write secure settings</string>
     <string name="kw_titan2_elite_tools_smart_backlight">keyboard backlight, keyboard light, led, backlight, dark, timeout, 30 seconds, always on, tile, quick settings</string>
 
     <!-- djb/toolbox: Titan 2 Elite toolbox (bloat remover, density, system tweaks, key mapping, Fn -> Ctrl, status bar, reset) -->

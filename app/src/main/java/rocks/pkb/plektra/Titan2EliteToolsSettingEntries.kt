@@ -49,6 +49,15 @@ internal fun titan2EliteToolsSettingEntries(): List<SettingEntry> = listOf(
         availabilityCheck = titan2EliteOnly,
         unavailableFallbackId = SettingLinkIds.MAIN_ADVANCED
     ),
+    // plk/tile-holder: the keyboard-light tile's switch, inside the Smart backlight section
+    SettingEntry(
+        id = SettingLinkIds.TITAN2_ELITE_TOOLS_BACKLIGHT_TILE,
+        titleRes = R.string.backlight_tile_holder_title,
+        summaryRes = R.string.backlight_tile_holder_description,
+        route = SettingRoute(SettingsDestination.Titan2EliteTools),
+        availabilityCheck = titan2EliteOnly,
+        unavailableFallbackId = SettingLinkIds.MAIN_ADVANCED
+    ),
     // djb/toolbox: the toolbox rows, rendered by ToolboxSection.kt
     SettingEntry(
         id = SettingLinkIds.TITAN2_ELITE_TOOLS_BLOAT,
