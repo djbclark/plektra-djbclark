@@ -25,6 +25,10 @@ import java.util.concurrent.TimeUnit
  *   2. AdbClient("127.0.0.1", port, storedKey).connect()
  *   3. one shell stream per command, in order, on that one connection
  *
+ * plk/shizuku-backend: when the user's "Privileged access via" setting picks Shizuku
+ * ([PrivilegedBackends]), the same door hands the checked command lines to Shizuku's UserService
+ * instead of connecting to adbd; nothing else about the door changes.
+ *
  * [execute] is the only way in, and it takes [PrivilegedCommand]s, never a string (finding 1.3g).
  * It is BLOCKING (network IO, up to ~8s of mDNS discovery): callers MUST invoke it OFF the main
  * thread. It never throws: every failure is returned, recorded in the audit log and surfaced via
@@ -123,7 +127,15 @@ object EmbeddedAdbShell {
      * [PIN_MISMATCH] is adbd presenting a different certificate from the pinned one: the user has
      * to forget the pairing and pair again.
      */
-    enum class BrokerStatus { OK, NOT_PAIRED, WIRELESS_DEBUGGING_OFF, NO_SERVICE, REJECTED, PIN_MISMATCH }
+    enum class BrokerStatus {
+        OK, NOT_PAIRED, WIRELESS_DEBUGGING_OFF, NO_SERVICE, REJECTED, PIN_MISMATCH,
+
+        /** plk/shizuku-backend: Shizuku was chosen but is not running, not allowed or not installed. */
+        SHIZUKU_UNAVAILABLE,
+    }
+
+    /** What [verifyWithBackend] found, and through which backend. */
+    data class Verdict(val status: BrokerStatus, val backend: PrivilegedBackend)
 
     /**
      * THE door to the broker. Runs [commands] in order on one connection and returns one result
@@ -132,14 +144,18 @@ object EmbeddedAdbShell {
      *    [BrokerTrigger.Kind.SCREEN] trigger runs [PrivilegedCommand.readOnly] commands only);
      * 2. a [PrivilegedCommand.terminal] command, if any, comes last;
      * 3. every command line validates (no command runs if one fails).
-     * Each command, and each refusal, goes to the [BrokerAuditLog] (finding 1.3h). When a command
-     * fails, the ones after it are not run. A terminal command that drops the connection reports
-     * failure "connection closed"; its caller checks the outcome some other way.
+     * Only then does it choose the backend (plk/shizuku-backend, [PrivilegedBackends]): Shizuku runs
+     * the lines through its UserService, the broker connects to adbd. [brokerOnly] skips the choice
+     * (the reset's unpair check is about the broker's own key). Each command, and each refusal,
+     * goes to the [BrokerAuditLog] (finding 1.3h), a command's entry naming its backend. When a
+     * command fails, the ones after it are not run. A terminal command that drops the connection
+     * reports failure "connection closed"; its caller checks the outcome some other way.
      */
     internal fun execute(
         context: Context,
         commands: List<PrivilegedCommand>,
         trigger: BrokerTrigger?,
+        brokerOnly: Boolean = false,
     ): List<PrivilegedResult> = synchronized(brokerLock) {
         val app = context.applicationContext
         if (commands.isEmpty()) return@synchronized emptyList()
@@ -152,12 +168,16 @@ object EmbeddedAdbShell {
             return commands.map { PrivilegedResult(ok = false, output = null, failure = reason, status = status) }
         }
 
-        fun fail(reason: String, status: BrokerStatus): List<PrivilegedResult> {
+        fun fail(reason: String, status: BrokerStatus, backend: PrivilegedBackend): List<PrivilegedResult> {
             commands.forEach {
-                BrokerAuditLog.record(app, BrokerAuditLog.Kind.COMMAND, it.id, ok = false, detail = reason)
+                BrokerAuditLog.record(
+                    app, BrokerAuditLog.Kind.COMMAND, it.id, ok = false, detail = auditDetail(backend, reason)
+                )
             }
             lastError = reason
-            return commands.map { PrivilegedResult(ok = false, output = null, failure = reason, status = status) }
+            return commands.map {
+                PrivilegedResult(ok = false, output = null, failure = reason, status = status, backend = backend)
+            }
         }
 
         when {
@@ -174,17 +194,87 @@ object EmbeddedAdbShell {
                 .getOrElse { return@synchronized refuse("invalid ${command.id}: ${it.message}") }
         }
 
+        // plk/shizuku-backend: past every check, choose the route.
+        if (!brokerOnly) {
+            val resolved = PrivilegedBackends.resolve(app)
+            if (resolved.backend == PrivilegedBackend.SHIZUKU) {
+                PrivilegedBackends.shizukuUnavailableReason(resolved.shizukuState)?.let { reason ->
+                    return@synchronized fail(reason, BrokerStatus.SHIZUKU_UNAVAILABLE, PrivilegedBackend.SHIZUKU)
+                }
+                return@synchronized runViaShizuku(app, commands, lines)
+            }
+        }
+
+        val broker = PrivilegedBackend.BROKER
         EmbeddedAdbInit.ensure()
-        if (!isPaired(app)) return@synchronized fail(REASON_NOT_PAIRED, BrokerStatus.NOT_PAIRED)
+        if (!isPaired(app)) return@synchronized fail(REASON_NOT_PAIRED, BrokerStatus.NOT_PAIRED, broker)
         if (!isWirelessDebuggingEnabled(app)) {
-            return@synchronized fail(REASON_WIRELESS_DEBUGGING_OFF, BrokerStatus.WIRELESS_DEBUGGING_OFF)
+            return@synchronized fail(REASON_WIRELESS_DEBUGGING_OFF, BrokerStatus.WIRELESS_DEBUGGING_OFF, broker)
         }
         val port = discoverPort(app)
         if (port == null || port <= 0) {
             Log.w(TAG, "embedded adb shell: $REASON_NO_SERVICE")
-            return@synchronized fail(REASON_NO_SERVICE, BrokerStatus.NO_SERVICE)
+            return@synchronized fail(REASON_NO_SERVICE, BrokerStatus.NO_SERVICE, broker)
         }
         runSession(app, port, commands, lines)
+    }
+
+    /** The audit detail of a command entry: its backend, and the reason when it failed. */
+    internal fun auditDetail(backend: PrivilegedBackend, reason: String? = null): String =
+        if (reason == null) "via ${backend.auditName}" else "via ${backend.auditName}: $reason"
+
+    /**
+     * plk/shizuku-backend: runs [lines] one by one through Shizuku's UserService, under the same
+     * output limit and deadline as the broker, and audits each like [runSession] does. Called only
+     * from [execute], after its checks. A non-zero exit code does not fail a command (adbd's shell
+     * reports none, so callers already judge results by output or by asking Android); it is noted
+     * in the audit entry.
+     */
+    private fun runViaShizuku(
+        app: Context,
+        commands: List<PrivilegedCommand>,
+        lines: List<String>,
+    ): List<PrivilegedResult> {
+        val backend = PrivilegedBackend.SHIZUKU
+        val shell = PrivilegedBackends.shizuku
+        val results = ArrayList<PrivilegedResult>(commands.size)
+        for (i in commands.indices) {
+            val command = commands[i]
+            val run = runCatching { shell.runLine(app, lines[i]) }
+                .getOrElse { ShellRunResult(false, null, null, describe(it)) }
+            if (run.ok) {
+                val output = run.output.orEmpty()
+                lastResult = output
+                lastError = null
+                val exit = run.exitCode?.takeIf { it != 0 }?.let { ", exit $it" }.orEmpty()
+                BrokerAuditLog.record(
+                    app, BrokerAuditLog.Kind.COMMAND, command.id, ok = true, detail = auditDetail(backend) + exit
+                )
+                results += PrivilegedResult(ok = true, output = output, failure = null, backend = backend)
+                continue
+            }
+            val reason = run.failure ?: "Shizuku command failed"
+            Log.w(TAG, "shizuku shell failed: $reason")
+            BrokerAuditLog.record(
+                app, BrokerAuditLog.Kind.COMMAND, command.id, ok = false, detail = auditDetail(backend, reason)
+            )
+            lastError = reason
+            val status = if (run.serviceUnavailable) BrokerStatus.SHIZUKU_UNAVAILABLE else null
+            results += PrivilegedResult(
+                ok = false, output = run.output, failure = reason, status = status, backend = backend
+            )
+            for (j in i + 1 until commands.size) {
+                BrokerAuditLog.record(
+                    app, BrokerAuditLog.Kind.COMMAND, commands[j].id, ok = false,
+                    detail = auditDetail(backend, REASON_EARLIER_FAILED)
+                )
+                results += PrivilegedResult(
+                    ok = false, output = null, failure = REASON_EARLIER_FAILED, backend = backend
+                )
+            }
+            return results
+        }
+        return results
     }
 
     /** Connect on [port] and run [lines], one stream each. Records every command it attempts. */
@@ -198,10 +288,16 @@ object EmbeddedAdbShell {
         val pins = EmbeddedAdbInit.pinStore(app)
         val results = ArrayList<PrivilegedResult>(commands.size)
 
+        val broker = PrivilegedBackend.BROKER
+
         fun failRest(reason: String, status: BrokerStatus?) {
             for (i in results.size until commands.size) {
-                BrokerAuditLog.record(app, BrokerAuditLog.Kind.COMMAND, commands[i].id, ok = false, detail = reason)
-                results += PrivilegedResult(ok = false, output = null, failure = reason, status = status)
+                BrokerAuditLog.record(
+                    app, BrokerAuditLog.Kind.COMMAND, commands[i].id, ok = false, detail = auditDetail(broker, reason)
+                )
+                results += PrivilegedResult(
+                    ok = false, output = null, failure = reason, status = status, backend = broker
+                )
             }
             lastError = reason
         }
@@ -240,15 +336,20 @@ object EmbeddedAdbShell {
                         val output = out.toString(Charsets.UTF_8.name())
                         lastResult = output
                         lastError = null
-                        BrokerAuditLog.record(app, BrokerAuditLog.Kind.COMMAND, command.id, ok = true)
-                        results += PrivilegedResult(ok = true, output = output, failure = null)
+                        BrokerAuditLog.record(
+                            app, BrokerAuditLog.Kind.COMMAND, command.id, ok = true, detail = auditDetail(broker)
+                        )
+                        results += PrivilegedResult(ok = true, output = output, failure = null, backend = broker)
                     } catch (t: Throwable) {
                         val partial = out.toString(Charsets.UTF_8.name()).ifEmpty { null }
                         val reason = if (command.terminal) REASON_CONNECTION_CLOSED else describe(t)
                         if (!command.terminal) Log.e(TAG, "embedded adb shell failed", t)
-                        BrokerAuditLog.record(app, BrokerAuditLog.Kind.COMMAND, command.id, ok = false, detail = reason)
+                        BrokerAuditLog.record(
+                            app, BrokerAuditLog.Kind.COMMAND, command.id, ok = false,
+                            detail = auditDetail(broker, reason)
+                        )
                         lastError = reason
-                        results += PrivilegedResult(ok = false, output = partial, failure = reason)
+                        results += PrivilegedResult(ok = false, output = partial, failure = reason, backend = broker)
                         failRest(REASON_EARLIER_FAILED, null)
                         return results
                     }
@@ -274,18 +375,32 @@ object EmbeddedAdbShell {
      *
      * The cheap prerequisites are answered without a trigger or a connection. BLOCKING (up to ~8s
      * of mDNS discovery plus a connect); call off the main thread.
+     *
+     * plk/shizuku-backend: it verifies whichever backend [execute] would use, so with Shizuku
+     * chosen an OK means Shizuku's shell answered. [brokerOnly] checks the broker itself.
      */
-    fun verify(context: Context, trigger: BrokerTrigger): BrokerStatus {
-        if (!isPaired(context)) return BrokerStatus.NOT_PAIRED
-        if (!isWirelessDebuggingEnabled(context)) return BrokerStatus.WIRELESS_DEBUGGING_OFF
-        val result = execute(context, listOf(PrivilegedCommand.Verify), trigger).single()
-        if (!result.ok) return result.status ?: BrokerStatus.REJECTED
+    fun verify(context: Context, trigger: BrokerTrigger, brokerOnly: Boolean = false): BrokerStatus =
+        verifyWithBackend(context, trigger, brokerOnly).status
+
+    /** [verify], also saying which backend answered (or would have). */
+    fun verifyWithBackend(context: Context, trigger: BrokerTrigger, brokerOnly: Boolean = false): Verdict {
+        val resolved = PrivilegedBackends.resolve(context)
+        val backend = if (brokerOnly) PrivilegedBackend.BROKER else resolved.backend
+        if (backend == PrivilegedBackend.BROKER) {
+            if (!isPaired(context)) return Verdict(BrokerStatus.NOT_PAIRED, backend)
+            if (!isWirelessDebuggingEnabled(context)) return Verdict(BrokerStatus.WIRELESS_DEBUGGING_OFF, backend)
+        } else if (resolved.shizukuState != ShizukuState.READY) {
+            return Verdict(BrokerStatus.SHIZUKU_UNAVAILABLE, backend)
+        }
+        val result = execute(context, listOf(PrivilegedCommand.Verify), trigger, brokerOnly).single()
+        val ran = result.backend ?: backend
+        if (!result.ok) return Verdict(result.status ?: BrokerStatus.REJECTED, ran)
         return if (isVerifyOutput(result.output.orEmpty())) {
-            BrokerStatus.OK
+            Verdict(BrokerStatus.OK, ran)
         } else {
-            // A real adbd echoes the marker back; anything else is not a shell we can trust.
-            lastError = "Unexpected verify output from adbd"
-            BrokerStatus.REJECTED
+            // A real shell echoes the marker back; anything else is not a shell we can trust.
+            lastError = "Unexpected verify output from ${ran.auditName}"
+            Verdict(BrokerStatus.REJECTED, ran)
         }
     }
 

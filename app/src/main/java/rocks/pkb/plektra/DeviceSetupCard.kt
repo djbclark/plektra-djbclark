@@ -213,6 +213,8 @@ fun DeviceSetupCard(modifier: Modifier = Modifier) {
                                 R.string.broker_blocked_no_service
                             EmbeddedAdbShell.BrokerStatus.NOT_PAIRED ->
                                 R.string.broker_blocked_not_paired
+                            EmbeddedAdbShell.BrokerStatus.SHIZUKU_UNAVAILABLE ->
+                                R.string.broker_blocked_shizuku
                             null -> R.string.device_setup_checking_body
                         }
                     ),

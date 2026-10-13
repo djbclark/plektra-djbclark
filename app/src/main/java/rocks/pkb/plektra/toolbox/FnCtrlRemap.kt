@@ -4,7 +4,7 @@ import android.content.Context
 import android.provider.Settings
 import android.util.Log
 import rocks.pkb.plektra.inputmethod.BrokerTrigger
-import rocks.pkb.plektra.inputmethod.EmbeddedAdbShell
+import rocks.pkb.plektra.inputmethod.PrivilegedBackends
 import rocks.pkb.plektra.inputmethod.PrivilegedCommand
 import rocks.pkb.plektra.inputmethod.PrivilegedShell
 import moe.shizuku.manager.adb.EmbeddedAdbInit
@@ -85,7 +85,7 @@ object FnCtrlRemap {
             }.getOrDefault(false)
             return if (ok && readPair(context) == (enable to function)) Result.SUCCESS else Result.FAILED
         }
-        if (EmbeddedAdbShell.isPaired(context)) {
+        if (PrivilegedBackends.hasAccess(context)) {
             if (enable !in 0..PrivilegedCommand.SetFnProgrammableKey.MAX_VALUE ||
                 function !in 0..PrivilegedCommand.SetFnProgrammableKey.MAX_VALUE
             ) return Result.FAILED

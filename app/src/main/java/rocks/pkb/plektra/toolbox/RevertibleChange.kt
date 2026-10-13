@@ -3,7 +3,7 @@ package rocks.pkb.plektra.toolbox
 import android.content.Context
 import android.util.Log
 import rocks.pkb.plektra.inputmethod.BrokerTrigger
-import rocks.pkb.plektra.inputmethod.EmbeddedAdbShell
+import rocks.pkb.plektra.inputmethod.PrivilegedBackends
 import rocks.pkb.plektra.inputmethod.PrivilegedCommand
 import rocks.pkb.plektra.inputmethod.PrivilegedSetup
 import rocks.pkb.plektra.inputmethod.PrivilegedShell
@@ -86,7 +86,7 @@ object RevertibleChange {
     private var armedTrigger: BrokerTrigger? = null
 
     internal fun apply(context: Context, kind: Kind, command: PrivilegedCommand, trigger: BrokerTrigger?): Outcome {
-        if (!EmbeddedAdbShell.isPaired(context)) return Outcome.NotPaired
+        if (!PrivilegedBackends.hasAccess(context)) return Outcome.NotPaired
         val appContext = context.applicationContext
 
         // Recorded first: a change we cannot reverse is worse than one that never lands.

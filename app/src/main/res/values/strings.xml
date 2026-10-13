@@ -2042,6 +2042,7 @@ Each key can be configured as Keycode, Action, Native Ctrl, or None. Use overrid
     <string name="broker_blocked_wireless_debugging">Wireless debugging is off. Android turns it off after a restart — turn it back on in Developer options.</string>
     <string name="broker_blocked_no_service">Wireless debugging is on but the phone is not advertising it. Turn it off and on again in Developer options.</string>
     <string name="broker_blocked_not_paired">Not paired. Follow the steps to set up wireless debugging.</string>
+    <string name="broker_blocked_shizuku">Shizuku is chosen under \"Privileged access via\" but is not running, or Plektra is not allowed in Shizuku.</string>
     <string name="broker_repair">Re-pair</string>
     <string name="broker_pin_mismatch_body">adbd\'s certificate changed. Forget the pairing and pair again.</string>
     <string name="broker_forgetting">Forgetting the pairing…</string>

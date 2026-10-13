@@ -380,13 +380,15 @@ internal enum class AppNotificationListener(val id: String, val className: Strin
 /**
  * What a [PrivilegedCommand] did. [failure] is a short reason when [ok] is false. [status] says
  * why the broker could not run at all (no pairing, Wireless debugging off, a changed adbd
- * certificate, ...), or is null when it ran.
+ * certificate, Shizuku unavailable, ...), or is null when it ran. [backend] is the route the door
+ * chose (plk/shizuku-backend), or null when the door refused the command before choosing.
  */
 internal data class PrivilegedResult(
     val ok: Boolean,
     val output: String?,
     val failure: String?,
     val status: EmbeddedAdbShell.BrokerStatus? = null,
+    val backend: PrivilegedBackend? = null,
 )
 
 /**
