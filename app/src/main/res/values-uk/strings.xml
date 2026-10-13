@@ -868,7 +868,6 @@ Ctrl-ярлики застосунків із урахуванням розкл�
     <string name="screen_trackpad_enabled_title">Увімкнути екранний трекпад</string>
     <string name="screen_trackpad_enabled_description">Перетворює весь дисплей на трекпад для курсора, поки активна клавіша-тригер</string>
     <string name="screen_trackpad_permission_title">Показ поверх інших застосунків</string>
-    <string name="screen_trackpad_permission_description">Потрібно, щоб трекпад міг перехоплювати свайпи поверх поточного застосунку</string>
     <string name="screen_trackpad_permission_granted">Дозвіл надано</string>
     <string name="screen_trackpad_permission_missing">Дозвіл не надано — торкніться, щоб відкрити системні налаштування</string>
     <string name="screen_trackpad_permission_toast">Екранному трекпаду потрібен дозвіл “Показ поверх інших застосунків”. Увімкніть його в налаштуваннях Plektra.</string>

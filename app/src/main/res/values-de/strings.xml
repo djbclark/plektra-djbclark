@@ -1616,7 +1616,6 @@ Jede Taste kann als Keycode, Aktion, Native Ctrl oder Keine konfiguriert werden.
     <string name="screen_trackpad_enabled_title">Bildschirm-Trackpad aktivieren</string>
     <string name="screen_trackpad_enabled_description">Macht das ganze Display zum Cursor-Trackpad, solange die Auslösetaste aktiv ist</string>
     <string name="screen_trackpad_permission_title">Über anderen Apps anzeigen</string>
-    <string name="screen_trackpad_permission_description">Erforderlich, damit das Trackpad Wischgesten über der aktuellen App erfassen kann</string>
     <string name="screen_trackpad_permission_granted">Berechtigung erteilt</string>
     <string name="screen_trackpad_permission_missing">Berechtigung nicht erteilt – tippe, um die Systemeinstellungen zu öffnen</string>
     <string name="screen_trackpad_permission_toast">Das Bildschirm-Trackpad braucht „Über anderen Apps anzeigen“. Aktiviere es in den Plektra-Einstellungen.</string>

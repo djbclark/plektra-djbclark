@@ -868,7 +868,6 @@ Nav Mode использует физическое положение клави
     <string name="screen_trackpad_enabled_title">Включить экранный трекпад</string>
     <string name="screen_trackpad_enabled_description">Превращает весь экран в трекпад для курсора, пока активна клавиша-триггер</string>
     <string name="screen_trackpad_permission_title">Поверх других приложений</string>
-    <string name="screen_trackpad_permission_description">Нужно, чтобы трекпад мог перехватывать свайпы поверх текущего приложения</string>
     <string name="screen_trackpad_permission_granted">Разрешение предоставлено</string>
     <string name="screen_trackpad_permission_missing">Разрешение не предоставлено — нажмите, чтобы открыть системные настройки</string>
     <string name="screen_trackpad_permission_toast">Экранному трекпаду нужно разрешение “Поверх других приложений”. Включите его в настройках Plektra.</string>

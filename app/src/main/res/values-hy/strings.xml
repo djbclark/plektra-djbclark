@@ -868,7 +868,6 @@ Nav Mode-ը օգտագործում է ստեղնի ֆիզիկական դիրքը
     <string name="screen_trackpad_enabled_title">Միացնել էկրանային թաչփադը</string>
     <string name="screen_trackpad_enabled_description">Ամբողջ էկրանը դարձնում է կուրսորի թաչփադ, քանի դեռ գործարկիչ ստեղնն ակտիվ է</string>
     <string name="screen_trackpad_permission_title">Ցուցադրում այլ հավելվածների վրա</string>
-    <string name="screen_trackpad_permission_description">Պահանջվում է, որպեսզի թաչփադը կարողանա գրանցել սահեցումները ընթացիկ հավելվածի վրայից</string>
     <string name="screen_trackpad_permission_granted">Թույլտվությունը տրված է</string>
     <string name="screen_trackpad_permission_missing">Թույլտվությունը տրված չէ. հպեք՝ համակարգի կարգավորումները բացելու համար</string>
     <string name="screen_trackpad_permission_toast">Էկրանային թաչփադը պահանջում է «Ցուցադրում այլ հավելվածների վրա»։ Միացրեք այն Plektra-ի կարգավորումներում։</string>

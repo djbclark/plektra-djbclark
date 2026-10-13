@@ -868,7 +868,6 @@ Każdy klawisz można skonfigurować jako Keycode, Akcja, Native Ctrl lub Brak. 
     <string name="screen_trackpad_enabled_title">Włącz trackpad ekranowy</string>
     <string name="screen_trackpad_enabled_description">Zamienia cały wyświetlacz w trackpad kursora, gdy klawisz wyzwalający jest aktywny</string>
     <string name="screen_trackpad_permission_title">Wyświetlanie nad innymi aplikacjami</string>
-    <string name="screen_trackpad_permission_description">Wymagane, aby trackpad mógł przechwytywać przesunięcia nad bieżącą aplikacją</string>
     <string name="screen_trackpad_permission_granted">Uprawnienie przyznane</string>
     <string name="screen_trackpad_permission_missing">Uprawnienie nieprzyznane — dotknij, aby otworzyć ustawienia systemu</string>
     <string name="screen_trackpad_permission_toast">Trackpad ekranowy wymaga uprawnienia „Wyświetlanie nad innymi aplikacjami”. Włącz je w ustawieniach Plektra.</string>

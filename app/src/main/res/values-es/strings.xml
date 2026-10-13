@@ -868,7 +868,6 @@ Cada tecla puede configurarse como Keycode, Acción, Native Ctrl o Ninguno. Usa 
     <string name="screen_trackpad_enabled_title">Activar trackpad de pantalla</string>
     <string name="screen_trackpad_enabled_description">Convierte toda la pantalla en un trackpad para el cursor mientras la tecla de activación esté activa</string>
     <string name="screen_trackpad_permission_title">Mostrar sobre otras aplicaciones</string>
-    <string name="screen_trackpad_permission_description">Necesario para que el trackpad pueda capturar deslizamientos sobre la aplicación actual</string>
     <string name="screen_trackpad_permission_granted">Permiso concedido</string>
     <string name="screen_trackpad_permission_missing">Permiso no concedido: toque para abrir los ajustes del sistema</string>
     <string name="screen_trackpad_permission_toast">El trackpad de pantalla necesita “Mostrar sobre otras aplicaciones”. Actívelo en los ajustes de Plektra.</string>

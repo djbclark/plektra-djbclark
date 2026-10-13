@@ -868,7 +868,6 @@ Mỗi phím có thể cấu hình là Keycode, Action, Native Ctrl hoặc None. 
     <string name="screen_trackpad_enabled_title">Bật bàn di chuột màn hình</string>
     <string name="screen_trackpad_enabled_description">Biến toàn bộ màn hình thành bàn di chuột con trỏ khi phím kích hoạt đang hoạt động</string>
     <string name="screen_trackpad_permission_title">Hiển thị trên ứng dụng khác</string>
-    <string name="screen_trackpad_permission_description">Cần thiết để bàn di chuột bắt được thao tác vuốt trên ứng dụng hiện tại</string>
     <string name="screen_trackpad_permission_granted">Đã cấp quyền</string>
     <string name="screen_trackpad_permission_missing">Chưa cấp quyền — chạm để mở cài đặt hệ thống</string>
     <string name="screen_trackpad_permission_toast">Bàn di chuột màn hình cần quyền “Hiển thị trên ứng dụng khác”. Bật trong cài đặt Plektra.</string>

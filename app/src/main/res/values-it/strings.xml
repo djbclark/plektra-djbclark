@@ -1044,7 +1044,6 @@ Ogni tasto può essere configurato come Keycode, Azione, Native Ctrl o Nessuno. 
     <string name="screen_trackpad_enabled_title">Abilita il trackpad su schermo</string>
     <string name="screen_trackpad_enabled_description">Trasforma l\'intero display in un trackpad per il cursore mentre il tasto di attivazione è attivo</string>
     <string name="screen_trackpad_permission_title">Visualizzazione sopra altre app</string>
-    <string name="screen_trackpad_permission_description">Necessaria perché il trackpad possa catturare gli swipe sopra l\'app corrente</string>
     <string name="screen_trackpad_permission_granted">Permesso concesso</string>
     <string name="screen_trackpad_permission_missing">Permesso non concesso: tocca per aprire le impostazioni di sistema</string>
     <string name="screen_trackpad_permission_toast">Il trackpad su schermo richiede “Visualizzazione sopra altre app”. Abilitalo nelle impostazioni di Plektra.</string>
