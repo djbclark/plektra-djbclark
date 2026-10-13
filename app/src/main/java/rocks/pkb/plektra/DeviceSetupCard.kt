@@ -184,7 +184,9 @@ fun DeviceSetupCard(modifier: Modifier = Modifier) {
                         when {
                             viaShizuku -> R.string.device_setup_ready_shizuku_title
                             connected -> R.string.device_setup_ready_title
-                            brokerStatus == null && paired -> R.string.device_setup_checking_title
+                            // Whatever the route (a key, or Shizuku just allowed), no verdict yet
+                            // means a check is pending, never "Setup needed".
+                            brokerStatus == null -> R.string.device_setup_checking_title
                             paired -> R.string.device_setup_unreachable_title
                             else -> R.string.device_setup_needed_title
                         }
@@ -259,8 +261,14 @@ fun DeviceSetupCard(modifier: Modifier = Modifier) {
                         val trigger = BrokerTrigger.fromTap(context, "forget_pairing")
                         forgetting = true
                         scope.launch {
-                            val result = withContext(Dispatchers.IO) {
-                                PrivilegedSetup.resetToStock(context, trigger)
+                            // Held against the status monitor so no check connects mid-unpair (the
+                            // TLS failure of a connect with a just-removed key was audited as a
+                            // failed verify); the check that follows finds no key and answers
+                            // NOT_PAIRED without connecting.
+                            val result = BrokerStatusMonitor.exclusive {
+                                withContext(Dispatchers.IO) {
+                                    PrivilegedSetup.resetToStock(context, trigger)
+                                }
                             }
                             forgetOutcome = forgetOutcomeOf(result)
                             forgetting = false
@@ -362,7 +370,8 @@ private fun ForgetOutcomeNotice(outcome: String, onOpenWireless: () -> Unit) {
     if (manual) {
         Spacer(modifier = Modifier.height(6.dp))
         Button(onClick = onOpenWireless) {
-            Text(stringResource(R.string.device_setup_open_wireless))
+            // Not the pairing button's label: this one only opens the page, to remove the entry.
+            Text(stringResource(R.string.broker_forget_open_wireless))
         }
     }
 }
