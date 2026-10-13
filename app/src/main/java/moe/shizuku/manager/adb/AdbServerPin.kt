@@ -1,0 +1,183 @@
+package moe.shizuku.manager.adb
+
+import android.annotation.SuppressLint
+import android.content.SharedPreferences
+import android.util.Log
+import androidx.core.content.edit
+import java.net.Socket
+import java.security.MessageDigest
+import java.security.cert.CertificateException
+import java.security.cert.X509Certificate
+import javax.net.ssl.SSLEngine
+import javax.net.ssl.X509ExtendedTrustManager
+
+private const val TAG = "AdbServerPin"
+
+/**
+ * Pins of adbd's TLS server certificate (adversary review 2026-10-12, finding 1.2).
+ *
+ * mDNS does not authenticate the `_adb-tls-connect._tcp` advertiser: any local app can advertise
+ * its own port. Without a pin the client would run its commands against whatever answered.
+ *
+ * A pin is the lowercase hex SHA-256 of the leaf certificate's SubjectPublicKeyInfo.
+ * 1. The pairing pin is the cert adbd presented on the pairing port. That session is authenticated
+ *    by the pairing code (SPAKE2 is bound to the TLS exporter), so this cert is genuinely adbd's.
+ * 2. The connect pin is the cert accepted on the connect port. Every connect must match it.
+ *
+ * DECIDED (trust on first use): it is not yet confirmed on a device that adbd presents the same
+ * cert on the connect port as on the pairing port. So while no connect pin is stored, the first
+ * connect that completes the ADB handshake stores whatever cert it saw. Pairing clears the
+ * connect pin and runs the privileged setup straight away, so that first connect happens seconds
+ * after an authenticated pairing, which is the only window a fake adbd could win. Installs paired
+ * before pinning existed take the same path once. When the connect cert matches the pairing pin
+ * the log says so; once that is confirmed on-device, requiring the match closes the window.
+ */
+interface AdbServerPinStore {
+    val pairingPin: String?
+    val connectPin: String?
+
+    /** A pairing just succeeded against a server presenting [pin]; restart trust on first use. */
+    fun recordPairing(pin: String)
+
+    fun storeConnectPin(pin: String)
+
+    fun clear()
+}
+
+class PreferenceAdbServerPinStore(private val preference: SharedPreferences) : AdbServerPinStore {
+
+    override val pairingPin: String? get() = preference.getString(PAIRING_KEY, null)
+
+    override val connectPin: String? get() = preference.getString(CONNECT_KEY, null)
+
+    override fun recordPairing(pin: String) {
+        preference.edit(commit = true) {
+            putString(PAIRING_KEY, pin)
+            remove(CONNECT_KEY)
+        }
+    }
+
+    override fun storeConnectPin(pin: String) {
+        preference.edit(commit = true) { putString(CONNECT_KEY, pin) }
+    }
+
+    override fun clear() {
+        preference.edit(commit = true) {
+            remove(PAIRING_KEY)
+            remove(CONNECT_KEY)
+        }
+    }
+
+    companion object {
+        const val PAIRING_KEY = "adb_server_pin_pairing"
+        const val CONNECT_KEY = "adb_server_pin_connect"
+    }
+}
+
+object AdbServerPin {
+
+    /** Lowercase hex SHA-256 of [cert]'s SubjectPublicKeyInfo. */
+    fun of(cert: X509Certificate): String =
+        MessageDigest.getInstance("SHA-256").digest(cert.publicKey.encoded)
+            .joinToString("") { "%02x".format(it) }
+}
+
+/**
+ * Accepts adbd's connect-port certificate only if it matches the stored connect pin, or, while no
+ * connect pin is stored, records it for [commitFirstUse] (see [AdbServerPinStore] for why).
+ *
+ * The check runs inside the TLS handshake, so a peer that fails it never receives our client
+ * certificate or a CertificateVerify signature.
+ */
+class PinnedAdbServerTrustManager(private val pins: AdbServerPinStore) : X509ExtendedTrustManager() {
+
+    @Volatile
+    private var firstUsePin: String? = null
+
+    private fun check(chain: Array<out X509Certificate>?) {
+        val leaf = chain?.firstOrNull() ?: throw CertificateException("adbd presented no certificate")
+        val seen = AdbServerPin.of(leaf)
+        val expected = pins.connectPin
+        if (expected != null) {
+            if (!MessageDigest.isEqual(seen.toByteArray(), expected.toByteArray())) {
+                Log.w(TAG, "adbd certificate does not match the pin (saw $seen); refusing")
+                throw CertificateException("adbd certificate does not match the stored pin")
+            }
+            return
+        }
+        firstUsePin = seen
+    }
+
+    /**
+     * Call once the ADB handshake has completed. If no connect pin was stored, stores the cert
+     * this connection accepted, so every later connect must present the same one.
+     */
+    fun commitFirstUse() {
+        val seen = firstUsePin ?: return
+        if (pins.connectPin != null) return
+        val pairing = pins.pairingPin
+        when {
+            pairing == null -> Log.w(TAG, "pinning adbd connect cert $seen on first use (no pairing pin recorded)")
+            pairing == seen -> Log.w(TAG, "pinning adbd connect cert $seen; it matches the pairing-port cert")
+            else -> Log.w(TAG, "pinning adbd connect cert $seen on first use; it differs from the pairing-port cert $pairing")
+        }
+        pins.storeConnectPin(seen)
+        firstUsePin = null
+    }
+
+    override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?, socket: Socket?) = check(chain)
+
+    override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?, engine: SSLEngine?) = check(chain)
+
+    override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) = check(chain)
+
+    override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?, socket: Socket?) {
+        throw CertificateException("client certificates are not accepted")
+    }
+
+    override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?, engine: SSLEngine?) {
+        throw CertificateException("client certificates are not accepted")
+    }
+
+    override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {
+        throw CertificateException("client certificates are not accepted")
+    }
+
+    override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
+}
+
+/**
+ * The pairing port's trust manager. It accepts any server certificate because the pairing session
+ * is authenticated afterwards by the pairing code: SPAKE2 is keyed with the TLS exporter, so a
+ * man in the middle cannot complete it. The cert seen here becomes the pairing pin only once the
+ * pairing succeeds (AdbPairingClient reads it from the session).
+ */
+@SuppressLint("CustomX509TrustManager")
+object PairingAdbServerTrustManager : X509ExtendedTrustManager() {
+
+    @SuppressLint("TrustAllX509TrustManager")
+    override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?, socket: Socket?) {
+    }
+
+    @SuppressLint("TrustAllX509TrustManager")
+    override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?, engine: SSLEngine?) {
+    }
+
+    @SuppressLint("TrustAllX509TrustManager")
+    override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {
+    }
+
+    override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?, socket: Socket?) {
+        throw CertificateException("client certificates are not accepted")
+    }
+
+    override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?, engine: SSLEngine?) {
+        throw CertificateException("client certificates are not accepted")
+    }
+
+    override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {
+        throw CertificateException("client certificates are not accepted")
+    }
+
+    override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
+}

@@ -11,6 +11,8 @@ import moe.shizuku.manager.adb.AdbKeyException
 import moe.shizuku.manager.adb.AdbMdns
 import moe.shizuku.manager.adb.EmbeddedAdbInit
 import moe.shizuku.manager.adb.PreferenceAdbKeyStore
+import moe.shizuku.manager.adb.PreferenceAdbServerPinStore
+import java.io.ByteArrayOutputStream
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.TimeUnit
 
@@ -35,6 +37,9 @@ object EmbeddedAdbShell {
     private const val MDNS_POLL_SECONDS = 8L
     // Pref key that PreferenceAdbKeyStore writes the private key under once paired.
     private const val STORED_KEY_PREF = "adbkey"
+
+    /** What [verify]'s command prints; anything else means the peer is not a working adbd. */
+    internal const val VERIFY_MARKER = "pastiera_verify"
 
     /** Last connect/shell error, for a troubleshooting surface. null after a clean run. */
     @Volatile
@@ -61,6 +66,7 @@ object EmbeddedAdbShell {
      */
     fun forgetPairing(context: Context) {
         PreferenceAdbKeyStore(EmbeddedAdbInit.prefs(context)).clear()
+        PreferenceAdbServerPinStore(EmbeddedAdbInit.prefs(context)).clear()
         lastError = null
         lastResult = null
     }
@@ -127,12 +133,17 @@ object EmbeddedAdbShell {
             Log.w(TAG, "embedded adb shell: $lastError")
             return false
         }
-        return connectAndRun(context, port, command)
+        return connectAndRun(context, port, command) != null
     }
 
-    /** Connect on [port] and run [command]. Sets [lastResult]/[lastError]. */
-    private fun connectAndRun(context: Context, port: Int, command: String): Boolean {
+    /**
+     * Connect on [port] and run [command]. Returns its output, or null on failure. Sets
+     * [lastResult]/[lastError]. The output is capped and the whole exchange has a deadline
+     * (AdbClient), so a fake adbd cannot exhaust memory or hold the broker lock.
+     */
+    private fun connectAndRun(context: Context, port: Int, command: String): String? {
         val keyStore = PreferenceAdbKeyStore(EmbeddedAdbInit.prefs(context))
+        val pins = PreferenceAdbServerPinStore(EmbeddedAdbInit.prefs(context))
         return try {
             val key = try {
                 AdbKey(keyStore, EmbeddedAdbInit.KEY_NAME)
@@ -142,18 +153,19 @@ object EmbeddedAdbShell {
                 keyStore.clear()
                 throw e
             }
-            AdbClient("127.0.0.1", port, key).use { client ->
+            val output = AdbClient("127.0.0.1", port, key, pins).use { client ->
                 client.connect()
-                val sb = StringBuilder()
-                client.shellCommand(command) { bytes -> sb.append(String(bytes)) }
-                lastResult = sb.toString()
+                val out = ByteArrayOutputStream()
+                client.shellCommand(command) { bytes -> out.write(bytes) }
+                out.toString(Charsets.UTF_8.name())
             }
+            lastResult = output
             lastError = null
-            true
+            output
         } catch (t: Throwable) {
             Log.e(TAG, "embedded adb shell failed", t)
             lastError = "${t.javaClass.simpleName}: ${t.message}"
-            false
+            null
         }
     }
 
@@ -181,7 +193,18 @@ object EmbeddedAdbShell {
         if (!isWirelessDebuggingEnabled(context)) return@synchronized BrokerStatus.WIRELESS_DEBUGGING_OFF
         val port = discoverPort(context)
         if (port == null || port <= 0) return@synchronized BrokerStatus.NO_SERVICE
-        if (connectAndRun(context, port, "echo pastiera_verify")) BrokerStatus.OK
-        else BrokerStatus.REJECTED
+        val output = connectAndRun(context, port, "echo $VERIFY_MARKER")
+            ?: return@synchronized BrokerStatus.REJECTED
+        if (isVerifyOutput(output)) {
+            BrokerStatus.OK
+        } else {
+            // A real adbd echoes the marker back; anything else is not a shell we can trust.
+            lastError = "Unexpected verify output from adbd"
+            BrokerStatus.REJECTED
+        }
     }
+
+    /** True when [output] is exactly the verify marker, allowing only the shell's line ending. */
+    internal fun isVerifyOutput(output: String): Boolean =
+        output.removeSuffix("\n").removeSuffix("\r") == VERIFY_MARKER
 }

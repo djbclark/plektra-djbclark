@@ -5,14 +5,11 @@
  */
 package moe.shizuku.manager.adb
 
-import android.annotation.SuppressLint
 import android.content.SharedPreferences
-import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import android.util.Log
-import androidx.annotation.RequiresApi
 import androidx.core.content.edit
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo
@@ -37,9 +34,8 @@ import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.spec.GCMParameterSpec
 import javax.net.ssl.SSLContext
-import javax.net.ssl.SSLEngine
 import javax.net.ssl.X509ExtendedKeyManager
-import javax.net.ssl.X509ExtendedTrustManager
+import javax.net.ssl.X509TrustManager
 
 private const val TAG = "AdbKey"
 
@@ -53,27 +49,6 @@ class AdbKey(private val adbKeyStore: AdbKeyStore, name: String) {
 
         private const val IV_SIZE_IN_BYTES = 12
         private const val TAG_SIZE_IN_BYTES = 16
-
-        private val PADDING = byteArrayOf(
-                0x00, 0x01, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0x00,
-                0x30, 0x21, 0x30, 0x09, 0x06, 0x05, 0x2b, 0x0e, 0x03, 0x02, 0x1a, 0x05, 0x00,
-                0x04, 0x14)
     }
 
     private val encryptionKey: Key
@@ -183,13 +158,6 @@ class AdbKey(private val adbKeyStore: AdbKeyStore, name: String) {
         return privateKey
     }
 
-    fun sign(data: ByteArray?): ByteArray {
-        val cipher = Cipher.getInstance("RSA/ECB/NoPadding")
-        cipher.init(Cipher.ENCRYPT_MODE, privateKey)
-        cipher.update(PADDING)
-        return cipher.doFinal(data)
-    }
-
     private val keyManager
         get() = object : X509ExtendedKeyManager() {
             private val alias = "key"
@@ -226,45 +194,20 @@ class AdbKey(private val adbKeyStore: AdbKeyStore, name: String) {
         }
 
 
-    private val trustManager
-        get() =
-            @RequiresApi(Build.VERSION_CODES.R)
-            object : X509ExtendedTrustManager() {
-
-                @SuppressLint("TrustAllX509TrustManager")
-                override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?, socket: Socket?) {
-                }
-
-                @SuppressLint("TrustAllX509TrustManager")
-                override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?, engine: SSLEngine?) {
-                }
-
-                @SuppressLint("TrustAllX509TrustManager")
-                override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {
-                }
-
-                @SuppressLint("TrustAllX509TrustManager")
-                override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?, socket: Socket?) {
-                }
-
-                @SuppressLint("TrustAllX509TrustManager")
-                override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?, engine: SSLEngine?) {
-                }
-
-                @SuppressLint("TrustAllX509TrustManager")
-                override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {
-                }
-
-                override fun getAcceptedIssuers(): Array<X509Certificate> {
-                    return emptyArray()
-                }
-            }
-
-    @delegate:RequiresApi(Build.VERSION_CODES.R)
-    val sslContext: SSLContext by lazy(LazyThreadSafetyMode.NONE) {
+    /**
+     * A TLS 1.3 context that presents this key as the client certificate and judges adbd's server
+     * certificate with [trustManager]: [PairingAdbServerTrustManager] on the pairing port (the
+     * pairing code authenticates that session), [PinnedAdbServerTrustManager] on the connect port.
+     * Never install it as a process default.
+     *
+     * The legacy non-TLS `A_AUTH` signer that used to live here is gone (adversary review
+     * 2026-10-12, finding 1.1): it signed any token a peer sent, which made the app a signing
+     * oracle for a key adbd treats as shell.
+     */
+    fun sslContext(trustManager: X509TrustManager): SSLContext {
         val sslContext = SSLContext.getInstance("TLSv1.3")
         sslContext.init(arrayOf(keyManager), arrayOf(trustManager), SecureRandom())
-        sslContext
+        return sslContext
     }
 }
 
