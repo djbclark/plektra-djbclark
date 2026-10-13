@@ -5,6 +5,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -191,7 +192,7 @@ fun DisplayDensityScreen(
             AlertDialog(
                 onDismissRequest = { /* only Keep or the countdown may close this */ },
                 title = { Text(stringResource(R.string.density_confirm_title)) },
-                text = { Text(stringResource(R.string.density_confirm_message, remaining)) },
+                text = { Text(pluralStringResource(R.plurals.density_confirm_message, remaining, remaining)) },
                 confirmButton = {
                     TextButton(onClick = {
                         deadlineMs = null

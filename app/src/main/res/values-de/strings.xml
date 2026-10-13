@@ -1705,7 +1705,7 @@ Jede Taste kann als Keycode, Aktion, Native Ctrl oder Keine konfiguriert werden.
     <string name="toolbox_group_system">Geräte-Tools</string>
     <string name="keymap_title">Tastenbelegung</string>
     <string name="keymap_row_description">Jede physische Taste und was sie aktuell tut</string>
-    <string name="keymap_intro">Belegungen leben an zwei Orten, die nie miteinander reden: Zeilen, die die Firmware liest, bevor irgendeine App die Taste sieht, und Plektras eigene Verarbeitung. Hier siehst du beides, pro Taste – auch die, die mit nichts belegt sind.</string>
+    <string name="keymap_intro">Belegungen leben an zwei Orten, die nie miteinander reden: Zeilen, welche die Firmware liest, bevor irgendeine App die Taste sieht, und Plektras eigene Verarbeitung. Hier siehst du beides, pro Taste – auch die, die mit nichts belegt sind.</string>
     <string name="keymap_footnote">Tasten mit einem Pfeil lassen sich ändern. Der Rest ist durch das Telefon oder die Hardware festgelegt.</string>
     <string name="tweaks_title">System-Tweaks</string>
     <string name="tweaks_row_description">Einstellungen, die Android unterstützt, dieses Telefon dir aber nie zeigt</string>
@@ -1732,7 +1732,10 @@ Jede Taste kann als Keycode, Aktion, Native Ctrl oder Keine konfiguriert werden.
     <string name="density_keep">Behalten</string>
     <string name="density_revert">Jetzt rückgängig machen</string>
     <string name="density_confirm_title">Kannst du das noch lesen?</string>
-    <string name="density_confirm_message">In %1$d Sekunden wird auf die Werksdichte zurückgesetzt, außer du behältst sie. Wenn der Bildschirm unbenutzbar ist, warte einfach – das macht sich von selbst rückgängig.</string>
+    <plurals name="density_confirm_message">
+        <item quantity="one">In %1$d Sekunde wird auf die Werksdichte zurückgesetzt, außer du behältst sie. Wenn der Bildschirm unbenutzbar ist, warte einfach – das macht sich von selbst rückgängig.</item>
+        <item quantity="other">In %1$d Sekunden wird auf die Werksdichte zurückgesetzt, außer du behältst sie. Wenn der Bildschirm unbenutzbar ist, warte einfach – das macht sich von selbst rückgängig.</item>
+    </plurals>
     <string name="bloat_title">Bloatware entfernen</string>
     <string name="bloat_row_description">Die Unihertz-Apps deaktivieren oder deinstallieren, die Android dich nicht entfernen lässt</string>
     <string name="bloat_wrong_device">Diese Liste wurde für das Titan 2 Elite geschrieben und bleibt auf anderen Telefonen ausgeschaltet, weil sie Pakete anhand ihres Namens entfernt.</string>
@@ -1747,7 +1750,10 @@ Jede Taste kann als Keycode, Aktion, Native Ctrl oder Keine konfiguriert werden.
     <string name="bloat_preset_privacy_description">Pakete, die melden oder aufzeichnen: Akku-Telemetrie für den Hersteller, APN-Details des Netzbetreibers, ein Chipsatz-Logger, der ununterbrochen schreibt, und automatische Anrufaufzeichnung. Einige davon tauchen auch in den Gruppen oben auf – ein Paket kann Fabrik-Werkzeug und Datenschutzfrage zugleich sein.</string>
     <string name="bloat_preset_description">Unihertz liefert mehrere Tools mit, deren Aufgabe es ist, Hintergrund-Apps zu stoppen: einen Telefonmanager, einen App-Freezer, einen Blocker, einen Junk-Cleaner und einen Chipsatz-Logger, der ständig schreibt. Android Auto ist eine langlaufende Sitzung – genau das, was diese unterbrechen.\n\nUm ehrlich zu sein: Das ist die wahrscheinlichste Ursache für Abbrüche von Android Auto, keine bewiesene. Sicher ist, was diese Apps tun. Deaktivieren ist umkehrbar, und das macht den Versuch lohnenswert.</string>
     <string name="bloat_preset_action">Alle %1$d deaktivieren</string>
-    <string name="bloat_unknown_title">%1$d Hersteller-Apps nicht in dieser Liste</string>
+    <plurals name="bloat_unknown_title">
+        <item quantity="one">%1$d Hersteller-App nicht in dieser Liste</item>
+        <item quantity="other">%1$d Hersteller-Apps nicht in dieser Liste</item>
+    </plurals>
     <string name="bloat_unknown_description">Jedes Titan 2 Elite wird identisch ausgeliefert, diese stammen also aus einem Firmware-Update nach dem Erstellen dieser Liste – oder das hier ist kein Titan 2 Elite. Angezeigt, nicht angerührt: Eine App, die niemand geprüft hat, sollte man nicht entfernen.</string>
     <string name="bloat_tier_safe">Fabrik-Tools</string>
     <string name="bloat_tier_safe_blurb">Test- und Kalibrierungs-Apps, die von der Produktionslinie übrig sind. Nichts benutzt sie.</string>
@@ -1762,14 +1768,16 @@ Jede Taste kann als Keycode, Aktion, Native Ctrl oder Keine konfiguriert werden.
     <string name="bloat_uninstall">Deinstallieren</string>
     <string name="bloat_restore">Wiederherstellen</string>
     <string name="bloat_restore_all">Alle wiederherstellen</string>
-    <string name="bloat_restore_all_summary">%1$d Paket(e) von Plektra geändert</string>
+    <plurals name="bloat_restore_all_summary">
+        <item quantity="one">%1$d Paket von Plektra geändert</item>
+        <item quantity="other">%1$d Pakete von Plektra geändert</item>
+    </plurals>
     <string name="bloat_uninstall_confirm_title">%1$s deinstallieren?</string>
     <string name="bloat_uninstall_confirm_message">Deaktivieren reicht meist: Es versteckt die App, stoppt sie und ist sofort umkehrbar. Deinstallieren entfernt sie für diesen Benutzer – Plektra kann sie trotzdem wiederherstellen, weil die App im Systemspeicher bleibt, aber ein Firmware-Update kann sie zurückbringen, und wenn drahtloses Debugging einmal nicht verfügbar ist, kannst du es von hier aus nicht rückgängig machen.</string>
     <string name="fn_ctrl_map_title">Fn-Taste auf Ctrl setzen</string>
     <string name="fn_ctrl_map_description">Belegt die Fn-Taste systemweit mit Ctrl, sodass Fn überall als Ctrl funktioniert (empfohlen für das Titan 2 Elite). Experimentell und Titan-spezifisch: Die Ctrl-Belegung wurde von einem Gerät mit Fn=Ctrl abgeleitet, kann sich auf anderer Firmware also anders verhalten, und ein Neustart kann nötig sein.</string>
     <string name="fn_ctrl_map_already_set">Fn ist auf Ctrl gesetzt ✓</string>
     <string name="fn_ctrl_map_action">Fn → Ctrl setzen</string>
-    <string name="fn_ctrl_map_working">Wird angewendet…</string>
     <string name="fn_ctrl_status_success">Fn ist jetzt Ctrl – möglicherweise musst du neu starten, damit es vollständig greift.</string>
     <string name="fn_ctrl_status_needs_permission">Der Bildschirm zum Ändern der Systemeinstellungen wird geöffnet – erlaube Plektra \"Systemeinstellungen ändern\" und tippe dann erneut.</string>
     <string name="fn_ctrl_map_warning">⚠ Das ändert eine systemweite Einstellung, die jede Tastatur betrifft und nach der Deinstallation von Plektra bestehen bleibt. Du kannst sie hier jederzeit rückgängig machen.</string>

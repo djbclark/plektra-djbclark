@@ -1034,7 +1034,12 @@ Nav Mode использует физическое положение клави
     <string name="density_keep">Оставить</string>
     <string name="density_revert">Отменить сейчас</string>
     <string name="density_confirm_title">Вы всё ещё можете это прочитать?</string>
-    <string name="density_confirm_message">Возврат к заводской плотности через %1$d с, если вы не оставите это значение. Если экран стал непригоден, просто подождите — всё отменится само.</string>
+    <plurals name="density_confirm_message">
+        <item quantity="one">Возврат к заводской плотности через %1$d с, если вы не оставите это значение. Если экран стал непригоден, просто подождите — всё отменится само.</item>
+        <item quantity="few">Возврат к заводской плотности через %1$d с, если вы не оставите это значение. Если экран стал непригоден, просто подождите — всё отменится само.</item>
+        <item quantity="many">Возврат к заводской плотности через %1$d с, если вы не оставите это значение. Если экран стал непригоден, просто подождите — всё отменится само.</item>
+        <item quantity="other">Возврат к заводской плотности через %1$d с, если вы не оставите это значение. Если экран стал непригоден, просто подождите — всё отменится само.</item>
+    </plurals>
     <string name="bloat_title">Удалить лишнее</string>
     <string name="bloat_row_description">Отключить или удалить приложения Unihertz, которые Android не даёт убрать</string>
     <string name="bloat_wrong_device">Этот список составлен для Titan 2 Elite и остаётся отключённым на других телефонах, потому что удаляет пакеты по имени.</string>
@@ -1049,7 +1054,12 @@ Nav Mode использует физическое положение клави
     <string name="bloat_preset_privacy_description">Пакеты, которые отчитываются или записывают: телеметрия батареи для производителя, данные APN оператора, логгер чипсета, пишущий непрерывно, и автоматическая запись звонков. Некоторые из них есть и в наборах выше — пакет может быть одновременно заводским инструментом и вопросом приватности.</string>
     <string name="bloat_preset_description">Unihertz поставляет несколько инструментов, чья задача — не давать фоновым приложениям работать: менеджер телефона, заморозка приложений, блокировщик, очиститель мусора и логгер чипсета, пишущий постоянно. Android Auto — это долгая сессия, а именно такие они и прерывают.\n\nСкажем честно: это самая вероятная причина обрывов Android Auto, но не доказанная. Что точно известно — так это что делают эти приложения. Отключение обратимо, поэтому попробовать стоит.</string>
     <string name="bloat_preset_action">Отключить все %1$d</string>
-    <string name="bloat_unknown_title">%1$d приложений производителя не из этого списка</string>
+    <plurals name="bloat_unknown_title">
+        <item quantity="one">%1$d приложение производителя не из этого списка</item>
+        <item quantity="few">%1$d приложения производителя не из этого списка</item>
+        <item quantity="many">%1$d приложений производителя не из этого списка</item>
+        <item quantity="other">%1$d приложения производителя не из этого списка</item>
+    </plurals>
     <string name="bloat_unknown_description">Все Titan 2 Elite поставляются одинаковыми, так что эти появились из обновления прошивки после составления списка — или это не Titan 2 Elite. Показаны, но не тронуты: приложение, которое никто не проверял, удалять не стоит.</string>
     <string name="bloat_tier_safe">Заводские инструменты</string>
     <string name="bloat_tier_safe_blurb">Тестовые и калибровочные приложения, оставшиеся с производственной линии. Их ничто не использует.</string>
@@ -1064,14 +1074,18 @@ Nav Mode использует физическое положение клави
     <string name="bloat_uninstall">Удалить</string>
     <string name="bloat_restore">Восстановить</string>
     <string name="bloat_restore_all">Восстановить все</string>
-    <string name="bloat_restore_all_summary">Пакетов, изменённых Plektra: %1$d</string>
+    <plurals name="bloat_restore_all_summary">
+        <item quantity="one">Пакетов, изменённых Plektra: %1$d</item>
+        <item quantity="few">Пакетов, изменённых Plektra: %1$d</item>
+        <item quantity="many">Пакетов, изменённых Plektra: %1$d</item>
+        <item quantity="other">Пакетов, изменённых Plektra: %1$d</item>
+    </plurals>
     <string name="bloat_uninstall_confirm_title">Удалить %1$s?</string>
     <string name="bloat_uninstall_confirm_message">Обычно достаточно отключить: приложение скрывается, перестаёт работать, и это мгновенно обратимо. Удаление убирает его для этого пользователя — Plektra всё ещё может восстановить его, потому что приложение остаётся в системном хранилище, но обновление прошивки может вернуть его, а если отладка по Wi-Fi станет недоступна, отменить отсюда не получится.</string>
     <string name="fn_ctrl_map_title">Назначить клавишу Fn как Ctrl</string>
     <string name="fn_ctrl_map_description">Сопоставить клавишу Fn с Ctrl на уровне системы, чтобы Fn работала как Ctrl везде (рекомендуется для Titan 2 Elite). Экспериментально и только для Titan: сопоставление Ctrl выведено с устройства, где было задано Fn=Ctrl, поэтому на другой прошивке оно может вести себя иначе, и может потребоваться перезагрузка.</string>
     <string name="fn_ctrl_map_already_set">Fn назначена как Ctrl ✓</string>
     <string name="fn_ctrl_map_action">Назначить Fn → Ctrl</string>
-    <string name="fn_ctrl_map_working">Применение…</string>
     <string name="fn_ctrl_status_success">Fn теперь Ctrl — для полного применения может потребоваться перезагрузка.</string>
     <string name="fn_ctrl_status_needs_permission">Открывается экран разрешений — выдайте Plektra \"Изменение системных настроек\", затем нажмите снова.</string>
     <string name="fn_ctrl_map_warning">⚠ Это меняет общесистемную настройку, которая влияет на все клавиатуры и остаётся после удаления Plektra. Отменить можно здесь в любой момент.</string>

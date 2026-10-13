@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="speech_external_enable">Enable FUTO Voice Input in Android keyboard settings</string>
     <string name="speech_external_installed">FUTO Voice Input is installed.</string>
     <string name="speech_external_missing">Install FUTO Voice Input to use this provider.</string>
@@ -2128,7 +2128,7 @@ Each key can be configured as Keycode, Action, Native Ctrl, or None. Use overrid
     <string name="density_title">Screen density</string>
     <string name="density_row_description">Fit more on screen, or make everything bigger</string>
     <string name="density_intro">Lower density fits more on screen; higher makes everything bigger. The Titan\'s screen is short, so a small reduction buys a surprising number of extra lines — and with a physical keyboard, none of that space goes back to an on-screen one.</string>
-    <string name="density_value">%1$d dpi (stock is %2$d)</string>
+    <string name="density_value" tools:ignore="PluralsCandidate">%1$d dpi (stock is %2$d)</string>
     <string name="density_smaller">Everything smaller, more fits on screen</string>
     <string name="density_larger">Everything larger, less fits on screen</string>
     <string name="density_stock">The density this screen shipped with</string>
@@ -2137,7 +2137,10 @@ Each key can be configured as Keycode, Action, Native Ctrl, or None. Use overrid
     <string name="density_keep">Keep it</string>
     <string name="density_revert">Undo now</string>
     <string name="density_confirm_title">Can you still read this?</string>
-    <string name="density_confirm_message">Reverting to the stock density in %1$d seconds unless you keep it. If the screen is unusable, just wait — this undoes itself.</string>
+    <plurals name="density_confirm_message">
+        <item quantity="one">Reverting to the stock density in %1$d second unless you keep it. If the screen is unusable, just wait — this undoes itself.</item>
+        <item quantity="other">Reverting to the stock density in %1$d seconds unless you keep it. If the screen is unusable, just wait — this undoes itself.</item>
+    </plurals>
     <string name="bloat_title">Remove bloat</string>
     <string name="bloat_row_description">Disable or uninstall the Unihertz apps Android won\'t let you remove</string>
     <string name="bloat_intro">Unihertz ships apps that cannot be removed the normal way. Plektra can use the wireless-debugging pairing from the device setup card at the top of this screen, so it can disable or uninstall them for you — and put every one of them back.</string>
@@ -2154,7 +2157,10 @@ Each key can be configured as Keycode, Action, Native Ctrl, or None. Use overrid
     <string name="bloat_preset_privacy_description">Packages that report or record: battery telemetry for the vendor, carrier APN details, a chipset logger that writes continuously, and automatic call recording. Some of these also appear in the sets above — a package can be factory tooling and a privacy question at the same time.</string>
     <string name="bloat_preset_description">Unihertz ships several tools whose job is stopping background apps from running: a phone manager, an app freezer, a blocker, a junk cleaner and a chipset logger that writes constantly. Android Auto is a long-running session, which is exactly what those interrupt.\n\nWorth being straight with you: this is the most likely cause of Android Auto dropping, not a proven one. What is certain is what these apps do. Disabling is reversible, which is what makes it worth trying.</string>
     <string name="bloat_preset_action">Disable all %1$d</string>
-    <string name="bloat_unknown_title">%1$d vendor apps not in this list</string>
+    <plurals name="bloat_unknown_title">
+        <item quantity="one">%1$d vendor app not in this list</item>
+        <item quantity="other">%1$d vendor apps not in this list</item>
+    </plurals>
     <string name="bloat_unknown_description">Every Titan 2 Elite ships identically, so these came from a firmware update after this list was written — or this is not a Titan 2 Elite. Shown, not touched: an app nobody has checked is not one to remove.</string>
     <string name="bloat_tier_safe">Factory tools</string>
     <string name="bloat_tier_safe_blurb">Test and calibration apps left over from the production line. Nothing uses them.</string>
@@ -2169,14 +2175,16 @@ Each key can be configured as Keycode, Action, Native Ctrl, or None. Use overrid
     <string name="bloat_uninstall">Uninstall</string>
     <string name="bloat_restore">Restore</string>
     <string name="bloat_restore_all">Restore all</string>
-    <string name="bloat_restore_all_summary">%1$d package(s) changed by Plektra</string>
+    <plurals name="bloat_restore_all_summary">
+        <item quantity="one">%1$d package changed by Plektra</item>
+        <item quantity="other">%1$d packages changed by Plektra</item>
+    </plurals>
     <string name="bloat_uninstall_confirm_title">Uninstall %1$s?</string>
     <string name="bloat_uninstall_confirm_message">Disabling is usually enough: it hides the app and stops it running, and is instantly reversible. Uninstalling removes it for this user — Plektra can still restore it because the app stays in system storage, but a firmware update may bring it back, and if wireless debugging is ever unavailable you cannot undo it from here.</string>
     <string name="fn_ctrl_map_title">Set Fn key to Ctrl</string>
     <string name="fn_ctrl_map_description">Map the Fn key to Ctrl at the system level, so Fn works as Ctrl everywhere (recommended for Titan 2 Elite). Experimental and Titan-specific: the Ctrl mapping is inferred from a device that had Fn=Ctrl set, so it may behave differently on other firmware, and a reboot may be needed.</string>
     <string name="fn_ctrl_map_already_set">Fn is set to Ctrl ✓</string>
     <string name="fn_ctrl_map_action">Set Fn → Ctrl</string>
-    <string name="fn_ctrl_map_working">Applying…</string>
     <string name="fn_ctrl_status_success">Fn is now Ctrl — you may need to reboot for it to fully apply.</string>
     <string name="fn_ctrl_status_needs_permission">Opening the write-settings screen — grant \"Modify system settings\" for Plektra, then tap again.</string>
     <string name="fn_ctrl_status_failed">Couldn\'t apply the mapping. Grant Plektra \"Modify system settings\", or set up the wireless-debugging pairing at the top of this screen, then try again.</string>
