@@ -23,32 +23,38 @@ import android.provider.Settings
  * debugging on (broker review 1.2b, 1.2c).
  *
  * The second half of this object is the in-process vendor switch (`agui_keyboard_background_light`)
- * that the Quick Settings tile toggles. It needs no broker at all once WRITE_SECURE_SETTINGS has
- * been granted, see [PrivilegedSetup.grantWriteSecureSettings].
+ * that the Quick Settings tile toggles. It needs no broker at all while WRITE_SECURE_SETTINGS is
+ * held, which is while a feature that needs it is on ([WriteSecureSettingsHolders.BACKLIGHT],
+ * [WriteSecureSettingsHolders.RING_KEYBOARD_DARK]; see [PrivilegedSetup.setWriteSecureSettingsNeeded]).
+ *
+ * Every broker call takes the [BrokerTrigger] of the user action behind it (finding 1.3g).
  */
 object KeyboardBacklightManager {
 
     // ---- always-on timeout, through the broker --------------------------------------------------
 
     /** Persist "keyboard backlight never turns off". Best-effort, off-thread, never throws. */
-    fun applyAlwaysOn(context: Context) = runSet(context, PrivilegedCommand.BacklightTimeout.ALWAYS_ON)
+    fun applyAlwaysOn(context: Context, trigger: BrokerTrigger?) =
+        runSet(context, PrivilegedCommand.BacklightTimeout.ALWAYS_ON, trigger)
 
     /** Restore the stock 30 s timeout. Best-effort, off-thread, never throws. */
-    fun revertToDefault(context: Context) = runSet(context, PrivilegedCommand.BacklightTimeout.STOCK)
+    fun revertToDefault(context: Context, trigger: BrokerTrigger?) =
+        runSet(context, PrivilegedCommand.BacklightTimeout.STOCK, trigger)
 
     /**
-     * Reads the timeout the device actually has, or null if it could not be read.
+     * Reads the timeout the device actually has, or null if it could not be read. A read, so an
+     * open screen's trigger is enough ([PrivilegedCommand.readOnly]).
      * BLOCKING on a broker round-trip; call off the main thread.
      */
-    fun readAppliedValue(context: Context): String? {
-        val result = PrivilegedShell.run(context, PrivilegedCommand.ReadBacklightTimeout)
+    fun readAppliedValue(context: Context, trigger: BrokerTrigger?): String? {
+        val result = PrivilegedShell.run(context, PrivilegedCommand.ReadBacklightTimeout, trigger)
         if (!result.ok) return null
         return parseParcelString(result.output)
     }
 
     /** True when the device is confirmed to hold the always-on sentinel. BLOCKING; off-thread. */
-    fun isAlwaysOnOnDevice(context: Context): Boolean =
-        readAppliedValue(context) == PrivilegedCommand.BacklightTimeout.ALWAYS_ON.wireValue
+    fun isAlwaysOnOnDevice(context: Context, trigger: BrokerTrigger?): Boolean =
+        readAppliedValue(context, trigger) == PrivilegedCommand.BacklightTimeout.ALWAYS_ON.wireValue
 
     /**
      * Pulls the String16 out of a `service call` result parcel.
@@ -87,7 +93,7 @@ object KeyboardBacklightManager {
      * and `false` for the revert, so the UI can key readiness off "configured once" rather than
      * live Wireless-debugging state.
      */
-    private fun runSet(context: Context, timeout: PrivilegedCommand.BacklightTimeout) {
+    private fun runSet(context: Context, timeout: PrivilegedCommand.BacklightTimeout, trigger: BrokerTrigger?) {
         val appContext = context.applicationContext
         // Cheap gate: without a working broker the write can't land, so don't queue an ~8 s mDNS
         // discovery. Checking Wireless debugging as well as the pairing matters: Android turns it
@@ -101,7 +107,7 @@ object KeyboardBacklightManager {
             return
         }
         PrivilegedShell.runAsync {
-            val result = PrivilegedShell.run(appContext, PrivilegedCommand.WriteBacklightTimeout(timeout))
+            val result = PrivilegedShell.run(appContext, PrivilegedCommand.WriteBacklightTimeout(timeout), trigger)
             if (result.ok) {
                 PrivilegedDiagnostics.setBacklightApplied(
                     appContext,
@@ -111,7 +117,7 @@ object KeyboardBacklightManager {
                 // holds now rather than assuming the write took.
                 PrivilegedDiagnostics.recordObservedBacklightValue(
                     appContext,
-                    runCatching { readAppliedValue(appContext) }.getOrNull()
+                    runCatching { readAppliedValue(appContext, trigger) }.getOrNull()
                 )
             }
             PrivilegedDiagnostics.record(

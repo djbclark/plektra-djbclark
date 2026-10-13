@@ -25,11 +25,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import rocks.pkb.plektra.inputmethod.BrokerTrigger
 import rocks.pkb.plektra.inputmethod.EmbeddedAdbShell
 import rocks.pkb.plektra.inputmethod.KeyboardBacklightManager
 import rocks.pkb.plektra.inputmethod.PrivilegedDiagnostics
 import rocks.pkb.plektra.inputmethod.PrivilegedSetup
+import rocks.pkb.plektra.inputmethod.WriteSecureSettingsHolders
 import rocks.pkb.plektra.ui.BrokerStatusMonitor
+import rocks.pkb.plektra.ui.awaitScreenTrigger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -46,8 +49,13 @@ import kotlinx.coroutines.withContext
  * ([BrokerStatusMonitor]) and does not start a check of its own.
  *
  * What it shows is the truth about the phone, not the toggle: "configured" is a one-way latch, so
- * once the broker is reachable the phone is asked what it holds, and a lost setting is reported
- * with a button to apply it again.
+ * once the broker is reachable the phone is asked what it holds (a read, so the open screen's
+ * trigger is enough), and a lost setting is reported with a button to apply it again.
+ *
+ * Every write goes through a tap (finding 1.3g): the switch, and the "Apply again" button, which
+ * also covers a switch turned on before the pairing was ready. The switch is the
+ * [WriteSecureSettingsHolders.BACKLIGHT] holder, so the Quick Settings tile can write the vendor
+ * keyboard-light row while it is on.
  */
 @Composable
 fun SmartBacklightSection(modifier: Modifier = Modifier) {
@@ -81,19 +89,21 @@ fun SmartBacklightSection(modifier: Modifier = Modifier) {
     var alwaysOnOnPhone by remember { mutableStateOf<Boolean?>(null) }
     LaunchedEffect(enabled, brokerStatus, verifyTick) {
         alwaysOnOnPhone = if (enabled && brokerStatus == EmbeddedAdbShell.BrokerStatus.OK) {
-            withContext(Dispatchers.IO) { KeyboardBacklightManager.isAlwaysOnOnDevice(context) }
+            // A read-only command: the open screen's trigger allows it, nothing else.
+            val trigger = awaitScreenTrigger(context, "backlight_section")
+            if (trigger == null) {
+                null
+            } else {
+                withContext(Dispatchers.IO) { KeyboardBacklightManager.isAlwaysOnOnDevice(context, trigger) }
+            }
         } else {
             null
         }
     }
 
-    // Enabled before the pairing or the Wireless debugging switch was ready: apply as soon as the
-    // broker is verified reachable. Idempotent, off-thread, and only ever on a verified OK.
-    LaunchedEffect(enabled, brokerStatus) {
-        if (enabled && brokerStatus == EmbeddedAdbShell.BrokerStatus.OK && !configured) {
-            PrivilegedSetup.applyAll(context, reason = "backlight_section")
-        }
-    }
+    // No write runs on screen open (finding 1.3g). A switch turned on before the pairing or
+    // Wireless debugging was ready shows "Apply again" below once the broker is reachable and
+    // the phone does not hold the setting.
 
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
@@ -120,12 +130,19 @@ fun SmartBacklightSection(modifier: Modifier = Modifier) {
                 onCheckedChange = { on ->
                     enabled = on
                     SettingsManager.setSmartBacklightEnabled(context, on)
+                    val trigger = BrokerTrigger.fromTap(context, "backlight_toggle")
+                    // The tile writes through WRITE_SECURE_SETTINGS; held while this is on.
+                    PrivilegedSetup.setWriteSecureSettingsNeeded(
+                        context, WriteSecureSettingsHolders.BACKLIGHT, on, trigger
+                    )
                     // One-time write of the persistent vendor setting (survives reboots). Both
-                    // calls are no-ops, with the reason recorded, if the broker cannot connect.
+                    // paths are no-ops, with the reason recorded, if the broker cannot connect,
+                    // and both end with Wireless debugging off when the user keeps that setting.
                     if (on) {
-                        PrivilegedSetup.applyAll(context, reason = "backlight_toggle")
+                        PrivilegedSetup.applyAll(context, reason = "backlight_toggle", trigger = trigger)
                     } else {
-                        KeyboardBacklightManager.revertToDefault(context)
+                        KeyboardBacklightManager.revertToDefault(context, trigger)
+                        PrivilegedSetup.queueFinishSetup(context, trigger)
                     }
                 }
             )
@@ -134,7 +151,10 @@ fun SmartBacklightSection(modifier: Modifier = Modifier) {
         if (enabled) {
             // A verified failure outranks the stored-state verdict: it is the only signal that can
             // catch a pairing the phone never accepted.
+            // Once the setting is stored on the phone, Wireless debugging being off (which the
+            // broker does itself after setup, finding 1.3e) is not a problem for this feature.
             val problem = brokerStatus?.takeIf { it != EmbeddedAdbShell.BrokerStatus.OK }
+                ?.takeUnless { configured && it == EmbeddedAdbShell.BrokerStatus.WIRELESS_DEBUGGING_OFF }
             if (problem != null) {
                 StatusLine(
                     text = "! " + stringResource(
@@ -162,13 +182,18 @@ fun SmartBacklightSection(modifier: Modifier = Modifier) {
             // how a toggle stays on while the backlight times out.
             if (alwaysOnOnPhone == false) {
                 StatusLine(
-                    text = "! " + stringResource(R.string.smart_backlight_not_on_device),
+                    text = "! " + stringResource(
+                        if (configured) R.string.smart_backlight_not_on_device else R.string.smart_backlight_not_applied_yet
+                    ),
                     isError = true
                 )
                 Button(
                     onClick = {
+                        // The whole setup, on a tap: the WRITE_SECURE_SETTINGS grant the tile
+                        // needs, the always-on value, and Wireless debugging off afterwards.
+                        val trigger = BrokerTrigger.fromTap(context, "backlight_reapply")
                         scope.launch {
-                            KeyboardBacklightManager.applyAlwaysOn(context)
+                            PrivilegedSetup.applyAll(context, reason = "backlight_reapply", trigger = trigger)
                             // The write is queued; look again after it has had time to land.
                             delay(1_500)
                             verifyTick++
@@ -176,7 +201,7 @@ fun SmartBacklightSection(modifier: Modifier = Modifier) {
                     },
                     modifier = Modifier.padding(horizontal = 16.dp)
                 ) {
-                    Text(stringResource(R.string.smart_backlight_reapply))
+                    Text(stringResource(if (configured) R.string.smart_backlight_reapply else R.string.smart_backlight_apply_now))
                 }
             }
 

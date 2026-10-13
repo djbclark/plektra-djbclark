@@ -21,6 +21,12 @@ import moe.shizuku.manager.adb.EmbeddedAdbInit
 object WriteSecureSettingsHolders {
     private const val KEY = "write_secure_settings_holders"
 
+    /**
+     * djb/backlight: the smart backlight switch. While it is on the app holds the permission, so
+     * the Quick Settings tile can write the vendor keyboard-light switch in-process.
+     */
+    const val BACKLIGHT = "backlight"
+
     fun holders(context: Context): Set<String> =
         EmbeddedAdbInit.prefs(context).getStringSet(KEY, emptySet()).orEmpty().toSet()
 

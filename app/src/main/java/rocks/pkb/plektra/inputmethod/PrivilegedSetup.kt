@@ -28,6 +28,7 @@ object PrivilegedSetup {
 
     fun applyAll(context: Context, reason: String, trigger: BrokerTrigger?) {
         val appContext = context.applicationContext
+        syncFeatureHolders(appContext)
         // Log.i is stripped from release builds, so a bail-out here would leave no trace at all.
         // A step records its own failure through PrivilegedDiagnostics.record.
         PrivilegedDiagnostics.brokerBlocker(appContext)?.let { blocker ->
@@ -69,6 +70,31 @@ object PrivilegedSetup {
 
     private fun recordBlocked(context: Context, step: PrivilegedDiagnostics.Step, blocker: String) {
         PrivilegedDiagnostics.record(context, step, ok = false, reason = blocker)
+    }
+
+    /**
+     * Brings [WriteSecureSettingsHolders] in line with the features' own switches before
+     * [applyAll] decides whether to grant or revoke. The switches set their holder as the user
+     * flips them; this covers an install that turned a feature on before holders existed (it
+     * would otherwise read as "nothing needs it" and lose the permission) and a re-pair after a
+     * reset, which clears the holders.
+     */
+    internal fun syncFeatureHolders(context: Context) {
+        WriteSecureSettingsHolders.set(
+            context,
+            WriteSecureSettingsHolders.BACKLIGHT,
+            SettingsManager.getSmartBacklightEnabled(context)
+        )
+    }
+
+    /**
+     * Queues [finishSetup] after the privileged steps already queued, for a user action that ran
+     * broker commands outside [applyAll] (a toolbox action, a feature switched off), so Wireless
+     * debugging is switched off after it too when the user keeps that setting on. Never throws.
+     */
+    fun queueFinishSetup(context: Context, trigger: BrokerTrigger?) {
+        val app = context.applicationContext
+        PrivilegedShell.runAsync { finishSetup(app, trigger) }
     }
 
     /**
@@ -127,10 +153,22 @@ object PrivilegedSetup {
         commands.forEachIndexed { i, command ->
             val failure = results.getOrNull(i)?.failure
             when (command) {
-                PrivilegedCommand.GrantWriteSecureSettings -> BrokerAuditLog.record(
-                    context, BrokerAuditLog.Kind.GRANT, "write_secure_settings",
-                    ok = hasWriteSecureSettings(context), detail = failure
-                )
+                PrivilegedCommand.GrantWriteSecureSettings -> {
+                    val granted = hasWriteSecureSettings(context)
+                    BrokerAuditLog.record(
+                        context, BrokerAuditLog.Kind.GRANT, "write_secure_settings",
+                        ok = granted, detail = failure
+                    )
+                    // djb/backlight: the diagnostics step the backlight screens read.
+                    PrivilegedDiagnostics.record(
+                        context, PrivilegedDiagnostics.Step.WRITE_SECURE_SETTINGS, ok = granted,
+                        reason = if (granted) {
+                            PrivilegedDiagnostics.REASON_OK
+                        } else {
+                            failure ?: PrivilegedDiagnostics.REASON_SHELL_FAILED
+                        }
+                    )
+                }
                 PrivilegedCommand.RevokeWriteSecureSettings -> BrokerAuditLog.record(
                     context, BrokerAuditLog.Kind.REVOKE, "write_secure_settings",
                     ok = !hasWriteSecureSettings(context), detail = failure

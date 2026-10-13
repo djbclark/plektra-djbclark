@@ -115,15 +115,25 @@ fun rememberVerifiedBrokerStatus(refreshKey: Any = Unit): State<EmbeddedAdbShell
         // Seeding is a side effect, so it belongs here rather than in a remember block.
         BrokerStatusMonitor.seed(context)
         // Only while the broker's screen is open and resumed, and only to verify (finding 1.3g).
-        // The first frame can land just before onResume, so wait briefly for it.
-        var trigger = BrokerTrigger.forScreen(context, "broker_screen")
-        var waitedMs = 0L
-        while (trigger == null && waitedMs < 3_000) {
-            delay(100)
-            waitedMs += 100
-            trigger = BrokerTrigger.forScreen(context, "broker_screen")
-        }
+        val trigger = awaitScreenTrigger(context, "broker_screen")
         BrokerStatusMonitor.refresh(context, trigger, force = true)
     }
     return BrokerStatusMonitor.status.collectAsState()
+}
+
+/**
+ * A [BrokerTrigger.Kind.SCREEN] trigger for a read a screen runs while it is open (finding 1.3g:
+ * read-only commands only, see [rocks.pkb.plektra.inputmethod.PrivilegedCommand.readOnly]). The
+ * first frame can land just before onResume, so this waits up to 3 s for it; null when the screen
+ * never resumed (then the read does not run). [source] is a constant naming the screen.
+ */
+suspend fun awaitScreenTrigger(context: Context, source: String): BrokerTrigger? {
+    var trigger = BrokerTrigger.forScreen(context, source)
+    var waitedMs = 0L
+    while (trigger == null && waitedMs < 3_000) {
+        delay(100)
+        waitedMs += 100
+        trigger = BrokerTrigger.forScreen(context, source)
+    }
+    return trigger
 }

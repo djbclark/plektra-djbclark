@@ -13,9 +13,11 @@ import rocks.pkb.plektra.ring.RingBacklight
  * (`Settings.Global.agui_keyboard_background_light`).
  *
  * Writing the global needs WRITE_SECURE_SETTINGS. The private build gets it from the embedded ADB
- * broker, which grants it once at pairing ([rocks.pkb.plektra.inputmethod.PrivilegedSetup]).
- * The tile itself never touches the broker: after the grant every write is an ordinary in-process
- * settings write, which is what a tile tap needs.
+ * broker, and holds it only while a feature that needs it is on: Smart backlight
+ * ([rocks.pkb.plektra.inputmethod.WriteSecureSettingsHolders.BACKLIGHT]) or the ring's
+ * keyboard-dark switch (finding 1.3c). The tile itself never touches the broker (it cannot mint a
+ * [rocks.pkb.plektra.inputmethod.BrokerTrigger]): while the permission is held every write is an
+ * ordinary in-process settings write, which is what a tile tap needs.
  *
  * Only offered on the Titan 2 Elite, where the vendor row exists.
  *

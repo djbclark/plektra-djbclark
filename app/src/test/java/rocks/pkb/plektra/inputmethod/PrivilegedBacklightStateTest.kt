@@ -49,9 +49,21 @@ class PrivilegedBacklightStateTest {
         assertFalse(SettingsManager.getPreferences(context).contains("privileged_backlight_applied"))
     }
 
+    /** An install that turned the backlight on before holders existed keeps the tile's permission. */
+    @Test
+    fun applyAllRegistersTheBacklightAsAWriteSecureSettingsHolder() {
+        SettingsManager.setSmartBacklightEnabled(context, true)
+        PrivilegedSetup.applyAll(context, "test", BrokerTrigger.forTest(BrokerTrigger.Kind.TAP))
+        assertTrue(WriteSecureSettingsHolders.BACKLIGHT in WriteSecureSettingsHolders.holders(context))
+
+        SettingsManager.setSmartBacklightEnabled(context, false)
+        PrivilegedSetup.applyAll(context, "test", BrokerTrigger.forTest(BrokerTrigger.Kind.TAP))
+        assertFalse(WriteSecureSettingsHolders.anyNeeded(context))
+    }
+
     @Test
     fun aBlockedBrokerRecordsTheReasonAgainstTheBacklightStep() {
-        KeyboardBacklightManager.applyAlwaysOn(context)
+        KeyboardBacklightManager.applyAlwaysOn(context, BrokerTrigger.forTest(BrokerTrigger.Kind.TAP))
 
         val outcome = requireNotNull(
             PrivilegedDiagnostics.last(context, PrivilegedDiagnostics.Step.BACKLIGHT)
@@ -62,10 +74,13 @@ class PrivilegedBacklightStateTest {
 
     @Test
     fun theShellRefusesToRunWhileTheBrokerIsBlocked() {
-        val result = PrivilegedShell.run(context, PrivilegedCommand.ReadBacklightTimeout)
+        val result = PrivilegedShell.run(
+            context, PrivilegedCommand.ReadBacklightTimeout, BrokerTrigger.forTest(BrokerTrigger.Kind.TAP)
+        )
 
         assertFalse(result.ok)
-        assertEquals(PrivilegedDiagnostics.REASON_NOT_PAIRED, result.failure)
+        assertEquals(EmbeddedAdbShell.REASON_NOT_PAIRED, result.failure)
+        assertEquals(EmbeddedAdbShell.BrokerStatus.NOT_PAIRED, result.status)
     }
 
     @Test
