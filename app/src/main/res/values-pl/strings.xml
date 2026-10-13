@@ -940,6 +940,7 @@ Każdy klawisz można skonfigurować jako Keycode, Akcja, Native Ctrl lub Brak. 
     <string name="device_setup_open_pairing">Otwórz Debugowanie bezprzewodowe</string>
     <string name="device_setup_dnd_on">Tryb Nie przeszkadzać jest włączony i może ukryć kod parowania. Wyłącz go do czasu sparowania.</string>
     <string name="device_setup_needs_notifications">Najpierw zezwól na powiadomienia Plektra — kod parowania przychodzi jako powiadomienie.</string>
+    <string name="screen_trackpad_permission_description">Wymagane, aby trackpad mógł przechwytywać przesunięcia nad bieżącą aplikacją</string>
 
     <!-- carried from PhysiBoard, unchanged strings only -->
     <string name="smart_backlight_title">Inteligentne podświetlenie klawiatury</string>
@@ -1082,6 +1083,15 @@ Każdy klawisz można skonfigurować jako Keycode, Akcja, Native Ctrl lub Brak. 
     <string name="broker_audit_clear">Wyczyść dziennik</string>
     <string name="broker_audit_ok">ok</string>
     <string name="broker_audit_failed">niepowodzenie</string>
+    <string name="privileged_access_title">Dostęp uprzywilejowany przez</string>
+    <string name="privileged_access_description">Jak Plektra uruchamia polecenia potrzebne narzędziom poniżej. Automatycznie używa Shizuku, gdy działa i Plektra ma w nim zezwolenie, a w przeciwnym razie wbudowanego brokera.</string>
+    <string name="privileged_access_mode_auto">Automatycznie</string>
+    <string name="privileged_access_mode_shizuku">Tylko Shizuku</string>
+    <string name="privileged_access_mode_broker">Tylko wbudowany broker</string>
+    <string name="privileged_access_shizuku_ready">Shizuku: działa i zezwolono</string>
+    <string name="privileged_access_shizuku_not_allowed">Shizuku: działa, brak zezwolenia</string>
+    <string name="privileged_access_shizuku_not_running">Shizuku: nie działa</string>
+    <string name="privileged_access_shizuku_not_installed">Shizuku: nie zainstalowano</string>
     <string name="privileged_access_shizuku_too_old">Shizuku: zbyt stary (wymaga wersji 11 lub nowszej)</string>
     <string name="privileged_access_shizuku_denied_permanently">Shizuku (Sui): odmówiono Plektra i nie będzie już pytać ponownie</string>
     <string name="shizuku_blocked_not_allowed">Wybrano Shizuku w sekcji Dostęp uprzywilejowany przez i działa on, ale Plektra nie ma jeszcze w nim zezwolenia.</string>
@@ -1094,6 +1104,11 @@ Każdy klawisz można skonfigurować jako Keycode, Akcja, Native Ctrl lub Brak. 
     <string name="shizuku_blocked_open_sui">Otwórz opcje programisty (Sui)</string>
     <string name="shizuku_blocked_use_broker">Aby zamiast tego użyć wbudowanego brokera, wybierz go w Narzędzia Titan 2 Elite > Dostęp uprzywilejowany przez.</string>
     <string name="shizuku_blocked_or_shizuku">Shizuku też działa: uruchom go i zezwól w nim Plektra, a narzędzia będą z niego korzystać bez parowania.</string>
+    <string name="privileged_access_shizuku_allow">Zezwól</string>
+    <string name="privileged_access_using_shizuku">Polecenia są uruchamiane przez Shizuku. Plektra nie rusza Debugowania bezprzewodowego.</string>
+    <string name="privileged_access_using_broker">Polecenia są uruchamiane przez wbudowany broker (debugowanie bezprzewodowe).</string>
+    <string name="device_setup_ready_shizuku_title">Połączono przez Shizuku</string>
+    <string name="device_setup_ready_shizuku_body">Narzędzia poniżej uzyskują dostęp do systemu przez Shizuku, więc Plektra nie potrzebuje własnego parowania. Wybierz \"Tylko wbudowany broker\", aby zamiast tego użyć parowania.</string>
     <string name="kw_main_titan2_elite_tools">titan, elite, t2e, konfiguracja urządzenia, broker, adb, debugowanie bezprzewodowe, parowanie, uprzywilejowany</string>
     <string name="kw_titan2_elite_tools_privileged_access">shizuku, shizukutendcf, broker, uprzywilejowany, root, powłoka, shell, adb, automatycznie, backend</string>
     <string name="kw_titan2_elite_tools_device_setup">adb, debugowanie bezprzewodowe, sparuj, parowanie, broker, shizuku, przyznaj, ustawienia zabezpieczeń</string>
