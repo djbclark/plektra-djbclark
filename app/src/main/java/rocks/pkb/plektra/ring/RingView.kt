@@ -41,6 +41,9 @@ class RingView(context: Context) : View(context) {
         setLayerType(LAYER_TYPE_SOFTWARE, null)
     }
 
+    /** The adjust screen drags this view with a touch listener; a plain tap still reports a click. */
+    override fun performClick(): Boolean = super.performClick()
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val r = ring ?: return

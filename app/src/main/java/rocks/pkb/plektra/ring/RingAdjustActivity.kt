@@ -38,6 +38,7 @@ class RingAdjustActivity : Activity() {
     private var lastX = 0f
     private var lastY = 0f
     private var dragging = false
+    private var moved = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -109,22 +110,33 @@ class RingAdjustActivity : Activity() {
             view.ring = ring
             insets
         }
-        view.setOnTouchListener { _, event -> onDrag(event) }
+        view.setOnTouchListener { v, event ->
+            // A tap that did not drag the ring is a click, for accessibility services.
+            if (onDrag(event)) v.performClick()
+            true
+        }
     }
 
     private fun gapPx() = 3f * resources.displayMetrics.density
     private fun strokePx() = 3f * resources.displayMetrics.density
 
+    /** Drags the ring; returns true when the gesture ended as a tap that moved nothing. */
     private fun onDrag(event: MotionEvent): Boolean {
         when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> { lastX = event.x; lastY = event.y; dragging = true }
+            MotionEvent.ACTION_DOWN -> { lastX = event.x; lastY = event.y; dragging = true; moved = false }
             MotionEvent.ACTION_MOVE -> if (dragging) {
+                if (event.x != lastX || event.y != lastY) moved = true
                 move(event.x - lastX, event.y - lastY)
                 lastX = event.x; lastY = event.y
             }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> dragging = false
+            MotionEvent.ACTION_UP -> {
+                val tapped = dragging && !moved
+                dragging = false
+                return tapped
+            }
+            MotionEvent.ACTION_CANCEL -> dragging = false
         }
-        return true
+        return false
     }
 
     private fun move(dx: Float, dy: Float) {
