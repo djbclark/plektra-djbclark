@@ -344,7 +344,8 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
     private val uiHandler = Handler(Looper.getMainLooper())
     // djb/caret-badge: modifier badge beside the text cursor, and the state of its cursor-update request
     private val caretBadgeController by lazy { CaretBadgeController(this) }
-    private var lastCaretBadgeEnabled: Boolean? = null
+    /** True while a modifier is on and the badge can actually be drawn, i.e. while it needs the caret position. */
+    private var caretBadgeMonitoring = false
     private var cursorUpdatesAccepted = false
     private var cursorUpdateAttempts = 0
     private var inputManager: InputManager? = null
@@ -3250,7 +3251,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
     private fun cursorAnchorUpdatesWanted(): Boolean =
         emojiSearchCursorAnchorMonitoringRequested ||
             smoothCaretEditorHidden ||
-            SettingsManager.getCaretModifierBadgeEnabled(this)
+            caretBadgeMonitoring
 
     /**
      * Emoji-picker search, the smooth caret, and the modifier badge all want the editor's caret
@@ -3284,6 +3285,8 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
      */
     private fun beginCursorAnchorMonitoring() {
         caretBadgeController.onEditorGone()
+        // The new editor starts with updates off; the next status refresh decides whether the badge needs them.
+        caretBadgeMonitoring = false
         cursorUpdatesAccepted = false
         cursorUpdateAttempts = 0
         // A fresh connection starts with updates off, so there is nothing to ask for or undo.
@@ -3391,15 +3394,20 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             shouldDisableSmartFeatures = shouldDisableSmartFeatures
         )
         updateSystemStatusModifierIcon(snapshot, effectiveSoftwareKeyboardMode)
-        // djb/caret-badge: show the armed modifier beside the text cursor
-        val caretBadgeEnabled = SettingsManager.getCaretModifierBadgeEnabled(this)
-        caretBadgeController.onSnapshot(snapshot, caretBadgeEnabled)
-        if (caretBadgeEnabled != lastCaretBadgeEnabled) {
-            lastCaretBadgeEnabled = caretBadgeEnabled
+        // Show the armed modifier beside the text cursor
+        // Never in restricted fields (passwords and the like): the badge would reveal the Shift state of
+        // what is being typed to anything that can see the screen.
+        val caretBadgeAllowed = SettingsManager.getCaretModifierBadgeEnabled(this) &&
+            !inputContextState.shouldDisableSuggestions &&
+            caretBadgeController.canDrawOverlays()
+        caretBadgeController.onSnapshot(snapshot, caretBadgeAllowed)
+        val caretBadgeNeedsCaret = caretBadgeController.hasItems
+        if (caretBadgeNeedsCaret != caretBadgeMonitoring) {
+            caretBadgeMonitoring = caretBadgeNeedsCaret
             cursorUpdatesAccepted = false
             cursorUpdateAttempts = 0
             syncCursorAnchorMonitoring()
-        } else if (caretBadgeEnabled) {
+        } else if (caretBadgeNeedsCaret) {
             retryCursorAnchorMonitoringIfNeeded()
         }
         val modifierIndicators = SettingsManager.getModifierIndicators(this)

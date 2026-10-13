@@ -2,6 +2,7 @@ package rocks.pkb.plektra.inputmethod
 
 import android.content.Context
 import android.graphics.PixelFormat
+import android.hardware.input.InputManager
 import android.inputmethodservice.InputMethodService
 import android.os.Build
 import android.provider.Settings
@@ -54,6 +55,9 @@ class CaretBadgeController(private val service: InputMethodService) {
 
     private var currentItems: List<CaretBadgeView.Item> = emptyList()
 
+    /** Whether any modifier is currently being shown, i.e. whether the caret position is needed. */
+    val hasItems: Boolean get() = currentItems.isNotEmpty()
+
     /**
      * The last caret position the editor reported, so pressing a modifier can put the badge on
      * screen straight away instead of waiting a round trip for a fresh one.
@@ -64,7 +68,8 @@ class CaretBadgeController(private val service: InputMethodService) {
     private data class Caret(val x: Float, val top: Float, val bottom: Float)
 
     /**
-     * Recomputes the label from the modifier state.
+     * Recomputes the label from the modifier state. [enabled] is false whenever the badge must not
+     * show at all (setting off, restricted field, no overlay permission).
      */
     fun onSnapshot(snapshot: StatusBarController.StatusSnapshot, enabled: Boolean) {
         val items = if (enabled) caretBadgeItemsFor(snapshot) else emptyList()
@@ -188,12 +193,18 @@ class CaretBadgeController(private val service: InputMethodService) {
             WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
         PixelFormat.TRANSLUCENT
     ).apply {
+        // Since Android 12 a touch is blocked, even through a not-touchable window, when the window
+        // is more opaque than the system limit, which would swallow taps right of the cursor.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val limit = context.getSystemService(InputManager::class.java)?.maximumObscuringOpacityForTouch
+            if (limit != null) alpha = minOf(alpha, limit)
+        }
         gravity = Gravity.TOP or Gravity.START
         this.x = x
         this.y = y
     }
 
-    private fun canDrawOverlays(): Boolean =
+    fun canDrawOverlays(): Boolean =
         runCatching { Settings.canDrawOverlays(context) }.getOrDefault(false)
 
     private fun dp(value: Int): Int =
