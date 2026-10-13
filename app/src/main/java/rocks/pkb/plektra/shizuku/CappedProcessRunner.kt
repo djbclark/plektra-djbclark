@@ -7,15 +7,36 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * plk/shizuku-backend: runs one started [Process] to its end under the broker's two limits: at
- * most `maxOutputBytes` of output (stdout and stderr together, as adbd's shell gives them) and at
- * most `deadlineMs` from start to exit. Past either limit the process is killed and the run fails,
- * as an [moe.shizuku.manager.adb.AdbClient] session would. Plain JVM, so it is tested with a fake
+ * plk/shizuku-backend: runs one program to its end under the broker's two limits: at most
+ * `maxOutputBytes` of output (stdout and stderr together, as adbd's shell gives them) and at most
+ * `deadlineMs` from start to exit. Past either limit the process is killed and the run fails, as
+ * an [moe.shizuku.manager.adb.AdbClient] session would. The program is started from an argv
+ * array, never through `sh -c`, so there is no wrapper shell: the process killed at the deadline
+ * is the one that was started, with no orphaned child. Plain JVM, so it is tested with a fake
  * process; it runs inside the Shizuku UserService ([PrivilegedShellService]).
  */
 internal object CappedProcessRunner {
 
     private const val CHUNK = 8 * 1024
+
+    /**
+     * Starts `ProcessBuilder(argv)` (stderr merged into stdout) and runs it under the limits. A
+     * program that cannot start fails the run like any other failure. [start] is the seam for
+     * tests.
+     */
+    fun runArgv(
+        argv: List<String>,
+        maxOutputBytes: Int,
+        deadlineMs: Long,
+        start: (List<String>) -> Process = { ProcessBuilder(it).redirectErrorStream(true).start() },
+    ): ShellRunResult {
+        val process = try {
+            start(argv)
+        } catch (e: IOException) {
+            return ShellRunResult(false, null, null, "${e.javaClass.simpleName}: ${e.message}")
+        }
+        return run(process, maxOutputBytes, deadlineMs)
+    }
 
     fun run(
         process: Process,

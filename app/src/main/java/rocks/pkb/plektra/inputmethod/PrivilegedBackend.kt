@@ -61,11 +61,13 @@ enum class ShizukuState {
 }
 
 /**
- * What one command line did through Shizuku. [ok] means the command ran to its end within the
+ * What one argv run did through Shizuku. [ok] means the program ran to its end within the
  * deadline and the output limit, whatever its exit code (the broker's adbd shell reports no exit
  * code, so callers judge the result by its output or by asking Android afterwards, as they do for
- * the broker). [exitCode] is null when the command did not finish. [serviceUnavailable] is true
- * when nothing ran because Shizuku or its service could not be reached.
+ * the broker). [exitCode] is null when the program did not finish. [serviceUnavailable] is true
+ * when nothing ran, or the run was cut off, because Shizuku or its service could not be reached
+ * or died. [uid] is the uid the service ran as (`Os.getuid()`: 2000 over adb, 0 under root), null
+ * when no service answered.
  */
 data class ShellRunResult(
     val ok: Boolean,
@@ -73,12 +75,14 @@ data class ShellRunResult(
     val exitCode: Int?,
     val failure: String?,
     val serviceUnavailable: Boolean = false,
+    val uid: Int? = null,
 ) {
     fun toBundle(): Bundle = Bundle().apply {
         putBoolean(KEY_OK, ok)
         putString(KEY_OUTPUT, output)
         putInt(KEY_EXIT, exitCode ?: NO_EXIT)
         putString(KEY_FAILURE, failure)
+        putInt(KEY_UID, uid ?: NO_EXIT)
     }
 
     companion object {
@@ -86,6 +90,7 @@ data class ShellRunResult(
         private const val KEY_OUTPUT = "output"
         private const val KEY_EXIT = "exit"
         private const val KEY_FAILURE = "failure"
+        private const val KEY_UID = "uid"
         private const val NO_EXIT = Int.MIN_VALUE
 
         fun unavailable(reason: String) =
@@ -109,6 +114,7 @@ data class ShellRunResult(
                 output = output,
                 exitCode = exit,
                 failure = bundle.getString(KEY_FAILURE),
+                uid = bundle.getInt(KEY_UID, NO_EXIT).takeIf { it != NO_EXIT },
             )
         }
     }
@@ -116,14 +122,18 @@ data class ShellRunResult(
 
 /**
  * The Shizuku side of the door, behind an interface so tests can run without a Shizuku server.
- * [runLine] takes a raw command line: only [EmbeddedAdbShell.execute] may call it, after its
- * checks, with a line from [PrivilegedCommand.commandLine] (BrokerSourceRulesTest).
+ * [runArgv] takes a raw argv: only [EmbeddedAdbShell.execute] may call it, after its checks, with
+ * an array from [PrivilegedCommand.argvs] (BrokerSourceRulesTest).
  */
 internal interface ShizukuShell {
     fun state(context: Context): ShizukuState
 
-    /** BLOCKING: binds the service if needed, then runs [commandLine]. Never throws. */
-    fun runLine(context: Context, commandLine: String): ShellRunResult
+    /**
+     * BLOCKING: binds the service if needed, then runs the program [argv] (no shell). A service
+     * that dies or disconnects during the run gives a failed result with
+     * [ShellRunResult.serviceUnavailable] set, never an ok one. Never throws.
+     */
+    fun runArgv(context: Context, argv: List<String>): ShellRunResult
 }
 
 /** Chooses the backend for the setting and Shizuku's state. */

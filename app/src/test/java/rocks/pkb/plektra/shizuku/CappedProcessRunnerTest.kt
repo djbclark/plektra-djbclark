@@ -18,7 +18,7 @@ import java.util.concurrent.TimeUnit
 /**
  * plk/shizuku-backend: the Shizuku runner keeps the broker's limits (AdbClient's
  * MAX_SHELL_OUTPUT_BYTES and CLIENT_DEADLINE_MS): too much output or too much time kills the
- * command and fails the run. A fake process stands in for `sh -c`.
+ * command and fails the run. A fake process stands in for the program.
  */
 class CappedProcessRunnerTest {
 
@@ -135,5 +135,45 @@ class CappedProcessRunnerTest {
         val process = FakeProcess(ByteArrayInputStream(ByteArray(0)))
         CappedProcessRunner.run(process, MAX_SHELL_OUTPUT_BYTES, CLIENT_DEADLINE_MS)
         assertEquals(0, process.stdin.size())
+    }
+
+    @Test
+    fun runArgvStartsExactlyTheGivenArgvAndNothingElse() {
+        var started: List<String>? = null
+        val process = FakeProcess(ByteArrayInputStream("ok\n".toByteArray()))
+        val result = CappedProcessRunner.runArgv(listOf("pm", "grant", "a.b", "p"), 1024, 10_000) {
+            started = it
+            process
+        }
+        assertEquals(listOf("pm", "grant", "a.b", "p"), started)
+        assertTrue(result.ok)
+        assertEquals("ok\n", result.output)
+    }
+
+    /** No `sh` wrapper: the deadline kills the process that was started, so no child is left behind. */
+    @Test
+    fun runArgvKillsTheStartedProcessAtTheDeadline() {
+        val process = FakeProcess(SilentStream(), exited = false)
+        val result = CappedProcessRunner.runArgv(listOf("sleep", "60"), MAX_SHELL_OUTPUT_BYTES, 200) { process }
+        assertFalse(result.ok)
+        assertEquals(CappedProcessRunner.deadlineFailure(200), result.failure)
+        assertTrue(process.destroyed)
+    }
+
+    @Test
+    fun runArgvFailsWhenTheProgramCannotStart() {
+        val result = CappedProcessRunner.runArgv(listOf("nope"), 1024, 1_000) { throw IOException("no such file") }
+        assertFalse(result.ok)
+        assertEquals("IOException: no such file", result.failure)
+        assertNull(result.exitCode)
+    }
+
+    /** A real process: shell syntax in an argument is just text, since no shell reads it. */
+    @Test
+    fun runArgvPassesShellSyntaxAsPlainText() {
+        val result = CappedProcessRunner.runArgv(listOf("echo", "a; echo b | cat"), 1024, 10_000)
+        assertTrue(result.failure, result.ok)
+        assertEquals("a; echo b | cat\n", result.output)
+        assertEquals(0, result.exitCode)
     }
 }
