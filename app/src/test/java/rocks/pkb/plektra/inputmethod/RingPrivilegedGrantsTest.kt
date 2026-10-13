@@ -20,6 +20,25 @@ class RingPrivilegedGrantsTest {
         assertEquals(listener, PrivilegedCommand.RING_LISTENER_CLASS)
     }
 
+    /** A reset withdraws the access the broker gave the ring (finding 1.3c). */
+    @Test
+    fun theRingListenerIsInTheResetLedgersSet() {
+        assertEquals("ring", AppNotificationListener.RING.id)
+        assertEquals(listener, AppNotificationListener.RING.className)
+        assertEquals(
+            "cmd notification disallow_listener $app/$listener",
+            PrivilegedCommand.DisallowNotificationListener(AppNotificationListener.RING).commandLine(app)
+        )
+    }
+
+    /** WRITE_SECURE_SETTINGS goes through the holders, never through a ring grant of its own. */
+    @Test
+    fun noRingGrantGrantsWriteSecureSettings() {
+        PrivilegedCommand.RingGrant.entries.forEach { grant ->
+            assertFalse(grant.name, grant.line(app).contains("WRITE_SECURE_SETTINGS"))
+        }
+    }
+
     @Test
     fun eachGrantIsExactlyOneKnownLine() {
         assertEquals(
@@ -33,10 +52,6 @@ class RingPrivilegedGrantsTest {
         assertEquals(
             "appops set $app POST_NOTIFICATION allow",
             PrivilegedCommand.RingGrant.ALLOW_POST_NOTIFICATIONS.line(app)
-        )
-        assertEquals(
-            "pm grant $app android.permission.WRITE_SECURE_SETTINGS",
-            PrivilegedCommand.RingGrant.WRITE_SECURE_SETTINGS.line(app)
         )
         assertEquals(
             "cmd notification disallow_listener $app/$listener",

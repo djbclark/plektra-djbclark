@@ -57,7 +57,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import rocks.pkb.plektra.inputmethod.BrokerTrigger
 import rocks.pkb.plektra.inputmethod.EmbeddedAdbShell
+import rocks.pkb.plektra.inputmethod.PrivilegedSetup
 import rocks.pkb.plektra.ring.NotificationRingActivity
 import rocks.pkb.plektra.ring.NotificationRingPolicy
 import rocks.pkb.plektra.ring.NotificationRingSetup
@@ -162,13 +164,25 @@ fun NotificationRingScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    // Every broker call here is a tap (finding 1.3g), and ends with Wireless debugging off when
+    // the user keeps that setting on (finding 1.3e).
     fun grant() {
         if (granting) return
         granting = true
-        NotificationRingSetup.grantViaBroker(context) {
+        val trigger = BrokerTrigger.fromTap(context, "ring_grant")
+        NotificationRingSetup.grantViaBroker(context, trigger) {
             // Worker thread; the composition reads state on the next frame.
             granting = false
             refresh()
+        }
+        PrivilegedSetup.queueFinishSetup(context, trigger)
+    }
+
+    // The keyboard-dark permission follows the ring and its switch (a WRITE_SECURE_SETTINGS holder).
+    fun updateKeyboardDarkHolder(source: String) {
+        val trigger = BrokerTrigger.fromTap(context, source)
+        if (NotificationRingSetup.updateKeyboardDarkHolder(context, trigger)) {
+            PrivilegedSetup.queueFinishSetup(context, trigger)
         }
     }
 
@@ -246,7 +260,7 @@ fun NotificationRingScreen(
                         onCheckedChange = { on ->
                             enabled = on
                             SettingsManager.setNotificationRingEnabled(context, on)
-                            if (on) grant()
+                            if (on) grant() else updateKeyboardDarkHolder("ring_toggle")
                         }
                     )
                 }
@@ -445,7 +459,11 @@ fun NotificationRingScreen(
                         onCheckedChange = { on ->
                             keyboardDark = on
                             SettingsManager.setRingKeyboardDarkEnabled(context, on)
-                            if (on && enabled && !canDarkenKeyboard) grant()
+                            if (on && enabled && !canDarkenKeyboard) {
+                                grant()
+                            } else {
+                                updateKeyboardDarkHolder("ring_keyboard_dark_toggle")
+                            }
                         }
                     )
                 }

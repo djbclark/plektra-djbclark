@@ -179,9 +179,6 @@ internal sealed class PrivilegedCommand {
         /** The silent notification the full-screen intent hangs on. */
         ALLOW_POST_NOTIFICATIONS,
 
-        /** The backlight group's WRITE_SECURE_SETTINGS grant, for the keyboard-dark switch. */
-        WRITE_SECURE_SETTINGS,
-
         /** Undo of [ALLOW_LISTENER], for a reset to stock. */
         DISALLOW_LISTENER,
 
@@ -192,7 +189,6 @@ internal sealed class PrivilegedCommand {
             ALLOW_LISTENER -> "cmd notification allow_listener $appPackage/$RING_LISTENER_CLASS"
             ALLOW_FULL_SCREEN_INTENT -> "appops set $appPackage USE_FULL_SCREEN_INTENT allow"
             ALLOW_POST_NOTIFICATIONS -> "appops set $appPackage POST_NOTIFICATION allow"
-            WRITE_SECURE_SETTINGS -> GrantWriteSecureSettings.commandLine(appPackage)
             DISALLOW_LISTENER -> "cmd notification disallow_listener $appPackage/$RING_LISTENER_CLASS"
             RESET_FULL_SCREEN_INTENT -> "appops set $appPackage USE_FULL_SCREEN_INTENT default"
         }
@@ -373,11 +369,13 @@ internal sealed class PrivilegedCommand {
 
 /**
  * Notification listeners of this app that the broker may have allowed (`cmd notification
- * allow_listener`), so a reset can withdraw that access. djb/broker: empty on purpose. djb/ring
- * adds its listener here, e.g. `RING("ring", "rocks.pkb.plektra.ring.NotificationRingListener")`,
- * and calls [BrokerGrantLedger.recordListenerAllowed] when its grant succeeds.
+ * allow_listener`), so a reset can withdraw that access. Each feature that allows one records it
+ * with [BrokerGrantLedger.recordListenerAllowed] when its grant succeeds.
  */
-internal enum class AppNotificationListener(val id: String, val className: String)
+internal enum class AppNotificationListener(val id: String, val className: String) {
+    /** djb/ring: [PrivilegedCommand.RingGrant.ALLOW_LISTENER]. */
+    RING("ring", PrivilegedCommand.RING_LISTENER_CLASS),
+}
 
 /**
  * What a [PrivilegedCommand] did. [failure] is a short reason when [ok] is false. [status] says

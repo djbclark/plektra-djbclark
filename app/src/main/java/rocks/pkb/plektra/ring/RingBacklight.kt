@@ -17,7 +17,8 @@ import java.util.concurrent.TimeUnit
  *
  * The switch is the vendor's own: `Settings.Global.agui_keyboard_background_light`, the same row
  * the Quick Settings tile toggles. Writing a Global needs WRITE_SECURE_SETTINGS, which the broker
- * grants ONCE with a `pm grant` ([NotificationRingSetup.grantViaBroker]) — after that every write
+ * grants with a `pm grant` while the ring's keyboard-dark switch holds it
+ * ([NotificationRingSetup.updateKeyboardDarkHolder]) — while it is held every write
  * here is an ordinary in-process settings write, and this object never talks to the broker. That
  * matters: the keyboard has to go dark in the moment a notification lands, and an ~8s broker round
  * trip in that path would be useless. This is why

@@ -27,6 +27,12 @@ object WriteSecureSettingsHolders {
      */
     const val BACKLIGHT = "backlight"
 
+    /**
+     * djb/ring: "keep the keyboard dark while the ring is lit". While the ring and that switch
+     * are both on, the ring writes the same vendor keyboard-light row in-process.
+     */
+    const val RING_KEYBOARD_DARK = "ring_keyboard_dark"
+
     fun holders(context: Context): Set<String> =
         EmbeddedAdbInit.prefs(context).getStringSet(KEY, emptySet()).orEmpty().toSet()
 

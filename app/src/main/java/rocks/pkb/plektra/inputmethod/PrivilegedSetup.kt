@@ -60,9 +60,12 @@ object PrivilegedSetup {
         }
         // djb/ring: the notification ring's grants (notification access, full-screen intent,
         // posting), in one broker connection. Only when the user turned the ring on; each grant
-        // that is already held is skipped.
+        // that is already held is skipped. Its keyboard-dark permission is a holder, which the
+        // session above already granted.
         if (SettingsManager.isNotificationRingEnabled(appContext)) {
-            rocks.pkb.plektra.ring.NotificationRingSetup.grantViaBroker(appContext, trigger)
+            rocks.pkb.plektra.ring.NotificationRingSetup.grantViaBroker(
+                appContext, trigger, includeKeyboardDark = false
+            )
         }
         // djb/<feature>: queue feature steps here, before finishSetup.
         PrivilegedShell.runAsync { finishSetup(appContext, trigger) }
@@ -84,6 +87,11 @@ object PrivilegedSetup {
             context,
             WriteSecureSettingsHolders.BACKLIGHT,
             SettingsManager.getSmartBacklightEnabled(context)
+        )
+        WriteSecureSettingsHolders.set(
+            context,
+            WriteSecureSettingsHolders.RING_KEYBOARD_DARK,
+            rocks.pkb.plektra.ring.NotificationRingSetup.needsKeyboardDarkPermission(context)
         )
     }
 
@@ -132,16 +140,23 @@ object PrivilegedSetup {
     /**
      * A feature that needs WRITE_SECURE_SETTINGS calls this when the user turns it on or off.
      * The permission is granted when the first holder appears and revoked when the last one goes.
-     * Off-thread, never throws.
+     * Off-thread, never throws. Returns true when a grant or revoke was queued (so the caller
+     * knows a broker session will run, and can queue [queueFinishSetup] after it).
      */
-    fun setWriteSecureSettingsNeeded(context: Context, holder: String, needed: Boolean, trigger: BrokerTrigger?) {
+    fun setWriteSecureSettingsNeeded(
+        context: Context,
+        holder: String,
+        needed: Boolean,
+        trigger: BrokerTrigger?,
+    ): Boolean {
         val app = context.applicationContext
         WriteSecureSettingsHolders.set(app, holder, needed)
-        val command = writeSecureSettingsAction(app) ?: return
+        val command = writeSecureSettingsAction(app) ?: return false
         PrivilegedShell.runAsync {
             val result = PrivilegedShell.run(app, command, trigger)
             recordPermissionOutcome(app, listOf(command), listOf(result))
         }
+        return true
     }
 
     /** Audit a grant or revoke by what Android now says, never by what the shell printed. */
