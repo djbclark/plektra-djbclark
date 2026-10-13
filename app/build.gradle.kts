@@ -360,6 +360,8 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        // the Shizuku UserService interface (src/main/aidl).
+        aidl = true
     }
     packaging {
         resources {
