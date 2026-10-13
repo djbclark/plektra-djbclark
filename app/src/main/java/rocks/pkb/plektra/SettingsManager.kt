@@ -6393,6 +6393,8 @@ object SettingsManager {
         getPreferences(context).getBoolean(KEY_RING_BACKLIGHT_SUPPRESSED, false)
 
     /** Records the value to put back. Written BEFORE the switch is touched, never after. */
+    // commit(): the record must be on disk before the switch changes, or a process death leaves it unrestorable.
+    @android.annotation.SuppressLint("ApplySharedPref")
     fun setRingBacklightSuppressed(context: Context, prior: Int) {
         getPreferences(context).edit()
             .putInt(KEY_RING_BACKLIGHT_PRIOR, prior)
