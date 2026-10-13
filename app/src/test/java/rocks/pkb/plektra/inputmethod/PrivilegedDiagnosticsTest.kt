@@ -3,6 +3,8 @@ package rocks.pkb.plektra.inputmethod
 import android.content.Context
 import android.provider.Settings
 import moe.shizuku.manager.adb.EmbeddedAdbInit
+import moe.shizuku.manager.adb.SoftwareAdbKeySource
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -19,15 +21,23 @@ import org.robolectric.annotation.Config
 class PrivilegedDiagnosticsTest {
 
     private val context: Context get() = RuntimeEnvironment.getApplication()
+    private val source = SoftwareAdbKeySource()
+    private val savedFactory = EmbeddedAdbInit.keySourceFactory
 
     @Before
     fun setUp() {
         EmbeddedAdbInit.prefs(context).edit().clear().commit()
+        EmbeddedAdbInit.keySourceFactory = { source }
         Settings.Global.putInt(context.contentResolver, "adb_wifi_enabled", 0)
     }
 
+    @After
+    fun tearDown() {
+        EmbeddedAdbInit.keySourceFactory = savedFactory
+    }
+
     private fun storeKey() {
-        EmbeddedAdbInit.prefs(context).edit().putString("adbkey", "AAAA").commit()
+        source.generate()
     }
 
     @Test

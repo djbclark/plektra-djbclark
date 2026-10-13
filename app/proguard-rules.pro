@@ -33,7 +33,5 @@
 -keep class moe.shizuku.manager.adb.** { *; }
 -keepclasseswithmembernames class * { native <methods>; }
 -keep class org.lsposed.hiddenapibypass.** { *; }
--keep class org.bouncycastle.** { *; }
--dontwarn org.bouncycastle.**
 -dontwarn org.conscrypt.**
 -dontwarn com.android.org.conscrypt.**

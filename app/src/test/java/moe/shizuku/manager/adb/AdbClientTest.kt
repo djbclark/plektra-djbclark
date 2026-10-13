@@ -301,6 +301,33 @@ class AdbClientTest {
         assertEquals("pastiera_verify\n", out.toString())
     }
 
+    // ---- 1.3d: a key handle with no encoding still authenticates ---------------------------
+
+    @Test
+    fun keystoreStyleOpaqueKeyCompletesTheTlsHandshakeAsTheClient() {
+        val material = SoftwareAdbKeySource.newMaterial()
+        assertNull(material.privateKey.encoded)
+        val key = AdbKey(material, EmbeddedAdbInit.KEY_NAME)
+        val seenClient = AtomicReference<java.security.PublicKey?>()
+        startPeer { socket ->
+            val tls = tlsHandshake(socket)
+            seenClient.set(runCatching { tls.session.peerCertificates.first().publicKey }.getOrNull())
+            openShell(tls)
+            send(tls.outputStream, A_WRTE, REMOTE_ID, 1, "pastiera_verify\n".toByteArray())
+            send(tls.outputStream, A_CLSE, REMOTE_ID, 1)
+            tls.inputStream.readBytes()
+        }
+        val out = StringBuilder()
+
+        AdbClient("127.0.0.1", serverSocket.localPort, key::sslContext, MemoryPins()).use { adb ->
+            adb.connect()
+            adb.shellCommand("echo pastiera_verify") { out.append(String(it)) }
+        }
+
+        assertEquals("pastiera_verify\n", out.toString())
+        assertEquals(material.publicKey, seenClient.get())
+    }
+
     // ---- 1.2b: output cap and deadline --------------------------------------------------------
 
     @Test

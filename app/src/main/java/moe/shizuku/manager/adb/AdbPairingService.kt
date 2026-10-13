@@ -163,25 +163,25 @@ class AdbPairingService : Service() {
         GlobalScope.launch(Dispatchers.IO) {
             val host = "127.0.0.1"
 
-            val keyStore = PreferenceAdbKeyStore(EmbeddedAdbInit.prefs(this@AdbPairingService))
-            // Constructing AdbKey GENERATES AND STORES a key when none is held, and isPaired()
-            // is nothing more than "a key is stored". So an attempt that never gets past the
+            val keyStore = EmbeddedAdbInit.keySource(this@AdbPairingService)
+            // loadOrGenerate GENERATES AND STORES a key when none is held, and isPaired() is
+            // nothing more than "a key is stored". So an attempt that never gets past the
             // pairing code would otherwise leave the app permanently believing it is paired.
             // Remember whether the key predates this attempt: only a key minted here may be
             // discarded on failure, because an existing one may back a working pairing.
-            // Read through the same predicate the rest of the app gates on, and one that cannot
-            // throw: keyStore.get() base64-decodes and would blow up here on a corrupt value.
+            // Read through the same predicate the rest of the app gates on (it also drops a
+            // legacy wrapped key, finding 1.3d, so this pairing mints a Keystore key).
             val keyExistedBeforeAttempt =
                 EmbeddedAdbShell.isPaired(this@AdbPairingService)
             val key = try {
                 try {
-                    AdbKey(keyStore, EmbeddedAdbInit.KEY_NAME)
+                    AdbKey.loadOrGenerate(keyStore, EmbeddedAdbInit.KEY_NAME)
                 } catch (e: AdbKeyException) {
                     // Pairing is the one place a stored key may be replaced: the phone is about
                     // to be told the new public key anyway, so an unreadable old one is dropped.
                     Log.e(tag, "Stored ADB key unreadable, generating a new one for this pairing", e)
-                    keyStore.clear()
-                    AdbKey(keyStore, EmbeddedAdbInit.KEY_NAME)
+                    keyStore.delete()
+                    AdbKey.loadOrGenerate(keyStore, EmbeddedAdbInit.KEY_NAME)
                 }
             } catch (e: Throwable) {
                 Log.e(tag, "Unable to load ADB key", e)
@@ -222,10 +222,10 @@ class AdbPairingService : Service() {
      * gates the backlight, the overlay grant, the trackpad and every other privileged step. A key
      * that predates the attempt is left alone: it may be backing a pairing that still works.
      */
-    private fun discardUnprovenKey(keyStore: PreferenceAdbKeyStore, keyExistedBeforeAttempt: Boolean) {
+    private fun discardUnprovenKey(keyStore: AdbKeySource, keyExistedBeforeAttempt: Boolean) {
         if (keyExistedBeforeAttempt) return
         Log.w(tag, "Pairing failed; discarding the key it generated so the app does not read as paired")
-        keyStore.clear()
+        keyStore.delete()
     }
 
     private fun handleResult(success: Boolean, exception: Throwable?) {

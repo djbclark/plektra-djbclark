@@ -487,8 +487,9 @@ dependencies {
     // Shizuku for ADB shell access
     implementation("dev.rikka.shizuku:api:13.1.5")
     implementation("dev.rikka.shizuku:provider:13.1.5")
-    // Embedded wireless-ADB broker (vendored moe.shizuku.manager.adb).
-    implementation("org.bouncycastle:bcpkix-jdk18on:1.80")
+    // Embedded wireless-ADB broker (vendored moe.shizuku.manager.adb). BouncyCastle only builds test
+    // certificates now: the ADB key and its certificate come from AndroidKeyStore (finding 1.3d).
+    testImplementation("org.bouncycastle:bcpkix-jdk18on:1.80")
     implementation("org.lsposed.hiddenapibypass:hiddenapibypass:6.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")

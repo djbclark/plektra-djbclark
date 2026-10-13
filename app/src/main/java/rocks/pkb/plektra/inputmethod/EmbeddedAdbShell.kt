@@ -10,7 +10,7 @@ import moe.shizuku.manager.adb.AdbKey
 import moe.shizuku.manager.adb.AdbKeyException
 import moe.shizuku.manager.adb.AdbMdns
 import moe.shizuku.manager.adb.EmbeddedAdbInit
-import moe.shizuku.manager.adb.PreferenceAdbKeyStore
+import moe.shizuku.manager.adb.LegacyAdbKey
 import moe.shizuku.manager.adb.PreferenceAdbServerPinStore
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.ArrayBlockingQueue
@@ -35,8 +35,6 @@ object EmbeddedAdbShell {
 
     private const val TAG = "EmbeddedAdbShell"
     private const val MDNS_POLL_SECONDS = 8L
-    // Pref key that PreferenceAdbKeyStore writes the private key under once paired.
-    private const val STORED_KEY_PREF = "adbkey"
 
     /** What [verify]'s command prints; anything else means the peer is not a working adbd. */
     internal const val VERIFY_MARKER = "pastiera_verify"
@@ -51,9 +49,15 @@ object EmbeddedAdbShell {
     var lastResult: String? = null
         private set
 
-    /** True once the broker has a stored ADB key (i.e. the device has been paired). */
-    fun isPaired(context: Context): Boolean =
-        EmbeddedAdbInit.prefs(context).contains(STORED_KEY_PREF)
+    /**
+     * True once the broker holds an ADB key (i.e. the device has been paired). A legacy
+     * AES-wrapped key from before finding 1.3d is discarded here, so such an install reads as not
+     * paired and pairs again with a Keystore key.
+     */
+    fun isPaired(context: Context): Boolean {
+        LegacyAdbKey.discard(EmbeddedAdbInit.prefs(context))
+        return EmbeddedAdbInit.keySource(context).exists()
+    }
 
     /**
      * Forget the stored key, so the app stops reading as paired and the setup card offers to pair
@@ -65,7 +69,8 @@ object EmbeddedAdbShell {
      * feature silently gated behind it and no way out but clearing app data. This is the way out.
      */
     fun forgetPairing(context: Context) {
-        PreferenceAdbKeyStore(EmbeddedAdbInit.prefs(context)).clear()
+        EmbeddedAdbInit.keySource(context).delete()
+        LegacyAdbKey.discard(EmbeddedAdbInit.prefs(context))
         PreferenceAdbServerPinStore(EmbeddedAdbInit.prefs(context)).clear()
         lastError = null
         lastResult = null
@@ -142,15 +147,16 @@ object EmbeddedAdbShell {
      * (AdbClient), so a fake adbd cannot exhaust memory or hold the broker lock.
      */
     private fun connectAndRun(context: Context, port: Int, command: String): String? {
-        val keyStore = PreferenceAdbKeyStore(EmbeddedAdbInit.prefs(context))
+        val keyStore = EmbeddedAdbInit.keySource(context)
         val pins = PreferenceAdbServerPinStore(EmbeddedAdbInit.prefs(context))
         return try {
             val key = try {
-                AdbKey(keyStore, EmbeddedAdbInit.KEY_NAME)
+                // Never generates: only pairing may mint a key.
+                AdbKey.existing(keyStore, EmbeddedAdbInit.KEY_NAME)
             } catch (e: AdbKeyException) {
                 // The phone still trusts the old key and we can no longer sign with it, so the
                 // pairing is gone either way. Forgetting it makes the setup card ask to pair again.
-                keyStore.clear()
+                keyStore.delete()
                 throw e
             }
             val output = AdbClient("127.0.0.1", port, key, pins).use { client ->

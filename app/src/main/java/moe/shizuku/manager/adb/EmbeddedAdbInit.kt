@@ -13,7 +13,10 @@ import org.lsposed.hiddenapibypass.HiddenApiBypass
  */
 object EmbeddedAdbInit {
 
-    /** SharedPreferences file that backs [PreferenceAdbKeyStore]. */
+    /**
+     * SharedPreferences file for the broker's state: the key marker ([AndroidKeyStoreAdbKeySource]),
+     * adbd's pins and the last verdict. MODE_PRIVATE and excluded from every backup.
+     */
     const val PREFS_NAME = "embedded_adb"
 
     /**
@@ -51,4 +54,15 @@ object EmbeddedAdbInit {
     @JvmStatic
     fun prefs(context: Context): SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    /**
+     * Where the broker's ADB key lives: AndroidKeyStore (finding 1.3d). Tests replace it with a
+     * software key, because Robolectric has no AndroidKeyStore.
+     */
+    @Volatile
+    @androidx.annotation.VisibleForTesting
+    var keySourceFactory: (Context) -> AdbKeySource = { AndroidKeyStoreAdbKeySource(prefs(it)) }
+
+    @JvmStatic
+    fun keySource(context: Context): AdbKeySource = keySourceFactory(context.applicationContext)
 }
