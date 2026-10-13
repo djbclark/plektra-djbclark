@@ -12,6 +12,7 @@ import moe.shizuku.manager.adb.AdbMdns
 import moe.shizuku.manager.adb.AdbServerPinMismatchException
 import moe.shizuku.manager.adb.EmbeddedAdbInit
 import moe.shizuku.manager.adb.LegacyAdbKey
+import moe.shizuku.manager.adb.MAX_SHELL_OUTPUT_BYTES
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.TimeUnit
@@ -189,10 +190,11 @@ object EmbeddedAdbShell {
             commands.any { !trigger.allows(it) } -> return@synchronized refuse(REFUSED_NOT_ALLOWED)
             commands.dropLast(1).any { it.terminal } -> return@synchronized refuse(REFUSED_TERMINAL_NOT_LAST)
         }
-        val lines = commands.map { command ->
-            runCatching { command.commandLine(app.packageName) }
+        val argvs = commands.map { command ->
+            runCatching { command.argvs(app.packageName) }
                 .getOrElse { return@synchronized refuse("invalid ${command.id}: ${it.message}") }
         }
+        val lines = argvs.map { PrivilegedCommand.shellLine(it) }
 
         // plk/shizuku-backend: past every check, choose the route.
         if (!brokerOnly) {
@@ -201,7 +203,7 @@ object EmbeddedAdbShell {
                 PrivilegedBackends.shizukuUnavailableReason(resolved.shizukuState)?.let { reason ->
                     return@synchronized fail(reason, BrokerStatus.SHIZUKU_UNAVAILABLE, PrivilegedBackend.SHIZUKU)
                 }
-                return@synchronized runViaShizuku(app, commands, lines)
+                return@synchronized runViaShizuku(app, commands, argvs)
             }
         }
 
@@ -219,36 +221,47 @@ object EmbeddedAdbShell {
         runSession(app, port, commands, lines)
     }
 
-    /** The audit detail of a command entry: its backend, and the reason when it failed. */
-    internal fun auditDetail(backend: PrivilegedBackend, reason: String? = null): String =
-        if (reason == null) "via ${backend.auditName}" else "via ${backend.auditName}: $reason"
+    /**
+     * The audit detail of a command entry: its backend, the uid the Shizuku service ran as when
+     * one answered (`via shizuku (uid 2000)`), and the reason when it failed.
+     */
+    internal fun auditDetail(backend: PrivilegedBackend, reason: String? = null, uid: Int? = null): String {
+        val who = uid?.let { " (uid $it)" }.orEmpty()
+        return if (reason == null) "via ${backend.auditName}$who" else "via ${backend.auditName}$who: $reason"
+    }
 
     /**
-     * plk/shizuku-backend: runs [lines] one by one through Shizuku's UserService, under the same
-     * output limit and deadline as the broker, and audits each like [runSession] does. Called only
-     * from [execute], after its checks. A non-zero exit code does not fail a command (adbd's shell
-     * reports none, so callers already judge results by output or by asking Android); it is noted
-     * in the audit entry.
+     * plk/shizuku-backend: runs each command's argv arrays through Shizuku's UserService, no
+     * shell, under the same output limit and deadline as the broker, and audits each like
+     * [runSession] does. Called only from [execute], after its checks. A command of several arrays
+     * runs them in order like `a; b` did: a non-zero exit does not stop the next one, the output is
+     * concatenated and the exit code is the last one's. A non-zero exit code does not fail a command
+     * (adbd's shell reports none, so callers already judge results by output or by asking
+     * Android); it is noted in the audit entry.
+     *
+     * A service that dies or disconnects mid-run (a Shizuku server restart takes it along) comes
+     * back as a failed result with the status SHIZUKU_UNAVAILABLE, never as success: the caller
+     * shows the failure and the user retries, which binds a fresh service.
      */
     private fun runViaShizuku(
         app: Context,
         commands: List<PrivilegedCommand>,
-        lines: List<String>,
+        argvs: List<List<List<String>>>,
     ): List<PrivilegedResult> {
         val backend = PrivilegedBackend.SHIZUKU
         val shell = PrivilegedBackends.shizuku
         val results = ArrayList<PrivilegedResult>(commands.size)
         for (i in commands.indices) {
             val command = commands[i]
-            val run = runCatching { shell.runLine(app, lines[i]) }
-                .getOrElse { ShellRunResult(false, null, null, describe(it)) }
+            val run = runArgvs(shell, app, argvs[i])
             if (run.ok) {
                 val output = run.output.orEmpty()
                 lastResult = output
                 lastError = null
                 val exit = run.exitCode?.takeIf { it != 0 }?.let { ", exit $it" }.orEmpty()
                 BrokerAuditLog.record(
-                    app, BrokerAuditLog.Kind.COMMAND, command.id, ok = true, detail = auditDetail(backend) + exit
+                    app, BrokerAuditLog.Kind.COMMAND, command.id, ok = true,
+                    detail = auditDetail(backend, uid = run.uid) + exit
                 )
                 results += PrivilegedResult(ok = true, output = output, failure = null, backend = backend)
                 continue
@@ -256,7 +269,8 @@ object EmbeddedAdbShell {
             val reason = run.failure ?: "Shizuku command failed"
             Log.w(TAG, "shizuku shell failed: $reason")
             BrokerAuditLog.record(
-                app, BrokerAuditLog.Kind.COMMAND, command.id, ok = false, detail = auditDetail(backend, reason)
+                app, BrokerAuditLog.Kind.COMMAND, command.id, ok = false,
+                detail = auditDetail(backend, reason, run.uid)
             )
             lastError = reason
             val status = if (run.serviceUnavailable) BrokerStatus.SHIZUKU_UNAVAILABLE else null
@@ -275,6 +289,28 @@ object EmbeddedAdbShell {
             return results
         }
         return results
+    }
+
+    /** One command's argv arrays in order; the first run that does not finish ends it as a failure. */
+    private fun runArgvs(shell: ShizukuShell, app: Context, argvs: List<List<String>>): ShellRunResult {
+        val output = StringBuilder()
+        var last: ShellRunResult? = null
+        for (argv in argvs) {
+            val run = runCatching { shell.runArgv(app, argv) }.getOrElse {
+                ShellRunResult(false, null, null, "Shizuku call failed: ${describe(it)}", serviceUnavailable = true)
+            }
+            if (!run.ok) return run.copy(output = (output.toString() + run.output.orEmpty()).ifEmpty { null })
+            output.append(run.output.orEmpty())
+            if (output.length > MAX_SHELL_OUTPUT_BYTES) {
+                return run.copy(
+                    ok = false, output = null, exitCode = null,
+                    failure = "shell output exceeded $MAX_SHELL_OUTPUT_BYTES bytes"
+                )
+            }
+            last = run
+        }
+        return last?.copy(output = output.toString())
+            ?: ShellRunResult(false, null, null, "no command to run")
     }
 
     /** Connect on [port] and run [lines], one stream each. Records every command it attempts. */

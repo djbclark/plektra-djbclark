@@ -33,9 +33,15 @@ import rocks.pkb.plektra.SettingsManager
 @Config(sdk = [33])
 class ShizukuBackendTest {
 
-    /** Records every line it is asked to run and answers from [answer]. */
+    /**
+     * Records every argv it is asked to run (as one space-joined string, [lines]; the raw arrays
+     * are in [argvs]) and answers from [answer]. A real service reports its uid with every answer;
+     * so does this one, as [uid], unless the answer says otherwise.
+     */
     private class FakeShizuku(var state: ShizukuState) : ShizukuShell {
         val lines = mutableListOf<String>()
+        val argvs = mutableListOf<List<String>>()
+        var uid: Int = 2000
         var answer: (String) -> ShellRunResult = { line ->
             val out = if (line == "echo ${EmbeddedAdbShell.VERIFY_MARKER}") "${EmbeddedAdbShell.VERIFY_MARKER}\n" else ""
             ShellRunResult(ok = true, output = out, exitCode = 0, failure = null)
@@ -43,9 +49,12 @@ class ShizukuBackendTest {
 
         override fun state(context: Context): ShizukuState = state
 
-        override fun runLine(context: Context, commandLine: String): ShellRunResult {
-            lines += commandLine
-            return answer(commandLine)
+        override fun runArgv(context: Context, argv: List<String>): ShellRunResult {
+            val line = argv.joinToString(" ")
+            lines += line
+            argvs += argv
+            val result = answer(line)
+            return if (result.uid == null && !result.serviceUnavailable) result.copy(uid = uid) else result
         }
     }
 
@@ -193,7 +202,7 @@ class ShizukuBackendTest {
         )
         assertTrue(results.all { it.ok && it.backend == PrivilegedBackend.SHIZUKU })
         assertEquals(listOf("verify", "grant_write_secure_settings"), commandEntries().map { it.id })
-        assertTrue(commandEntries().all { it.ok && it.detail == "via shizuku" })
+        assertTrue(commandEntries().all { it.ok && it.detail == "via shizuku (uid 2000)" })
     }
 
     @Test
@@ -217,7 +226,7 @@ class ShizukuBackendTest {
         val details = commandEntries().map { it.detail }
         assertEquals(
             listOf(
-                "via shizuku: shell output exceeded $MAX_SHELL_OUTPUT_BYTES bytes",
+                "via shizuku (uid 2000): shell output exceeded $MAX_SHELL_OUTPUT_BYTES bytes",
                 "via shizuku: ${EmbeddedAdbShell.REASON_EARLIER_FAILED}",
             ),
             details
@@ -229,7 +238,93 @@ class ShizukuBackendTest {
         shizuku.answer = { ShellRunResult(true, "", 1, null) }
         val result = PrivilegedShell.run(context, PrivilegedCommand.RevokeWriteSecureSettings, tap)
         assertTrue(result.ok)
-        assertEquals("via shizuku, exit 1", commandEntries().single().detail)
+        assertEquals("via shizuku (uid 2000), exit 1", commandEntries().single().detail)
+    }
+
+    /** Root is allowed (DECIDED 8, djbclark): the command runs and the audit records uid 0. */
+    @Test
+    fun aServiceRunningAsRootIsAllowedAndItsUidIsAudited() {
+        shizuku.uid = 0
+        val result = PrivilegedShell.run(context, PrivilegedCommand.Verify, tap)
+        assertTrue(result.ok)
+        assertEquals("via shizuku (uid 0)", commandEntries().single().detail)
+    }
+
+    /** Every Shizuku run is a program and its arguments: no `sh -c`, no shell syntax. */
+    @Test
+    fun shizukuGetsArgvArraysAndNeverAShell() {
+        PrivilegedShell.runSession(
+            context,
+            listOf(
+                PrivilegedCommand.ListPackageStates,
+                PrivilegedCommand.RingGrants(PrivilegedCommand.RingGrant.entries),
+                PrivilegedCommand.WriteBacklightTimeout(PrivilegedCommand.BacklightTimeout.ALWAYS_ON),
+            ),
+            tap
+        )
+        assertTrue(shizuku.argvs.isNotEmpty())
+        shizuku.argvs.forEach { argv ->
+            assertFalse(argv.toString(), argv[0] == "sh" || argv[0].endsWith("/sh"))
+            assertFalse(argv.toString(), "-c" in argv)
+            assertFalse(argv.toString(), argv.any { ';' in it || '"' in it })
+        }
+        // `a; b; c` became one run per array, in order.
+        assertEquals(
+            listOf("echo __E__", "pm list packages -e", "echo __D__", "pm list packages -d", "echo __U__", "pm list packages -u"),
+            shizuku.lines.take(6)
+        )
+        assertEquals(
+            listOf("service", "call", "agui_functional_service", "2", "s16", "keyboard_brightness_timeout", "s16", "-1"),
+            shizuku.argvs.last()
+        )
+    }
+
+    @Test
+    fun aCommandOfSeveralArraysKeepsGoingAfterANonZeroExitAndJoinsTheOutput() {
+        shizuku.answer = { line -> ShellRunResult(true, "[$line]", if (line == "echo __D__") 1 else 0, null) }
+        val result = PrivilegedShell.run(context, PrivilegedCommand.ListPackageStates, tap)
+        assertTrue(result.ok)
+        assertEquals(6, shizuku.lines.size)
+        assertTrue(result.output!!.startsWith("[echo __E__][pm list packages -e][echo __D__]"))
+        assertEquals("via shizuku (uid 2000)", commandEntries().single().detail)
+    }
+
+    // ---- the binder dies mid-run ---------------------------------------------------------------
+
+    /** The server restarts while a command runs: the call throws DeadObjectException. */
+    @Test
+    fun aBinderThatDiesMidRunIsAFailureTheUserCanRetryNeverSuccess() {
+        val dead = android.os.DeadObjectException("binder died")
+        val original = shizuku.answer
+        shizuku.answer = { throw dead }
+        val failed = PrivilegedShell.run(context, PrivilegedCommand.GrantWriteSecureSettings, tap)
+        assertFalse(failed.ok)
+        assertEquals(EmbeddedAdbShell.BrokerStatus.SHIZUKU_UNAVAILABLE, failed.status)
+        assertTrue(failed.failure!!.contains("DeadObjectException"))
+        val entry = commandEntries().single()
+        assertFalse(entry.ok)
+        assertTrue(entry.detail!!.startsWith("via shizuku: Shizuku call failed"))
+
+        // Retry: the next command binds a fresh service and works.
+        shizuku.answer = original
+        val retried = PrivilegedShell.run(context, PrivilegedCommand.Verify, tap)
+        assertTrue(retried.ok)
+    }
+
+    /** The service goes away between two arrays of one command: no success, no later array, no later command. */
+    @Test
+    fun aBinderThatDiesBetweenTwoArraysFailsTheWholeCommandAndTheRest() {
+        shizuku.answer = { line ->
+            if (line == "echo __D__") ShellRunResult.unavailable("service stopped") else ShellRunResult(true, "ok\n", 0, null)
+        }
+        val results = PrivilegedShell.runSession(
+            context, listOf(PrivilegedCommand.ListPackageStates, PrivilegedCommand.Verify), tap
+        )
+        assertFalse(results[0].ok)
+        assertEquals("service stopped", results[0].failure)
+        assertEquals(EmbeddedAdbShell.BrokerStatus.SHIZUKU_UNAVAILABLE, results[0].status)
+        assertEquals(EmbeddedAdbShell.REASON_EARLIER_FAILED, results[1].failure)
+        assertEquals(listOf("echo __E__", "pm list packages -e", "echo __D__"), shizuku.lines)
     }
 
     @Test

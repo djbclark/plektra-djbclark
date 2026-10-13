@@ -78,6 +78,7 @@ import java.util.Locale
 import android.view.inputmethod.InputMethodManager
 import android.view.inputmethod.InputMethodSubtype
 import rocks.pkb.plektra.clipboard.ClipboardHistoryManager
+import rocks.pkb.plektra.shizuku.ShizukuUserServiceShell
 import android.content.pm.PackageManager
 import rikka.shizuku.Shizuku
 
@@ -4375,6 +4376,9 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         pendingKeyboardSurfaceTransition?.let(uiHandler::removeCallbacks)
         pendingKeyboardSurfaceTransition = null
         super.onWindowHidden()
+        // plk/shizuku-backend: the keyboard is gone, so stop the Shizuku shell service's process
+        // too (it is rebound on the next command). Unbinding runs no command, mints no trigger.
+        ShizukuUserServiceShell.onKeyboardHidden()
         if (::screenTrackpadController.isInitialized) screenTrackpadController.deactivate() // djb/screen-trackpad
         if (::candidatesBarController.isInitialized) {
             candidatesBarController.dismissEmojiPickerPopups()
