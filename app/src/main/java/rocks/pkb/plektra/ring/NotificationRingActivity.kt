@@ -73,16 +73,14 @@ class NotificationRingActivity : Activity() {
 
         setShowWhenLocked(true)
         setTurnScreenOn(true)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            window.attributes = window.attributes.apply {
-                layoutInDisplayCutoutMode =
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
-                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
-                    else
-                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-                screenBrightness = SettingsManager.getNotificationRingBrightness(this@NotificationRingActivity)
-                    .screenBrightness
-            }
+        window.attributes = window.attributes.apply {
+            layoutInDisplayCutoutMode =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+                else
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            screenBrightness = SettingsManager.getNotificationRingBrightness(this@NotificationRingActivity)
+                .screenBrightness
         }
         WindowCompat.setDecorFitsSystemWindows(window, false)
         WindowInsetsControllerCompat(window, window.decorView).apply {
