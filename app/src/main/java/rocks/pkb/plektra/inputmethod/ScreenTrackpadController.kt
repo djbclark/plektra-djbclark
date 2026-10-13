@@ -39,6 +39,8 @@ internal class ScreenTrackpadController(
     private val handler: Handler,
     private val inputConnectionProvider: () -> InputConnection?,
     private val isShiftActive: () -> Boolean,
+    /** True only while a real editable text field (input connection and non-null input type) is focused. */
+    private val isEditableFieldFocused: () -> Boolean,
     private val replayKey: (downKeyCode: Int, downEvent: KeyEvent, upEvent: KeyEvent?) -> Unit,
 ) {
     private enum class State { IDLE, PENDING_HOLD, ABORTED, ACTIVE_HOLD, ACTIVE_STICKY }
@@ -205,6 +207,9 @@ internal class ScreenTrackpadController(
     /** Returns true when the overlay is showing. */
     private fun activate(sticky: Boolean): Boolean {
         if (overlayView != null) return true
+        // No editable field (e.g. a terminal with TYPE_NULL): there is no cursor to move, so never
+        // put a full-screen touch catcher over the app.
+        if (!isEditableFieldFocused()) return false
         if (!Settings.canDrawOverlays(service)) {
             Toast.makeText(service, R.string.screen_trackpad_permission_toast, Toast.LENGTH_LONG).show()
             return false
@@ -224,7 +229,7 @@ internal class ScreenTrackpadController(
         view.setBackgroundColor(Color.TRANSPARENT)
         view.isClickable = true
 
-        if (SettingsManager.isScreenTrackpadHintEnabled(service)) {
+        if (shouldShowHint(sticky, SettingsManager.isScreenTrackpadHintEnabled(service))) {
             val hint = TextView(service).apply {
                 setTextColor(Color.WHITE)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
@@ -304,6 +309,11 @@ internal class ScreenTrackpadController(
     private fun handleTouch(event: MotionEvent) {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                // The editor went away without a key-up reaching us: never leave the overlay up.
+                if (inputConnectionProvider() == null || !isEditableFieldFocused()) {
+                    deactivate()
+                    return
+                }
                 tracking = true
                 movedDuringGesture = false
                 lastX = event.x; lastY = event.y
@@ -351,6 +361,13 @@ internal class ScreenTrackpadController(
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value.toFloat(), service.resources.displayMetrics).toInt()
 
     companion object {
+        /**
+         * The pill is also the visible sign (and exit button) of the sticky modes, so it is shown
+         * there even when the hint setting is off: an invisible full-screen touch catcher must
+         * never exist. In hold mode the held key is the sign, so the setting is honoured.
+         */
+        internal fun shouldShowHint(sticky: Boolean, hintSetting: Boolean): Boolean = sticky || hintSetting
+
         private const val TAG = "ScreenTrackpad"
         private const val HOLD_THRESHOLD_MS = 250L
         private const val DOUBLE_TAP_THRESHOLD_MS = 400L
