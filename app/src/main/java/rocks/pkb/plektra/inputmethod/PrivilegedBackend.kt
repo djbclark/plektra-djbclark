@@ -39,8 +39,22 @@ enum class ShizukuState {
     /** Installed, but its server is not running (no binder). */
     NOT_RUNNING,
 
+    /**
+     * A Shizuku server older than v11 is reachable, but it cannot hand out the permission or the
+     * user service this backend needs ([rikka.shizuku.Shizuku.isPreV11]).
+     */
+    TOO_OLD,
+
     /** Running, but Plektra has not been allowed in Shizuku. */
     NOT_ALLOWED,
+
+    /**
+     * Running, not allowed, and Android will not show the prompt again. Seen on Sui only, after
+     * "Deny and don't ask again" (`shouldShowRequestPermissionRationale()` is true, so
+     * `requestPermission` answers DENIED without a dialog). Shizuku's own Deny is one-time, so
+     * it stays [NOT_ALLOWED]. The user has to allow Plektra in Sui's management screen.
+     */
+    DENIED_PERMANENTLY,
 
     /** Running and Plektra is allowed. */
     READY,
@@ -171,9 +185,13 @@ object PrivilegedBackends {
         ShizukuState.NOT_ALLOWED -> REASON_SHIZUKU_NOT_ALLOWED
         ShizukuState.NOT_RUNNING -> REASON_SHIZUKU_NOT_RUNNING
         ShizukuState.NOT_INSTALLED -> REASON_SHIZUKU_NOT_INSTALLED
+        ShizukuState.TOO_OLD -> REASON_SHIZUKU_TOO_OLD
+        ShizukuState.DENIED_PERMANENTLY -> REASON_SHIZUKU_DENIED_PERMANENTLY
     }
 
     const val REASON_SHIZUKU_NOT_ALLOWED = "Shizuku is running but Plektra is not allowed."
     const val REASON_SHIZUKU_NOT_RUNNING = "Shizuku is not running."
     const val REASON_SHIZUKU_NOT_INSTALLED = "Shizuku is not installed."
+    const val REASON_SHIZUKU_TOO_OLD = "Shizuku is too old (it needs version 11 or newer)."
+    const val REASON_SHIZUKU_DENIED_PERMANENTLY = "Plektra was denied in Sui with \"don't ask again\"."
 }
