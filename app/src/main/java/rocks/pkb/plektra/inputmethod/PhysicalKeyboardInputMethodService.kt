@@ -4474,7 +4474,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         
         if (cursorPositionChanged && collapsedSelection && !shouldSkipForCommit) {
             if (!forwardByOne) {
-                DeferredPunctuationSpaceTracker.clear()
+                DeferredPunctuationSpaceTracker.onCursorMoved(currentInputConnection, newSelStart)
             }
             // Update suggestions on cursor movement (if suggestions enabled)
             if (!state.shouldDisableSuggestions) {

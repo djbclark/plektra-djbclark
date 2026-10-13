@@ -418,6 +418,29 @@ class AlternateCharacterManager(
         scheduleLongPress(keyCode, inputConnection)
     }
 
+    /**
+     * The text a Shift long press gives for [typedText] on [keyCode]: the uppercase
+     * letter, or the lowercase one when the typed letter already is that uppercase
+     * (auto-capitalized, one-shot Shift, Caps Lock), so Shift always toggles case.
+     * Null when the key has no case to toggle.
+     */
+    private fun resolveShiftLongPressText(keyCode: Int, typedText: String?): String? {
+        if (LayoutMappingRepository.isMapped(keyCode)) {
+            val upper = LayoutMappingRepository.getUppercase(keyCode) ?: return null
+            if (typedText != null && typedText == upper) {
+                val lower = LayoutMappingRepository.getLowercase(keyCode)
+                    ?.takeIf { it.isNotEmpty() && it != upper }
+                    ?: upper.lowercase().takeIf { it != upper }
+                if (lower != null) return lower
+            }
+            return upper
+        }
+        if (typedText.isNullOrEmpty() || !typedText[0].isLetter()) return null
+        val upper = typedText.uppercase()
+        if (upper != typedText) return upper
+        return typedText.lowercase().takeIf { it != typedText } ?: upper
+    }
+
     private fun scheduleLongPress(
         keyCode: Int,
         inputConnection: InputConnection
@@ -550,38 +573,39 @@ class AlternateCharacterManager(
                     }
 
                     "shift" -> {
-                        // Long press with Shift: get uppercase from layout (always use JSON for mapped keys)
+                        // Long press with Shift toggles case: uppercase from the layout (always use
+                        // JSON for mapped keys), or lowercase when the typed letter is already
+                        // uppercase (auto-capitalized, one-shot Shift, Caps Lock).
                         if (LayoutMappingRepository.isMapped(keyCode)) {
-                            val upperChar = LayoutMappingRepository.getUppercase(keyCode)
-                            if (upperChar != null) {
+                            val shiftChar = resolveShiftLongPressText(keyCode, insertedChar)
+                            if (shiftChar != null) {
                                 longPressActivated[keyCode] = true
-                                val upperCharString = upperChar
 
                                 inputConnection.deleteSurroundingText(1, 0)
-                                if (!handleBoundaryTextBeforeCommit(upperCharString, inputConnection)) {
-                                    inputConnection.commitText(upperCharString, 1)
+                                if (!handleBoundaryTextBeforeCommit(shiftChar, inputConnection)) {
+                                    inputConnection.commitText(shiftChar, 1)
                                 }
 
                                 insertedNormalChars.remove(keyCode)
                                 keyPressWasShifted.remove(keyCode)
                                 longPressRunnables.remove(keyCode)
-                                Log.d(TAG, "Long press Shift per keyCode $keyCode -> $upperCharString")
-                                upperChar.firstOrNull()?.let { onAltCharInserted?.invoke(it) }
+                                Log.d(TAG, "Long press Shift per keyCode $keyCode -> $shiftChar")
+                                shiftChar.firstOrNull()?.let { onAltCharInserted?.invoke(it) }
                             }
                         } else if (insertedChar != null && insertedChar.isNotEmpty() && insertedChar[0].isLetter()) {
-                            // Fallback for unmapped keys only: use Kotlin uppercase.
+                            // Fallback for unmapped keys only: use Kotlin case conversion.
                             longPressActivated[keyCode] = true
-                            val upperChar = insertedChar.uppercase()
+                            val shiftChar = resolveShiftLongPressText(keyCode, insertedChar) ?: insertedChar.uppercase()
 
                             inputConnection.deleteSurroundingText(1, 0)
-                            inputConnection.commitText(upperChar, 1)
+                            inputConnection.commitText(shiftChar, 1)
 
                             insertedNormalChars.remove(keyCode)
                             keyPressWasShifted.remove(keyCode)
                             longPressRunnables.remove(keyCode)
-                            Log.d(TAG, "Long press Shift per keyCode $keyCode -> $upperChar (fallback)")
-                            if (upperChar.isNotEmpty()) {
-                                onAltCharInserted?.invoke(upperChar[0])
+                            Log.d(TAG, "Long press Shift per keyCode $keyCode -> $shiftChar (fallback)")
+                            if (shiftChar.isNotEmpty()) {
+                                onAltCharInserted?.invoke(shiftChar[0])
                             }
                         }
                     }
@@ -697,8 +721,10 @@ class AlternateCharacterManager(
     ): LongPressCycle? {
         val original = insertedNormalChars[keyCode]?.takeIf { it.isNotEmpty() } ?: return null
         val wasShifted = keyPressWasShifted[keyCode] ?: false
-        val candidates = modes
-            .mapNotNull { resolveLongPressCandidate(it, keyCode, original, wasShifted) }
+        val singleSteps = modes.map { resolveLongPressCandidate(it, keyCode, original, wasShifted) }
+        // The combined step comes last; distinct() drops it when it repeats an earlier step.
+        val candidates = (singleSteps + resolveCombinedShiftCandidate(modes, keyCode, original))
+            .filterNotNull()
             .filter { it.isNotEmpty() && it != original }
             .distinct()
         if (candidates.isEmpty()) return null
@@ -714,8 +740,34 @@ class AlternateCharacterManager(
         return cycle
     }
 
+    /**
+     * When one cycle mode is Shift and the other is Variations or a SYM page, the step
+     * that applies both: the other mode resolved on the Shift-toggled character
+     * (e -> è -> E -> È; an auto-capitalized E gives E -> È -> e -> è). Device SYM
+     * ("alt") has no Shift-specific map, so it never adds a combined step.
+     */
+    private fun resolveCombinedShiftCandidate(
+        modes: List<String>,
+        keyCode: Int,
+        original: String
+    ): String? {
+        if (modes.size != 2 || "shift" !in modes) return null
+        val other = modes.first { it != "shift" }
+        if (other != "variations" && other != "sym" && other != "sym_symbols" && other != "sym_emoji") {
+            return null
+        }
+        val toggled = resolveShiftLongPressText(keyCode, original)?.takeIf { it.isNotEmpty() } ?: return null
+        return resolveLongPressCandidate(other, keyCode, toggled, wasShifted = toggled[0].isUpperCase())
+    }
+
     private fun advanceLongPressCycle(keyCode: Int, cycle: LongPressCycle): Boolean {
-        val nextIndex = (cycle.index + 1) % cycle.steps.size
+        var nextIndex = (cycle.index + 1) % cycle.steps.size
+        // Never spend a step on the text already shown: skip to the one after it.
+        if (cycle.steps[nextIndex] == cycle.displayed && cycle.steps.size > 1 &&
+            (cycle.loop || nextIndex < cycle.steps.lastIndex)
+        ) {
+            nextIndex = (nextIndex + 1) % cycle.steps.size
+        }
         val next = cycle.steps[nextIndex]
         if (next != cycle.displayed) {
             val replaced = replaceInsertedTextWithVariation(
@@ -756,14 +808,22 @@ class AlternateCharacterManager(
         if (shownBeforeCursor) {
             // Re-commit punctuation through the Alt path so boundary handling,
             // French spacing and auto-space replacement apply to the final choice.
-            inputConnection.deleteSurroundingText(text.length, 0)
-            handleAltCombination(
-                keyCode = keyCode,
-                inputConnection = inputConnection,
-                event = null,
-                mappingsOverride = mapOf(keyCode to text),
-                defaultHandler = { _, _ -> false }
-            )
+            // One batch edit, so editors that honour it report a single selection
+            // change rather than the delete on its own (which would look like a
+            // cursor move and drop a deferred punctuation space).
+            inputConnection.beginBatchEdit()
+            try {
+                inputConnection.deleteSurroundingText(text.length, 0)
+                handleAltCombination(
+                    keyCode = keyCode,
+                    inputConnection = inputConnection,
+                    event = null,
+                    mappingsOverride = mapOf(keyCode to text),
+                    defaultHandler = { _, _ -> false }
+                )
+            } finally {
+                inputConnection.endBatchEdit()
+            }
             return
         }
         text.firstOrNull()?.let { onAltCharInserted?.invoke(it) }
@@ -809,11 +869,8 @@ class AlternateCharacterManager(
                     }
                 }
             }
-            "shift" -> if (LayoutMappingRepository.isMapped(keyCode)) {
-                LayoutMappingRepository.getUppercase(keyCode)
-            } else {
-                insertedChar.takeIf { it[0].isLetter() }?.uppercase()
-            }
+            // Toggles case, so an auto-capitalized T steps to t rather than repeating T.
+            "shift" -> resolveShiftLongPressText(keyCode, insertedChar)
             else -> altModifierMappings[keyCode]
         }
     }
