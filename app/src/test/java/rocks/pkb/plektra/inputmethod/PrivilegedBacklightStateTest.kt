@@ -1,5 +1,6 @@
 package rocks.pkb.plektra.inputmethod
 
+import android.Manifest
 import android.content.Context
 import android.provider.Settings
 import rocks.pkb.plektra.SettingsManager
@@ -13,6 +14,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
@@ -52,6 +54,8 @@ class PrivilegedBacklightStateTest {
     /** An install that turned the backlight on before holders existed keeps the tile's permission. */
     @Test
     fun applyAllRegistersTheBacklightAsAWriteSecureSettingsHolder() {
+        // plk/tile-holder: the tile's own switch off, so only Smart backlight holds it.
+        SettingsManager.setBacklightTileEnabled(context, false)
         SettingsManager.setSmartBacklightEnabled(context, true)
         PrivilegedSetup.applyAll(context, "test", BrokerTrigger.forTest(BrokerTrigger.Kind.TAP))
         assertTrue(WriteSecureSettingsHolders.BACKLIGHT in WriteSecureSettingsHolders.holders(context))
@@ -59,6 +63,108 @@ class PrivilegedBacklightStateTest {
         SettingsManager.setSmartBacklightEnabled(context, false)
         PrivilegedSetup.applyAll(context, "test", BrokerTrigger.forTest(BrokerTrigger.Kind.TAP))
         assertFalse(WriteSecureSettingsHolders.anyNeeded(context))
+    }
+
+    // ---- plk/tile-holder: the keyboard-light tile's own holder ------------------------------
+
+    private fun grantWriteSecureSettings() {
+        Shadows.shadowOf(RuntimeEnvironment.getApplication())
+            .grantPermissions(Manifest.permission.WRITE_SECURE_SETTINGS)
+    }
+
+    private val tap get() = BrokerTrigger.forTest(BrokerTrigger.Kind.TAP)
+
+    @Test
+    fun theTileSwitchStartsOffOnAFreshInstallAndIsStored() {
+        assertFalse(SettingsManager.getBacklightTileEnabled(context))
+        assertTrue(SettingsManager.getPreferences(context).contains("backlight_tile_enabled"))
+        // Settled once: Smart backlight going on later does not flip it.
+        SettingsManager.setSmartBacklightEnabled(context, true)
+        assertFalse(SettingsManager.getBacklightTileEnabled(context))
+    }
+
+    /** An upgrade where the tile already worked keeps a working tile. */
+    @Test
+    fun theTileSwitchStartsOnWhereTheTileAlreadyWorked() {
+        SettingsManager.setSmartBacklightEnabled(context, true)
+        assertTrue(SettingsManager.getBacklightTileEnabled(context))
+
+        SettingsManager.getPreferences(context).edit().clear().commit()
+        grantWriteSecureSettings()
+        assertTrue(SettingsManager.getBacklightTileEnabled(context))
+    }
+
+    @Test
+    fun holderSyncIncludesTheTileSwitch() {
+        SettingsManager.setBacklightTileEnabled(context, true)
+        PrivilegedSetup.syncFeatureHolders(context)
+        assertEquals(
+            setOf(WriteSecureSettingsHolders.BACKLIGHT_TILE),
+            WriteSecureSettingsHolders.holders(context)
+        )
+
+        SettingsManager.setBacklightTileEnabled(context, false)
+        PrivilegedSetup.syncFeatureHolders(context)
+        assertFalse(WriteSecureSettingsHolders.anyNeeded(context))
+    }
+
+    /** Re-pairing (applyAll) restores the tile's holder after a reset cleared them. */
+    @Test
+    fun applyAllKeepsTheTileHolder() {
+        SettingsManager.setBacklightTileEnabled(context, true)
+        WriteSecureSettingsHolders.clear(context)
+        PrivilegedSetup.applyAll(context, "test", tap)
+        assertTrue(WriteSecureSettingsHolders.BACKLIGHT_TILE in WriteSecureSettingsHolders.holders(context))
+    }
+
+    @Test
+    fun smartBacklightOffWithTheTileOnKeepsThePermission() {
+        grantWriteSecureSettings()
+        SettingsManager.setSmartBacklightEnabled(context, true)
+        SettingsManager.setBacklightTileEnabled(context, true)
+        // The tile's holder was never recorded (as on an upgrade before any applyAll); the switch
+        // going off must still see it.
+        WriteSecureSettingsHolders.set(context, WriteSecureSettingsHolders.BACKLIGHT, true)
+
+        SettingsManager.setSmartBacklightEnabled(context, false)
+        val queued = PrivilegedSetup.setWriteSecureSettingsNeeded(
+            context, WriteSecureSettingsHolders.BACKLIGHT, false, tap
+        )
+
+        assertFalse("no revoke queued", queued)
+        assertEquals(
+            setOf(WriteSecureSettingsHolders.BACKLIGHT_TILE),
+            WriteSecureSettingsHolders.holders(context)
+        )
+    }
+
+    @Test
+    fun theTileSwitchOffWithNothingElseRevokes() {
+        grantWriteSecureSettings()
+        SettingsManager.setBacklightTileEnabled(context, true)
+        PrivilegedSetup.syncFeatureHolders(context)
+
+        SettingsManager.setBacklightTileEnabled(context, false)
+        val queued = PrivilegedSetup.setWriteSecureSettingsNeeded(
+            context, WriteSecureSettingsHolders.BACKLIGHT_TILE, false, tap
+        )
+
+        assertTrue("the revoke is queued", queued)
+        assertFalse(WriteSecureSettingsHolders.anyNeeded(context))
+    }
+
+    @Test
+    fun theTileSwitchOffKeepsThePermissionWhileSmartBacklightHoldsIt() {
+        grantWriteSecureSettings()
+        SettingsManager.setSmartBacklightEnabled(context, true)
+        SettingsManager.setBacklightTileEnabled(context, false)
+
+        val queued = PrivilegedSetup.setWriteSecureSettingsNeeded(
+            context, WriteSecureSettingsHolders.BACKLIGHT_TILE, false, tap
+        )
+
+        assertFalse(queued)
+        assertEquals(setOf(WriteSecureSettingsHolders.BACKLIGHT), WriteSecureSettingsHolders.holders(context))
     }
 
     @Test

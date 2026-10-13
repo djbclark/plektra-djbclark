@@ -6811,6 +6811,34 @@ object SettingsManager {
         getPreferences(context).edit().putBoolean(KEY_SMART_BACKLIGHT_ENABLED, enabled).apply()
     }
 
+    // plk/tile-holder: the keyboard-light Quick Settings tile's own WRITE_SECURE_SETTINGS holder
+    // ([rocks.pkb.plektra.inputmethod.WriteSecureSettingsHolders.BACKLIGHT_TILE]), a switch in the
+    // Smart backlight section.
+    private const val KEY_BACKLIGHT_TILE_ENABLED = "backlight_tile_enabled"
+
+    /**
+     * Keep WRITE_SECURE_SETTINGS for the keyboard-light tile even while Smart backlight is off.
+     *
+     * Never stored until first read: an install where the tile already worked (Smart backlight on,
+     * or the permission held for the ring's keep-dark) starts with it on, so upgrading keeps a
+     * working tile; any other install starts with it off. The first answer is stored, so the
+     * default never shifts under the user afterwards.
+     */
+    fun getBacklightTileEnabled(context: Context): Boolean {
+        val prefs = getPreferences(context)
+        if (prefs.contains(KEY_BACKLIGHT_TILE_ENABLED)) {
+            return prefs.getBoolean(KEY_BACKLIGHT_TILE_ENABLED, false)
+        }
+        val initial = getSmartBacklightEnabled(context) ||
+            rocks.pkb.plektra.inputmethod.PrivilegedSetup.hasWriteSecureSettings(context)
+        setBacklightTileEnabled(context, initial)
+        return initial
+    }
+
+    fun setBacklightTileEnabled(context: Context, enabled: Boolean) {
+        getPreferences(context).edit { putBoolean(KEY_BACKLIGHT_TILE_ENABLED, enabled) }
+    }
+
     // plk/shizuku-backend: "Privileged access via" on the Titan 2 Elite tools screen. Which route the
     // broker's door uses (see inputmethod/PrivilegedBackend.kt); a choice, not device state, so it
     // is backed up with the other settings.

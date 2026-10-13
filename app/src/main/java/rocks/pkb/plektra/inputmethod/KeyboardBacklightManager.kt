@@ -24,8 +24,8 @@ import android.provider.Settings
  *
  * The second half of this object is the in-process vendor switch (`agui_keyboard_background_light`)
  * that the Quick Settings tile toggles. It needs no broker at all while WRITE_SECURE_SETTINGS is
- * held, which is while a feature that needs it is on ([WriteSecureSettingsHolders.BACKLIGHT],
- * [WriteSecureSettingsHolders.RING_KEYBOARD_DARK]; see [PrivilegedSetup.setWriteSecureSettingsNeeded]).
+ * held, which is while a feature that needs it is on ([WriteSecureSettingsHolders.BACKLIGHT_TILE],
+ * [WriteSecureSettingsHolders.BACKLIGHT], [WriteSecureSettingsHolders.RING_KEYBOARD_DARK]; see [PrivilegedSetup.setWriteSecureSettingsNeeded]).
  *
  * Every broker call takes the [BrokerTrigger] of the user action behind it (finding 1.3g).
  */

@@ -28,6 +28,12 @@ object WriteSecureSettingsHolders {
     const val BACKLIGHT = "backlight"
 
     /**
+     * plk/tile-holder: the "Quick Settings tile" switch in the Smart backlight section. Keeps the
+     * permission for the keyboard-light tile on its own, so the tile works with Smart backlight off.
+     */
+    const val BACKLIGHT_TILE = "backlight_tile"
+
+    /**
      * djb/ring: "keep the keyboard dark while the ring is lit". While the ring and that switch
      * are both on, the ring writes the same vendor keyboard-light row in-process.
      */

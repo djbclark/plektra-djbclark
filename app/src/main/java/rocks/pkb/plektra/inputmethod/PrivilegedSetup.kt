@@ -96,6 +96,12 @@ object PrivilegedSetup {
             WriteSecureSettingsHolders.BACKLIGHT,
             SettingsManager.getSmartBacklightEnabled(context)
         )
+        // plk/tile-holder: the keyboard-light tile's own switch.
+        WriteSecureSettingsHolders.set(
+            context,
+            WriteSecureSettingsHolders.BACKLIGHT_TILE,
+            SettingsManager.getBacklightTileEnabled(context)
+        )
         WriteSecureSettingsHolders.set(
             context,
             WriteSecureSettingsHolders.RING_KEYBOARD_DARK,
@@ -169,6 +175,10 @@ object PrivilegedSetup {
         trigger: BrokerTrigger?,
     ): Boolean {
         val app = context.applicationContext
+        // plk/tile-holder: the other features' holders first, from their own switches, so one
+        // going off never revokes from under another whose holder was never recorded (an upgrade
+        // that has not run applyAll since the holder was added). This call's own value wins.
+        syncFeatureHolders(app)
         WriteSecureSettingsHolders.set(app, holder, needed)
         val command = writeSecureSettingsAction(app) ?: return false
         PrivilegedShell.runAsync {
