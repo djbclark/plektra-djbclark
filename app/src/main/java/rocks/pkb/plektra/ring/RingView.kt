@@ -15,7 +15,13 @@ import android.view.View
 class RingView(context: Context) : View(context) {
 
     var ring: RingGeometry.Ring? = null
-        set(value) { field = value; invalidate() }
+        set(value) {
+            field = value
+            // The blur depends only on the stroke, so it is built when the ring changes, not per frame.
+            glow.maskFilter = value?.takeIf { it.stroke > 0f }
+                ?.let { BlurMaskFilter(it.stroke * 2f, BlurMaskFilter.Blur.NORMAL) }
+            invalidate()
+        }
 
     var color: Int = NotificationRingPolicy.DEFAULT_COLOR
         set(value) { field = value; invalidate() }
@@ -52,7 +58,6 @@ class RingView(context: Context) : View(context) {
         glow.color = color
         glow.alpha = (90 * alpha).toInt()
         glow.strokeWidth = r.stroke * 2.5f
-        glow.maskFilter = BlurMaskFilter(r.stroke * 2f, BlurMaskFilter.Blur.NORMAL)
         canvas.drawCircle(r.cx, r.cy, r.radius, glow)
 
         stroke.color = color
