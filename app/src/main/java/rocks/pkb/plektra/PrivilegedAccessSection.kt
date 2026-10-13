@@ -37,8 +37,11 @@ import rocks.pkb.plektra.inputmethod.ShizukuState
 import rocks.pkb.plektra.shizuku.ShizukuUserServiceShell
 import rocks.pkb.plektra.ui.BrokerStatusMonitor
 
-/** Shizuku echoes this back with the user's answer; any constant of ours will do. */
-private const val SHIZUKU_PERMISSION_REQUEST = 4_212
+/**
+ * Shizuku echoes this back with the user's answer; any constant of ours will do. Shared with
+ * [PrivilegedBlockedNotice], whose Allow button asks the same question.
+ */
+internal const val SHIZUKU_PERMISSION_REQUEST = 4_212
 
 /**
  * plk/shizuku-backend: "Privileged access via" on the Titan 2 Elite tools screen, under the
@@ -164,4 +167,6 @@ private fun ShizukuState.labelRes(): Int = when (this) {
     ShizukuState.NOT_ALLOWED -> R.string.privileged_access_shizuku_not_allowed
     ShizukuState.NOT_RUNNING -> R.string.privileged_access_shizuku_not_running
     ShizukuState.NOT_INSTALLED -> R.string.privileged_access_shizuku_not_installed
+    ShizukuState.TOO_OLD -> R.string.privileged_access_shizuku_too_old
+    ShizukuState.DENIED_PERMANENTLY -> R.string.privileged_access_shizuku_denied_permanently
 }

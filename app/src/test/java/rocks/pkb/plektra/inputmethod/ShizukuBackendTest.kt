@@ -90,14 +90,20 @@ class ShizukuBackendTest {
             (PrivilegedAccessMode.AUTOMATIC to ShizukuState.NOT_ALLOWED) to broker,
             (PrivilegedAccessMode.AUTOMATIC to ShizukuState.NOT_RUNNING) to broker,
             (PrivilegedAccessMode.AUTOMATIC to ShizukuState.NOT_INSTALLED) to broker,
+            (PrivilegedAccessMode.AUTOMATIC to ShizukuState.TOO_OLD) to broker,
+            (PrivilegedAccessMode.AUTOMATIC to ShizukuState.DENIED_PERMANENTLY) to broker,
             (PrivilegedAccessMode.SHIZUKU_ONLY to ShizukuState.READY) to shizuku,
             (PrivilegedAccessMode.SHIZUKU_ONLY to ShizukuState.NOT_ALLOWED) to shizuku,
             (PrivilegedAccessMode.SHIZUKU_ONLY to ShizukuState.NOT_RUNNING) to shizuku,
             (PrivilegedAccessMode.SHIZUKU_ONLY to ShizukuState.NOT_INSTALLED) to shizuku,
+            (PrivilegedAccessMode.SHIZUKU_ONLY to ShizukuState.TOO_OLD) to shizuku,
+            (PrivilegedAccessMode.SHIZUKU_ONLY to ShizukuState.DENIED_PERMANENTLY) to shizuku,
             (PrivilegedAccessMode.BROKER_ONLY to ShizukuState.READY) to broker,
             (PrivilegedAccessMode.BROKER_ONLY to ShizukuState.NOT_ALLOWED) to broker,
             (PrivilegedAccessMode.BROKER_ONLY to ShizukuState.NOT_RUNNING) to broker,
             (PrivilegedAccessMode.BROKER_ONLY to ShizukuState.NOT_INSTALLED) to broker,
+            (PrivilegedAccessMode.BROKER_ONLY to ShizukuState.TOO_OLD) to broker,
+            (PrivilegedAccessMode.BROKER_ONLY to ShizukuState.DENIED_PERMANENTLY) to broker,
         )
         assertEquals(PrivilegedAccessMode.entries.size * ShizukuState.entries.size, expected.size)
         expected.forEach { (key, backend) ->
