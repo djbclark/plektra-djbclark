@@ -12,6 +12,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import rocks.pkb.plektra.inputmethod.BrokerTrigger
 import rocks.pkb.plektra.inputmethod.EmbeddedAdbShell
+import rocks.pkb.plektra.inputmethod.PrivilegedBackend
+import rocks.pkb.plektra.inputmethod.PrivilegedBackends
 import rocks.pkb.plektra.inputmethod.PrivilegedDiagnostics
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -44,6 +46,11 @@ object BrokerStatusMonitor {
     /** The current verdict, or null before the first check has landed. */
     val status: StateFlow<EmbeddedAdbShell.BrokerStatus?> = _status.asStateFlow()
 
+    private val _backend = MutableStateFlow<PrivilegedBackend?>(null)
+
+    /** plk/shizuku-backend: the backend the current verdict is about, or null before a check. */
+    val backend: StateFlow<PrivilegedBackend?> = _backend.asStateFlow()
+
     private val refreshMutex = Mutex()
 
     @Volatile
@@ -73,10 +80,11 @@ object BrokerStatusMonitor {
         refreshMutex.withLock {
             val age = System.currentTimeMillis() - lastCheckedAt
             if (!force && lastCheckedAt != 0L && age < FRESH_FOR_MS) return
-            val result = withContext(Dispatchers.IO) { EmbeddedAdbShell.verify(appContext, trigger) }
+            val verdict = withContext(Dispatchers.IO) { EmbeddedAdbShell.verifyWithBackend(appContext, trigger) }
             lastCheckedAt = System.currentTimeMillis()
-            PrivilegedDiagnostics.recordBrokerStatus(appContext, result)
-            _status.value = result
+            PrivilegedDiagnostics.recordBrokerStatus(appContext, verdict.status)
+            _backend.value = verdict.backend
+            _status.value = verdict.status
         }
     }
 
@@ -87,6 +95,7 @@ object BrokerStatusMonitor {
     fun invalidate() {
         lastCheckedAt = 0L
         _status.value = null
+        _backend.value = null
     }
 }
 
@@ -105,13 +114,17 @@ fun rememberVerifiedBrokerStatus(refreshKey: Any = Unit): State<EmbeddedAdbShell
     // Wireless debugging is the setting most likely to change while a screen is open, and the one
     // that silently breaks an otherwise good pairing, so it is polled and drives a re-check.
     var wirelessOn by remember { mutableStateOf(EmbeddedAdbShell.isWirelessDebuggingEnabled(context)) }
+    // plk/shizuku-backend: so is the backend (Shizuku started or stopped, Plektra allowed, the
+    // setting changed); a change re-checks through the backend now in use.
+    var backendNow by remember { mutableStateOf(PrivilegedBackends.current(context)) }
     LaunchedEffect(Unit) {
         while (true) {
             delay(1_500)
             wirelessOn = EmbeddedAdbShell.isWirelessDebuggingEnabled(context)
+            backendNow = PrivilegedBackends.current(context)
         }
     }
-    LaunchedEffect(refreshKey, wirelessOn) {
+    LaunchedEffect(refreshKey, wirelessOn, backendNow) {
         // Seeding is a side effect, so it belongs here rather than in a remember block.
         BrokerStatusMonitor.seed(context)
         // Only while the broker's screen is open and resumed, and only to verify (finding 1.3g).

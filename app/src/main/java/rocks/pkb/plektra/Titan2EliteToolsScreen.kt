@@ -117,6 +117,11 @@ fun Titan2EliteToolsScreen(
 
             DeviceSetupCard(modifier = Modifier.settingRow(SettingLinkIds.TITAN2_ELITE_TOOLS_DEVICE_SETUP))
 
+            // plk/shizuku-backend: Shizuku or the built-in broker, and Shizuku's status.
+            PrivilegedAccessSection(
+                modifier = Modifier.settingRow(SettingLinkIds.TITAN2_ELITE_TOOLS_PRIVILEGED_ACCESS)
+            )
+
             // Broker safety: Wireless debugging off after setup, the key-expiry advice, the audit log.
             BrokerSafetySection()
 
