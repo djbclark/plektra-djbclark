@@ -10,6 +10,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import rocks.pkb.plektra.inputmethod.BrokerTrigger
 import rocks.pkb.plektra.inputmethod.EmbeddedAdbShell
 import rocks.pkb.plektra.inputmethod.PrivilegedBackend
@@ -20,6 +23,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -53,19 +57,34 @@ object BrokerStatusMonitor {
 
     private val refreshMutex = Mutex()
 
+    private val _invalidations = MutableStateFlow(0)
+
+    /**
+     * Counts [invalidate] calls. A screen keys its re-check on this: an invalidation can land while
+     * the user is away from the app (pairing finishes on Android's Wireless debugging page), the
+     * refresh then has no resumed screen to run for, and nothing else would change to make the
+     * screen ask again.
+     */
+    val invalidations: StateFlow<Int> = _invalidations.asStateFlow()
+
     @Volatile
     private var lastCheckedAt = 0L
 
     @Volatile
     private var seeded = false
 
-    /** Show the last persisted verdict immediately, so a screen never opens blank. */
+    /**
+     * Show the last persisted verdict immediately, so a screen never opens blank. Only a problem
+     * verdict: a stored OK is exactly what a screen must not claim before a check has run (the
+     * phone may have been unpaired or Shizuku stopped since), so OK stays "checking".
+     */
     @Synchronized
     fun seed(context: Context) {
         if (seeded) return
         seeded = true
         if (_status.value == null) {
             _status.value = PrivilegedDiagnostics.lastBrokerStatus(context)?.first
+                ?.takeIf { it != EmbeddedAdbShell.BrokerStatus.OK }
         }
     }
 
@@ -80,7 +99,12 @@ object BrokerStatusMonitor {
         refreshMutex.withLock {
             val age = System.currentTimeMillis() - lastCheckedAt
             if (!force && lastCheckedAt != 0L && age < FRESH_FOR_MS) return
+            val generation = _invalidations.value
             val verdict = withContext(Dispatchers.IO) { EmbeddedAdbShell.verifyWithBackend(appContext, trigger) }
+            // Invalidated while the check ran: it describes the state from before, so publishing it
+            // would put a stale verdict back. The status stays unknown, and the bump of
+            // [invalidations] already makes every open screen ask again.
+            if (_invalidations.value != generation) return
             lastCheckedAt = System.currentTimeMillis()
             PrivilegedDiagnostics.recordBrokerStatus(appContext, verdict.status)
             _backend.value = verdict.backend
@@ -89,13 +113,23 @@ object BrokerStatusMonitor {
     }
 
     /**
-     * Drop the cached verdict after something that invalidates it — forgetting a pairing, or
-     * pairing again. Without this the stale answer would stand for up to [FRESH_FOR_MS].
+     * Runs [block] (forgetting the pairing) while no check can connect. A check started in the
+     * middle of an unpair talks to adbd with a key it has just removed, fails the TLS handshake and
+     * audits that failure as if something were wrong; waiting here, it runs after the key is gone
+     * and answers NOT_PAIRED without connecting. [block] must not call [refresh].
+     */
+    suspend fun <T> exclusive(block: suspend () -> T): T = refreshMutex.withLock { block() }
+
+    /**
+     * Drop the cached verdict after something that invalidates it — forgetting a pairing, pairing
+     * again, Shizuku's permission answer, a changed backend. Without this the stale answer would
+     * stand for up to [FRESH_FOR_MS]. Every screen re-checks as soon as it is resumed.
      */
     fun invalidate() {
         lastCheckedAt = 0L
         _status.value = null
         _backend.value = null
+        _invalidations.update { it + 1 }
     }
 }
 
@@ -124,12 +158,24 @@ fun rememberVerifiedBrokerStatus(refreshKey: Any = Unit): State<EmbeddedAdbShell
             backendNow = PrivilegedBackends.current(context)
         }
     }
-    LaunchedEffect(refreshKey, wirelessOn, backendNow) {
+    // Keyed on [BrokerStatusMonitor.invalidations] too, and run only while RESUMED: a pairing or
+    // Shizuku answer invalidates the verdict while the user is on another app's page, where a check
+    // has no screen to run for. Without the resume hook the card stayed on "Checking…" forever.
+    val invalidations by BrokerStatusMonitor.invalidations.collectAsState()
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(refreshKey, wirelessOn, backendNow, invalidations) {
         // Seeding is a side effect, so it belongs here rather than in a remember block.
         BrokerStatusMonitor.seed(context)
-        // Only while the broker's screen is open and resumed, and only to verify (finding 1.3g).
-        val trigger = awaitScreenTrigger(context, "broker_screen")
-        BrokerStatusMonitor.refresh(context, trigger, force = true)
+        var changed = true
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            // A changed key always re-verifies; a bare return to the screen only when there is no
+            // verdict (the refresh was dropped while away), else the fresh one is reused.
+            val force = changed || BrokerStatusMonitor.status.value == null
+            changed = false
+            // Only while the broker's screen is open and resumed, and only to verify (finding 1.3g).
+            val trigger = awaitScreenTrigger(context, "broker_screen")
+            BrokerStatusMonitor.refresh(context, trigger, force = force)
+        }
     }
     return BrokerStatusMonitor.status.collectAsState()
 }
