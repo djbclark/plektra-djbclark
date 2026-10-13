@@ -1,6 +1,7 @@
 package rocks.pkb.plektra
 
 import android.content.Context
+import rocks.pkb.plektra.inputmethod.BrokerTrigger
 import rocks.pkb.plektra.toolbox.FnCtrlRemap
 
 /**
@@ -48,17 +49,18 @@ object SystemChangeManager {
      * Revert every system-wide change the toolbox can make. BLOCKING — call OFF the main thread.
      * Never throws. Runs the reverts independently and reports each outcome.
      */
-    fun resetToStock(context: Context): ResetResult {
-        val fn = runCatching { revertFnCtrl(context) }.getOrDefault(StepOutcome.FAILED)
+    fun resetToStock(context: Context, trigger: BrokerTrigger?): ResetResult {
+        val fn = runCatching { revertFnCtrl(context, trigger) }.getOrDefault(StepOutcome.FAILED)
         return ResetResult(fnCtrl = fn)
     }
 
     // 1. Fn -> Ctrl. Restore the captured original programmable-key values (or write 0/0 when
     //    the original was unset / never captured). The same code path as the "Reset Fn key"
     //    button, so the two cannot drift apart.
-    private fun revertFnCtrl(context: Context): StepOutcome = when (FnCtrlRemap.revert(context)) {
-        FnCtrlRemap.Result.SUCCESS -> StepOutcome.SUCCESS
-        FnCtrlRemap.Result.NEEDS_PERMISSION -> StepOutcome.NEEDS_PERMISSION
-        FnCtrlRemap.Result.FAILED -> StepOutcome.FAILED
-    }
+    private fun revertFnCtrl(context: Context, trigger: BrokerTrigger?): StepOutcome =
+        when (FnCtrlRemap.revert(context, trigger)) {
+            FnCtrlRemap.Result.SUCCESS -> StepOutcome.SUCCESS
+            FnCtrlRemap.Result.NEEDS_PERMISSION -> StepOutcome.NEEDS_PERMISSION
+            FnCtrlRemap.Result.FAILED -> StepOutcome.FAILED
+        }
 }

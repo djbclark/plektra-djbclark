@@ -3,6 +3,7 @@ package rocks.pkb.plektra.toolbox
 import android.content.Context
 import android.provider.Settings
 import android.util.Log
+import rocks.pkb.plektra.inputmethod.BrokerTrigger
 import rocks.pkb.plektra.inputmethod.EmbeddedAdbShell
 import rocks.pkb.plektra.inputmethod.PrivilegedCommand
 import rocks.pkb.plektra.inputmethod.PrivilegedShell
@@ -64,9 +65,10 @@ object SystemTweaks {
         val toggles: Map<Toggle, Boolean>
     )
 
-    fun read(context: Context): State? {
+    /** A read: the open screen's trigger is enough ([PrivilegedCommand.readOnly]). */
+    fun read(context: Context, trigger: BrokerTrigger?): State? {
         if (!EmbeddedAdbShell.isPaired(context)) return null
-        val out = PrivilegedShell.run(context, PrivilegedCommand.ReadSystemTweaks).output ?: return null
+        val out = PrivilegedShell.run(context, PrivilegedCommand.ReadSystemTweaks, trigger).output ?: return null
         return parse(out)
     }
 
@@ -84,8 +86,8 @@ object SystemTweaks {
         return State(animation = animation, toggles = toggles)
     }
 
-    fun setAnimationSpeed(context: Context, speed: AnimationSpeed): Boolean {
-        if (!PrivilegedShell.run(context, PrivilegedCommand.SetAnimationSpeed(speed)).ok) return false
+    fun setAnimationSpeed(context: Context, speed: AnimationSpeed, trigger: BrokerTrigger?): Boolean {
+        if (!PrivilegedShell.run(context, PrivilegedCommand.SetAnimationSpeed(speed), trigger).ok) return false
         // Public API, so this is a real second opinion rather than the shell agreeing with itself.
         val seen = runCatching {
             Settings.Global.getFloat(context.contentResolver, ANIMATION_KEYS.first())
@@ -104,10 +106,10 @@ object SystemTweaks {
      * Not read back: the key is a hidden setting this app may not be allowed to read, and an
      * unreadable key looks exactly like an unset one.
      */
-    fun setToggle(context: Context, toggle: Toggle, enabled: Boolean): Boolean =
-        PrivilegedShell.run(context, PrivilegedCommand.SetTweak(toggle, enabled)).ok
+    fun setToggle(context: Context, toggle: Toggle, enabled: Boolean, trigger: BrokerTrigger?): Boolean =
+        PrivilegedShell.run(context, PrivilegedCommand.SetTweak(toggle, enabled), trigger).ok
 
     /** Everything on this screen back to how the phone shipped. */
-    fun resetAll(context: Context): Boolean =
-        PrivilegedShell.run(context, PrivilegedCommand.ResetSystemTweaks).ok
+    fun resetAll(context: Context, trigger: BrokerTrigger?): Boolean =
+        PrivilegedShell.run(context, PrivilegedCommand.ResetSystemTweaks, trigger).ok
 }

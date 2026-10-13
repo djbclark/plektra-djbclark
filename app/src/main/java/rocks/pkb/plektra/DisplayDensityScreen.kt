@@ -9,8 +9,11 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import rocks.pkb.plektra.inputmethod.BrokerTrigger
+import rocks.pkb.plektra.inputmethod.PrivilegedSetup
 import rocks.pkb.plektra.toolbox.DisplayDensity
 import rocks.pkb.plektra.toolbox.RevertibleChange
+import rocks.pkb.plektra.ui.awaitScreenTrigger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -41,23 +44,34 @@ fun DisplayDensityScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var deadlineMs by remember { mutableStateOf<Long?>(null) }
     var secondsLeft by remember { mutableStateOf<Int?>(null) }
+    // A change past its deadline that could not be undone without a tap (the process died, so
+    // the trigger of the tap that applied it is gone): the screen offers the revert as a button.
+    var stuckRevert by remember { mutableStateOf(false) }
+
+    // Broker triggers (finding 1.3g): opening the screen only reads (SCREEN trigger); a change is
+    // a tap, and after one the screen reads back on that same tap. Wireless debugging is switched
+    // off (finding 1.3e) only once a change is settled, never while a revert is armed.
+    suspend fun reload(trigger: BrokerTrigger?) {
+        loading = true
+        // A change armed before this screen was (re)created, which is what a density change
+        // does to the settings activity, resumes its countdown; one already past its deadline
+        // is undone at once, with the trigger of the tap that applied it.
+        val pending = RevertibleChange.pending(context)
+        if (pending != null && pending.remainingMs() == 0L) {
+            withContext(Dispatchers.IO) { RevertibleChange.revertExpired(context) }
+        }
+        val readTrigger = trigger ?: awaitScreenTrigger(context, "density_screen")
+        val read = withContext(Dispatchers.IO) { DisplayDensity.read(context, readTrigger) }
+        info = read
+        if (read != null && selected == 0f) selected = read.current.toFloat()
+        val now = RevertibleChange.pending(context)
+        stuckRevert = now != null && now.remainingMs() == 0L
+        deadlineMs = now?.deadlineMs?.takeIf { now.remainingMs() > 0L }
+        loading = false
+    }
 
     fun load() {
-        loading = true
-        scope.launch {
-            // A change armed before this screen was (re)created, which is what a density change
-            // does to the settings activity, resumes its countdown; one already past its deadline
-            // is undone at once.
-            val pending = RevertibleChange.pending(context)
-            if (pending != null && pending.remainingMs() == 0L) {
-                withContext(Dispatchers.IO) { RevertibleChange.revertNow(context) }
-            }
-            val read = withContext(Dispatchers.IO) { DisplayDensity.read(context) }
-            info = read
-            if (read != null && selected == 0f) selected = read.current.toFloat()
-            deadlineMs = RevertibleChange.pending(context)?.deadlineMs
-            loading = false
-        }
+        scope.launch { reload(null) }
     }
 
     LaunchedEffect(Unit) { load() }
@@ -74,8 +88,8 @@ fun DisplayDensityScreen(
         }
         secondsLeft = null
         deadlineMs = null
-        withContext(Dispatchers.IO) { RevertibleChange.revertNow(context) }
-        load()
+        withContext(Dispatchers.IO) { RevertibleChange.revertExpired(context) }
+        reload(null)
     }
 
     ToolboxPageScaffold(
@@ -93,6 +107,29 @@ fun DisplayDensityScreen(
             if (loading) {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 return@ToolboxPageScaffold
+            }
+
+            if (stuckRevert) {
+                Text(
+                    text = stringResource(R.string.density_revert_pending),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                )
+                Button(
+                    enabled = !busy,
+                    onClick = {
+                        val trigger = BrokerTrigger.fromTap(context, "density_revert_pending")
+                        busy = true
+                        scope.launch {
+                            withContext(Dispatchers.IO) { RevertibleChange.revertNow(context, trigger) }
+                            busy = false
+                            reload(trigger)
+                            PrivilegedSetup.queueFinishSetup(context, trigger)
+                        }
+                    },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                ) { Text(stringResource(R.string.density_revert)) }
             }
 
             val current = info
@@ -147,22 +184,29 @@ fun DisplayDensityScreen(
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
-                        enabled = !busy && secondsLeft == null && chosen != current.current,
+                        enabled = !busy && !stuckRevert && secondsLeft == null && chosen != current.current,
                         onClick = {
+                            val trigger = BrokerTrigger.fromTap(context, "density_apply")
                             busy = true
                             error = null
                             scope.launch {
                                 val outcome = withContext(Dispatchers.IO) {
-                                    DisplayDensity.apply(context, current, chosen)
+                                    DisplayDensity.apply(context, current, chosen, trigger)
                                 }
                                 busy = false
                                 when (outcome) {
+                                    // Settled by Keep, Revert or the countdown, each of which
+                                    // switches Wireless debugging off afterwards.
                                     is RevertibleChange.Outcome.Applied -> {
                                         deadlineMs = RevertibleChange.pending(context)?.deadlineMs
                                     }
-                                    is RevertibleChange.Outcome.NotPaired ->
+                                    is RevertibleChange.Outcome.NotPaired -> {
                                         error = context.getString(R.string.bloat_not_paired)
-                                    is RevertibleChange.Outcome.Failed -> error = outcome.reason
+                                    }
+                                    is RevertibleChange.Outcome.Failed -> {
+                                        error = outcome.reason
+                                        PrivilegedSetup.queueFinishSetup(context, trigger)
+                                    }
                                 }
                             }
                         }
@@ -172,12 +216,14 @@ fun DisplayDensityScreen(
                         TextButton(
                             enabled = !busy && secondsLeft == null,
                             onClick = {
+                                val trigger = BrokerTrigger.fromTap(context, "density_reset")
                                 busy = true
                                 scope.launch {
-                                    withContext(Dispatchers.IO) { DisplayDensity.reset(context) }
+                                    withContext(Dispatchers.IO) { DisplayDensity.reset(context, trigger) }
                                     busy = false
                                     selected = current.physical.toFloat()
-                                    load()
+                                    reload(trigger)
+                                    PrivilegedSetup.queueFinishSetup(context, trigger)
                                 }
                             }
                         ) { Text(stringResource(R.string.density_reset)) }
@@ -195,17 +241,23 @@ fun DisplayDensityScreen(
                 text = { Text(pluralStringResource(R.plurals.density_confirm_message, remaining, remaining)) },
                 confirmButton = {
                     TextButton(onClick = {
+                        val trigger = BrokerTrigger.fromTap(context, "density_keep")
                         deadlineMs = null
                         RevertibleChange.keep(context)
-                        load()
+                        scope.launch {
+                            reload(trigger)
+                            PrivilegedSetup.queueFinishSetup(context, trigger)
+                        }
                     }) { Text(stringResource(R.string.density_keep)) }
                 },
                 dismissButton = {
                     TextButton(onClick = {
+                        val trigger = BrokerTrigger.fromTap(context, "density_revert")
                         deadlineMs = null
                         scope.launch {
-                            withContext(Dispatchers.IO) { RevertibleChange.revertNow(context) }
-                            load()
+                            withContext(Dispatchers.IO) { RevertibleChange.revertNow(context, trigger) }
+                            reload(trigger)
+                            PrivilegedSetup.queueFinishSetup(context, trigger)
                         }
                     }) { Text(stringResource(R.string.density_revert)) }
                 }

@@ -3,6 +3,7 @@ package rocks.pkb.plektra.toolbox
 import android.content.Context
 import android.content.res.Resources
 import android.util.Log
+import rocks.pkb.plektra.inputmethod.BrokerTrigger
 import rocks.pkb.plektra.inputmethod.EmbeddedAdbShell
 import rocks.pkb.plektra.inputmethod.PrivilegedCommand
 import rocks.pkb.plektra.inputmethod.PrivilegedShell
@@ -50,9 +51,9 @@ object DisplayDensity {
      * force right now is taken from the system resources, which is what the screen is really
      * drawn with, and falls back to the shell's answer.
      */
-    fun read(context: Context): Info? {
+    fun read(context: Context, trigger: BrokerTrigger?): Info? {
         if (!EmbeddedAdbShell.isPaired(context)) return null
-        val out = PrivilegedShell.run(context, PrivilegedCommand.ReadDensity).output ?: return null
+        val out = PrivilegedShell.run(context, PrivilegedCommand.ReadDensity, trigger).output ?: return null
         val physical = parsePhysical(out) ?: return null
         val shellCurrent = parseOverride(out) ?: physical
         val local = Resources.getSystem().displayMetrics.densityDpi
@@ -72,19 +73,21 @@ object DisplayDensity {
      * chaining changes would otherwise leave the undo pointing at another override rather
      * than at the value the panel actually shipped with.
      */
-    fun apply(context: Context, info: Info, density: Int): RevertibleChange.Outcome {
+    fun apply(context: Context, info: Info, density: Int, trigger: BrokerTrigger?): RevertibleChange.Outcome {
         val allowed = range(info.physical)
         if (density !in allowed || density !in PrivilegedCommand.SetDensity.MIN_DPI..PrivilegedCommand.SetDensity.MAX_DPI) {
             Log.w(TAG, "Refusing density $density outside $allowed")
             return RevertibleChange.Outcome.Failed("Outside the safe range")
         }
-        return RevertibleChange.apply(context, RevertibleChange.Kind.DENSITY, PrivilegedCommand.SetDensity(density))
+        return RevertibleChange.apply(
+            context, RevertibleChange.Kind.DENSITY, PrivilegedCommand.SetDensity(density), trigger
+        )
     }
 
     /** Back to the panel's own density, with no confirmation window — this is always safe. */
-    fun reset(context: Context): Boolean {
+    fun reset(context: Context, trigger: BrokerTrigger?): Boolean {
         if (!EmbeddedAdbShell.isPaired(context)) return false
-        val ok = PrivilegedShell.run(context, PrivilegedCommand.ResetDensity).ok
+        val ok = PrivilegedShell.run(context, PrivilegedCommand.ResetDensity, trigger).ok
         if (ok) RevertibleChange.keep(context)
         return ok
     }

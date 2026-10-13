@@ -2,8 +2,10 @@ package rocks.pkb.plektra.toolbox
 
 import android.content.Context
 import android.util.Log
+import rocks.pkb.plektra.inputmethod.BrokerTrigger
 import rocks.pkb.plektra.inputmethod.EmbeddedAdbShell
 import rocks.pkb.plektra.inputmethod.PrivilegedCommand
+import rocks.pkb.plektra.inputmethod.PrivilegedSetup
 import rocks.pkb.plektra.inputmethod.PrivilegedShell
 import moe.shizuku.manager.adb.EmbeddedAdbInit
 import org.json.JSONObject
@@ -34,6 +36,13 @@ import java.util.concurrent.TimeUnit
  *    screen is gone.
  *  - The revert is a [Kind], not a stored command line: nothing read back from preferences
  *    is ever turned into a shell command.
+ *
+ * Broker triggers (finding 1.3g): [apply] takes the tap's trigger, and the timed revert runs
+ * with that same trigger (it is the tail of that tap: the window plus slack is well inside
+ * [BrokerTrigger.VALID_FOR_MS]). A revert found pending when the screen reopens after the process
+ * died needs a fresh tap: the screen shows a revert button for it. Wireless debugging is
+ * switched off (finding 1.3e) only once the change is settled, kept or reverted, never between
+ * apply and the revert, which would leave the revert unable to run.
  *
  * BLOCKING — every call runs a broker command. Never call from the main thread, and never from
  * the IME input path.
@@ -72,14 +81,18 @@ object RevertibleChange {
     @Volatile
     private var scheduled: ScheduledFuture<*>? = null
 
-    internal fun apply(context: Context, kind: Kind, command: PrivilegedCommand): Outcome {
+    /** The tap that applied the pending change, for its timed revert. In memory only. */
+    @Volatile
+    private var armedTrigger: BrokerTrigger? = null
+
+    internal fun apply(context: Context, kind: Kind, command: PrivilegedCommand, trigger: BrokerTrigger?): Outcome {
         if (!EmbeddedAdbShell.isPaired(context)) return Outcome.NotPaired
         val appContext = context.applicationContext
 
         // Recorded first: a change we cannot reverse is worse than one that never lands.
         arm(appContext, Pending(kind, System.currentTimeMillis() + CONFIRM_WINDOW_MS + ARM_SLACK_MS))
 
-        val result = PrivilegedShell.run(appContext, command)
+        val result = PrivilegedShell.run(appContext, command, trigger)
         if (!result.ok) {
             disarm(appContext)
             return Outcome.Failed(result.failure ?: "Command failed")
@@ -88,7 +101,7 @@ object RevertibleChange {
         // The window starts when the change is on screen, not when we asked for it.
         val pending = Pending(kind, System.currentTimeMillis() + CONFIRM_WINDOW_MS)
         arm(appContext, pending)
-        schedule(appContext, pending)
+        schedule(appContext, pending, trigger)
         return Outcome.Applied
     }
 
@@ -97,11 +110,26 @@ object RevertibleChange {
         disarm(context.applicationContext)
     }
 
+    /**
+     * The window expired with nobody confirming: put it back with the trigger of the tap that
+     * applied it (the timer, or a screen whose countdown ran out). After a process death there is
+     * no such trigger, so this is refused and the change stays armed until the user taps revert.
+     * On success Wireless debugging is switched off if the user keeps that setting. True when
+     * nothing is left to revert.
+     */
+    fun revertExpired(context: Context): Boolean {
+        val appContext = context.applicationContext
+        val trigger = armedTrigger
+        val ok = revertNow(appContext, trigger)
+        if (ok) PrivilegedSetup.queueFinishSetup(appContext, trigger)
+        return ok
+    }
+
     /** The window expired, or the user said no. Put it back. */
-    fun revertNow(context: Context): Boolean {
+    fun revertNow(context: Context, trigger: BrokerTrigger?): Boolean {
         val appContext = context.applicationContext
         val pending = pending(appContext) ?: return true
-        val ok = PrivilegedShell.run(appContext, pending.kind.revert).ok
+        val ok = PrivilegedShell.run(appContext, pending.kind.revert, trigger).ok
         if (ok) disarm(appContext)
         return ok
     }
@@ -137,16 +165,18 @@ object RevertibleChange {
     private fun disarm(context: Context) {
         scheduled?.cancel(false)
         scheduled = null
+        armedTrigger = null
         prefs(context).edit().remove(KEY_PENDING).apply()
     }
 
     /** Runs the revert even if the screen that applied the change has been destroyed. */
-    private fun schedule(appContext: Context, pending: Pending) {
+    private fun schedule(appContext: Context, pending: Pending, trigger: BrokerTrigger?) {
+        armedTrigger = trigger
         scheduled?.cancel(false)
         scheduled = timer.schedule({
             val current = pending(appContext)
             if (current != null && current.remainingMs() == 0L) {
-                if (!revertNow(appContext)) Log.w(TAG, "Timed revert failed; it stays armed")
+                if (!revertExpired(appContext)) Log.w(TAG, "Timed revert failed; it stays armed")
             }
         }, pending.remainingMs() + 500L, TimeUnit.MILLISECONDS)
     }

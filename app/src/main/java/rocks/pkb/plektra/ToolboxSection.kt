@@ -55,6 +55,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import rocks.pkb.plektra.inputmethod.BrokerTrigger
+import rocks.pkb.plektra.inputmethod.PrivilegedSetup
 import rocks.pkb.plektra.toolbox.FnCtrlRemap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -281,12 +283,16 @@ private fun FnCtrlCard(modifier: Modifier) {
 
     fun startFn(action: FnAction, askPermission: () -> Unit) {
         if (busy) return
+        // A tap (finding 1.3g). On the way back from the grant screen the write goes through the
+        // Settings API, so a null trigger there costs nothing.
+        val trigger = BrokerTrigger.fromTap(context, if (action == FnAction.APPLY) "fn_ctrl_apply" else "fn_ctrl_revert")
         busy = true
         statusRes = null
         scope.launch {
             val result = withContext(Dispatchers.IO) {
-                if (action == FnAction.APPLY) FnCtrlRemap.apply(context) else FnCtrlRemap.revert(context)
+                if (action == FnAction.APPLY) FnCtrlRemap.apply(context, trigger) else FnCtrlRemap.revert(context, trigger)
             }
+            PrivilegedSetup.queueFinishSetup(context, trigger)
             when (result) {
                 FnCtrlRemap.Result.SUCCESS -> {
                     alreadySet = action == FnAction.APPLY
@@ -455,8 +461,10 @@ private fun ResetToStockRow(modifier: Modifier) {
                 TextButton(onClick = {
                     showDialog = false
                     inProgress = true
+                    val trigger = BrokerTrigger.fromTap(context, "toolbox_reset_to_stock")
                     scope.launch {
-                        val result = withContext(Dispatchers.IO) { SystemChangeManager.resetToStock(context) }
+                        val result = withContext(Dispatchers.IO) { SystemChangeManager.resetToStock(context, trigger) }
+                        PrivilegedSetup.queueFinishSetup(context, trigger)
                         inProgress = false
                         val message = when {
                             result.allSucceeded -> R.string.reset_to_stock_result_success

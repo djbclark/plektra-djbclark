@@ -3,6 +3,7 @@ package rocks.pkb.plektra.toolbox
 import android.content.Context
 import android.provider.Settings
 import android.util.Log
+import rocks.pkb.plektra.inputmethod.BrokerTrigger
 import rocks.pkb.plektra.inputmethod.EmbeddedAdbShell
 import rocks.pkb.plektra.inputmethod.PrivilegedCommand
 import rocks.pkb.plektra.inputmethod.PrivilegedShell
@@ -44,9 +45,9 @@ object FnCtrlRemap {
     fun isSet(context: Context): Boolean = readPair(context) == (1 to 1)
 
     /** Apply Fn -> Ctrl. Captures the original values first (once). */
-    fun apply(context: Context): Result {
+    fun apply(context: Context, trigger: BrokerTrigger?): Result {
         captureOriginalIfNeeded(context)
-        val result = write(context, 1, 1)
+        val result = write(context, 1, 1, trigger)
         // Nothing was written, so a capture taken now would go stale before the next attempt.
         if (result == Result.NEEDS_PERMISSION) clearCapture(context)
         return result
@@ -56,7 +57,7 @@ object FnCtrlRemap {
      * Undo [apply]: restore the captured original values, or disable the remap (0/0) when the
      * original was unset or never captured. On success the capture is cleared.
      */
-    fun revert(context: Context): Result {
+    fun revert(context: Context, trigger: BrokerTrigger?): Result {
         val prefs = prefs(context)
         val captured = prefs.getBoolean(KEY_CAPTURED, false)
         val target = revertTarget(
@@ -64,7 +65,7 @@ object FnCtrlRemap {
             prefs.getInt(KEY_PREV_ENABLE, VALUE_UNSET),
             prefs.getInt(KEY_PREV_FUNCTION, VALUE_UNSET)
         )
-        val result = write(context, target.first, target.second)
+        val result = write(context, target.first, target.second, trigger)
         if (result == Result.SUCCESS) clearCapture(context)
         return result
     }
@@ -76,7 +77,7 @@ object FnCtrlRemap {
             (if (captured && usable(prevFunction)) prevFunction else 0)
     }
 
-    private fun write(context: Context, enable: Int, function: Int): Result {
+    private fun write(context: Context, enable: Int, function: Int, trigger: BrokerTrigger?): Result {
         if (Settings.System.canWrite(context)) {
             val ok = runCatching {
                 Settings.System.putInt(context.contentResolver, FN_KEY_ENABLE, enable)
@@ -88,7 +89,7 @@ object FnCtrlRemap {
             if (enable !in 0..PrivilegedCommand.SetFnProgrammableKey.MAX_VALUE ||
                 function !in 0..PrivilegedCommand.SetFnProgrammableKey.MAX_VALUE
             ) return Result.FAILED
-            val ran = PrivilegedShell.run(context, PrivilegedCommand.SetFnProgrammableKey(enable, function)).ok
+            val ran = PrivilegedShell.run(context, PrivilegedCommand.SetFnProgrammableKey(enable, function), trigger).ok
             // The shell is not the witness: read the rows back through the Settings API.
             val seen = readPair(context)
             if (ran && seen != (enable to function)) Log.w(TAG, "Fn rows read $seen after writing $enable/$function")

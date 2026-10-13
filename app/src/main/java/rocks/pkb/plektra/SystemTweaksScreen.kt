@@ -9,7 +9,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import rocks.pkb.plektra.inputmethod.BrokerTrigger
+import rocks.pkb.plektra.inputmethod.PrivilegedSetup
 import rocks.pkb.plektra.toolbox.SystemTweaks
+import rocks.pkb.plektra.ui.awaitScreenTrigger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -33,22 +36,30 @@ fun SystemTweaksScreen(
     var loading by remember { mutableStateOf(true) }
     var busy by remember { mutableStateOf(false) }
 
+    // Opening the screen reads (a SCREEN trigger runs read-only commands only, finding 1.3g).
     fun load() {
         loading = true
         scope.launch {
-            state = withContext(Dispatchers.IO) { SystemTweaks.read(context) }
+            val trigger = awaitScreenTrigger(context, "tweaks_screen")
+            state = withContext(Dispatchers.IO) { SystemTweaks.read(context, trigger) }
             loading = false
         }
     }
 
     LaunchedEffect(Unit) { load() }
 
-    fun run(block: suspend () -> Unit) {
+    // Every change is a tap. The screen reads the result back on the same tap, then Wireless
+    // debugging is switched off if the user keeps that setting (finding 1.3e).
+    fun run(source: String, block: suspend (BrokerTrigger?) -> Unit) {
+        val trigger = BrokerTrigger.fromTap(context, source)
         busy = true
         scope.launch {
-            withContext(Dispatchers.IO) { block() }
+            state = withContext(Dispatchers.IO) {
+                block(trigger)
+                SystemTweaks.read(context, trigger)
+            }
             busy = false
-            load()
+            PrivilegedSetup.queueFinishSetup(context, trigger)
         }
     }
 
@@ -101,7 +112,7 @@ fun SystemTweaksScreen(
                         FilterChip(
                             selected = current.animation == speed,
                             enabled = !busy,
-                            onClick = { run { SystemTweaks.setAnimationSpeed(context, speed) } },
+                            onClick = { run("tweaks_animation") { t -> SystemTweaks.setAnimationSpeed(context, speed, t) } },
                             label = {
                                 Text(
                                     stringResource(
@@ -124,7 +135,9 @@ fun SystemTweaksScreen(
                 checked = current.toggles[SystemTweaks.Toggle.NOTIFICATION_HISTORY] == true,
                 enabled = !busy,
                 onCheckedChange = { on ->
-                    run { SystemTweaks.setToggle(context, SystemTweaks.Toggle.NOTIFICATION_HISTORY, on) }
+                    run("tweaks_notification_history") { t ->
+                        SystemTweaks.setToggle(context, SystemTweaks.Toggle.NOTIFICATION_HISTORY, on, t)
+                    }
                 }
             )
             TweakSwitch(
@@ -133,13 +146,15 @@ fun SystemTweaksScreen(
                 checked = current.toggles[SystemTweaks.Toggle.ONE_HANDED_MODE] == true,
                 enabled = !busy,
                 onCheckedChange = { on ->
-                    run { SystemTweaks.setToggle(context, SystemTweaks.Toggle.ONE_HANDED_MODE, on) }
+                    run("tweaks_one_handed") { t ->
+                        SystemTweaks.setToggle(context, SystemTweaks.Toggle.ONE_HANDED_MODE, on, t)
+                    }
                 }
             )
 
             TextButton(
                 enabled = !busy,
-                onClick = { run { SystemTweaks.resetAll(context) } },
+                onClick = { run("tweaks_reset") { t -> SystemTweaks.resetAll(context, t) } },
                 modifier = Modifier.padding(horizontal = 8.dp)
             ) { Text(stringResource(R.string.tweaks_reset)) }
 

@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.util.Log
+import rocks.pkb.plektra.inputmethod.BrokerTrigger
 import rocks.pkb.plektra.inputmethod.EmbeddedAdbShell
 import rocks.pkb.plektra.inputmethod.PrivilegedCommand
 import rocks.pkb.plektra.inputmethod.PrivilegedShell
@@ -68,8 +69,9 @@ object PackageRemover {
      */
     internal fun isReady(context: Context): Boolean = EmbeddedAdbShell.isPaired(context)
 
-    fun census(context: Context): Census? {
-        val states = readStates(context) ?: return null
+    /** A read: the open screen's trigger is enough ([PrivilegedCommand.readOnly]). */
+    fun census(context: Context, trigger: BrokerTrigger?): Census? {
+        val states = readStates(context, trigger) ?: return null
         val unrecognised = lastEverything
             .filter { BloatCatalog.isVendorNamespace(it) && !BloatCatalog.isCatalogued(it) }
             .sorted()
@@ -86,9 +88,9 @@ object PackageRemover {
      * Read through the shell because a disabled or uninstalled-for-user package is awkward to
      * classify for the whole catalog at once. Display data only: it never decides what runs.
      */
-    fun readStates(context: Context): Map<String, PackageState>? {
+    fun readStates(context: Context, trigger: BrokerTrigger?): Map<String, PackageState>? {
         if (!isReady(context)) return null
-        val out = PrivilegedShell.run(context, PrivilegedCommand.ListPackageStates).output ?: return null
+        val out = PrivilegedShell.run(context, PrivilegedCommand.ListPackageStates, trigger).output ?: return null
 
         fun section(from: String, to: String?): Set<String> {
             val start = out.indexOf(from).takeIf { it >= 0 }?.plus(from.length) ?: return emptySet()
@@ -116,8 +118,8 @@ object PackageRemover {
     }
 
     /** Hide the package and stop it running. Reversible with [restore]; nothing is deleted. */
-    fun disable(context: Context, packageName: String, currentState: PackageState): Result {
-        return mutate(context, packageName, currentState, RemovalJournal.Action.DISABLED, PrivilegedCommand.DisablePackage(packageName), PackageState.DISABLED)
+    fun disable(context: Context, packageName: String, currentState: PackageState, trigger: BrokerTrigger?): Result {
+        return mutate(context, packageName, currentState, RemovalJournal.Action.DISABLED, PrivilegedCommand.DisablePackage(packageName), PackageState.DISABLED, trigger)
     }
 
     /**
@@ -125,8 +127,8 @@ object PackageRemover {
      * but a factory reset or a firmware update is the only other way back, which is why the
      * UI warns before offering this.
      */
-    fun uninstall(context: Context, packageName: String, currentState: PackageState): Result {
-        return mutate(context, packageName, currentState, RemovalJournal.Action.UNINSTALLED, PrivilegedCommand.UninstallPackage(packageName), PackageState.UNINSTALLED)
+    fun uninstall(context: Context, packageName: String, currentState: PackageState, trigger: BrokerTrigger?): Result {
+        return mutate(context, packageName, currentState, RemovalJournal.Action.UNINSTALLED, PrivilegedCommand.UninstallPackage(packageName), PackageState.UNINSTALLED, trigger)
     }
 
     /**
@@ -134,15 +136,15 @@ object PackageRemover {
      * package can be both uninstalled-for-user and disabled, and reinstalling does not by
      * itself re-enable.
      */
-    fun restore(context: Context, packageName: String): Result {
+    fun restore(context: Context, packageName: String, trigger: BrokerTrigger?): Result {
         if (!PrivilegedCommand.isValidPackageName(packageName)) {
             Log.w(TAG, "Refusing a package name that is not one")
             return Result.Refused("Not a package name")
         }
         if (!isReady(context)) return Result.NotPaired
 
-        val reinstalled = PrivilegedShell.run(context, PrivilegedCommand.InstallExistingPackage(packageName))
-        val enabled = PrivilegedShell.run(context, PrivilegedCommand.EnablePackage(packageName))
+        val reinstalled = PrivilegedShell.run(context, PrivilegedCommand.InstallExistingPackage(packageName), trigger)
+        val enabled = PrivilegedShell.run(context, PrivilegedCommand.EnablePackage(packageName), trigger)
 
         val confirmed = when (localState(context, packageName)) {
             PackageState.ACTIVE -> true
@@ -158,11 +160,11 @@ object PackageRemover {
     }
 
     /** Undo everything the journal knows about. Reports how many came back, and how many there were. */
-    fun restoreAll(context: Context): Pair<Int, Int> {
+    fun restoreAll(context: Context, trigger: BrokerTrigger?): Pair<Int, Int> {
         val records = RemovalJournal.all(context)
         var restored = 0
         records.forEach { record ->
-            if (restore(context, record.packageName) is Result.Success) restored++
+            if (restore(context, record.packageName, trigger) is Result.Success) restored++
         }
         return restored to records.size
     }
@@ -190,7 +192,8 @@ object PackageRemover {
         currentState: PackageState,
         action: RemovalJournal.Action,
         command: PrivilegedCommand,
-        expected: PackageState
+        expected: PackageState,
+        trigger: BrokerTrigger?,
     ): Result {
         if (!BloatCatalog.isSupportedDevice()) {
             return Result.Refused("This catalog is for the Titan 2 Elite only")
@@ -214,7 +217,7 @@ object PackageRemover {
             )
         )
 
-        val result = PrivilegedShell.run(context, command)
+        val result = PrivilegedShell.run(context, command, trigger)
         val local = localState(context, packageName)
         if (!result.ok || (local != null && local != expected)) {
             // It never happened (the shell failed, or the phone says otherwise), so the journal

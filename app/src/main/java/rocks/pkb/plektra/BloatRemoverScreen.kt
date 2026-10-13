@@ -16,7 +16,10 @@ import rocks.pkb.plektra.toolbox.BloatCatalog
 import rocks.pkb.plektra.toolbox.PackageRemover
 import rocks.pkb.plektra.toolbox.PackageState
 import rocks.pkb.plektra.toolbox.RemovalJournal
+import rocks.pkb.plektra.inputmethod.BrokerTrigger
 import rocks.pkb.plektra.inputmethod.EmbeddedAdbShell
+import rocks.pkb.plektra.inputmethod.PrivilegedSetup
+import rocks.pkb.plektra.ui.awaitScreenTrigger
 import rocks.pkb.plektra.ui.rememberVerifiedBrokerStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -53,15 +56,20 @@ fun BloatRemoverScreen(
     var journalCount by remember { mutableStateOf(RemovalJournal.all(context).size) }
     var unrecognised by remember { mutableStateOf<List<String>>(emptyList()) }
 
-    fun refresh() {
+    // [trigger] is the tap that just changed something, so the census reads on that same tap
+    // before Wireless debugging is switched off; null means the screen is opening, which may
+    // only read (a SCREEN trigger, finding 1.3g).
+    fun refresh(trigger: BrokerTrigger? = null, afterRead: () -> Unit = {}) {
         if (!supported) return
         loading = true
         scope.launch {
+            val readTrigger = trigger ?: awaitScreenTrigger(context, "bloat_screen")
             // `paired` is now the verified broker status and refreshes itself; re-deriving it
             // from the stored key here would put the false positive straight back.
             val read = withContext(Dispatchers.IO) {
-                PackageRemover.census(context)
+                PackageRemover.census(context, readTrigger)
             }
+            afterRead()
             if (read != null) {
                 states = read.states
                 unrecognised = read.unrecognised
@@ -73,15 +81,20 @@ fun BloatRemoverScreen(
 
     LaunchedEffect(Unit) { refresh() }
 
+    // After a change: read back on the same tap, then Wireless debugging off (finding 1.3e).
+    fun refreshAndFinish(trigger: BrokerTrigger?) =
+        refresh(trigger) { PrivilegedSetup.queueFinishSetup(context, trigger) }
+
     fun act(entry: BloatCatalog.Entry, uninstall: Boolean) {
+        val trigger = BrokerTrigger.fromTap(context, if (uninstall) "bloat_uninstall" else "bloat_disable")
         busy = entry.packageName
         scope.launch {
             val current = states[entry.packageName] ?: PackageState.ACTIVE
             val result = withContext(Dispatchers.IO) {
                 if (uninstall) {
-                    PackageRemover.uninstall(context, entry.packageName, current)
+                    PackageRemover.uninstall(context, entry.packageName, current, trigger)
                 } else {
-                    PackageRemover.disable(context, entry.packageName, current)
+                    PackageRemover.disable(context, entry.packageName, current, trigger)
                 }
             }
             busy = null
@@ -91,17 +104,18 @@ fun BloatRemoverScreen(
                 is PackageRemover.Result.Refused -> result.reason
                 is PackageRemover.Result.Failed -> result.reason
             }
-            refresh()
+            refreshAndFinish(trigger)
         }
     }
 
     fun restore(packageName: String) {
+        val trigger = BrokerTrigger.fromTap(context, "bloat_restore")
         busy = packageName
         scope.launch {
-            val result = withContext(Dispatchers.IO) { PackageRemover.restore(context, packageName) }
+            val result = withContext(Dispatchers.IO) { PackageRemover.restore(context, packageName, trigger) }
             busy = null
             if (result is PackageRemover.Result.Failed) message = result.reason
-            refresh()
+            refreshAndFinish(trigger)
         }
     }
 
@@ -177,6 +191,7 @@ fun BloatRemoverScreen(
                         Button(
                             enabled = busy == null,
                             onClick = {
+                                val trigger = BrokerTrigger.fromTap(context, "bloat_preset")
                                 busy = "*"
                                 scope.launch {
                                     withContext(Dispatchers.IO) {
@@ -184,12 +199,13 @@ fun BloatRemoverScreen(
                                             PackageRemover.disable(
                                                 context,
                                                 entry.packageName,
-                                                states[entry.packageName] ?: PackageState.ACTIVE
+                                                states[entry.packageName] ?: PackageState.ACTIVE,
+                                                trigger
                                             )
                                         }
                                     }
                                     busy = null
-                                    refresh()
+                                    refreshAndFinish(trigger)
                                 }
                             },
                             modifier = Modifier.padding(top = 8.dp)
@@ -213,11 +229,12 @@ fun BloatRemoverScreen(
                             modifier = Modifier.weight(1f)
                         )
                         TextButton(onClick = {
+                            val trigger = BrokerTrigger.fromTap(context, "bloat_restore_all")
                             busy = "*"
                             scope.launch {
-                                withContext(Dispatchers.IO) { PackageRemover.restoreAll(context) }
+                                withContext(Dispatchers.IO) { PackageRemover.restoreAll(context, trigger) }
                                 busy = null
-                                refresh()
+                                refreshAndFinish(trigger)
                             }
                         }) { Text(stringResource(R.string.bloat_restore_all)) }
                     }
