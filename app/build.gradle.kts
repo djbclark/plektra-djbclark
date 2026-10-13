@@ -353,6 +353,8 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        // plk/shizuku-backend: the Shizuku UserService interface (src/main/aidl).
+        aidl = true
     }
     packaging {
         resources {
