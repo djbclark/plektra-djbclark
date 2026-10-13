@@ -16,8 +16,13 @@ object EmbeddedAdbInit {
     /** SharedPreferences file that backs [PreferenceAdbKeyStore]. */
     const val PREFS_NAME = "embedded_adb"
 
-    /** ADB public-key comment / name, must match between pairing and connect. */
-    const val KEY_NAME = "pastiera"
+    /**
+     * The name adbd stores after the public key, which Settings > Wireless debugging shows under
+     * Paired devices. One word: AdbDebuggingManager splits the stored key on whitespace and shows
+     * only the first word after the base64 (adversary review 2026-10-12, finding 1.3a). It is sent
+     * at pairing time, so a new name takes effect on the next pairing.
+     */
+    const val KEY_NAME = "plektra-djb"
 
     /**
      * The only hidden class the vendored code reflects on (AdbPairingClient.exportKeyingMaterial).
