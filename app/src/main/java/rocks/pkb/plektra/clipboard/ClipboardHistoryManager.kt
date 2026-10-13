@@ -31,8 +31,8 @@ class ClipboardHistoryManager internal constructor(
     private var deviceStateReceiverRegistered = false
     private var screenOffReceived = false
     private var lastHistoryAccessible: Boolean? = null
-    private val historyChangeListeners = linkedSetOf<() -> Unit>()
-    private var externalHistoryListener: ClipboardDao.Listener? = null
+    private val historyChangeListeners = java.util.concurrent.CopyOnWriteArraySet<() -> Unit>()
+    @Volatile private var externalHistoryListener: ClipboardDao.Listener? = null
     private val daoListener = object : ClipboardDao.Listener {
         override fun onClipInserted(position: Int) {
             externalHistoryListener?.onClipInserted(position)
@@ -50,7 +50,7 @@ class ClipboardHistoryManager internal constructor(
             externalHistoryListener?.onHistoryLoaded()
         }
     }
-    private fun notifyHistoryChanged() = historyChangeListeners.toList().forEach { it() }
+    private fun notifyHistoryChanged() = historyChangeListeners.forEach { it() }
 
     private val accessStateListeners = linkedSetOf<(Boolean) -> Unit>()
     private val deviceStateReceiver = object : BroadcastReceiver() {
@@ -140,16 +140,7 @@ class ClipboardHistoryManager internal constructor(
         // For UX: allow deleting pinned entries when explicitly requested (force=true)
         if (entry.isPinned && !force) return
 
-        if (entry.isPinned && force) {
-            // Unpin first so DAO allows removal, then delete using the updated position
-            toggleClipPinned(entry.id)
-            val updatedIndex = (0 until getHistorySize()).firstOrNull { idx ->
-                getHistoryEntry(idx)?.id == entry.id
-            }
-            updatedIndex?.let { dao?.deleteClipAt(it) }
-        } else {
-            dao?.deleteClipAt(index)
-        }
+        dao?.deleteClip(entry.id)
     }
 
     fun sortHistoryEntries() {
