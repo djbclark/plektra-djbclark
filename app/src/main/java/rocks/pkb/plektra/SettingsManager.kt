@@ -8,6 +8,7 @@ import android.provider.OpenableColumns
 import android.util.Log
 import android.view.KeyEvent
 import android.view.inputmethod.InputMethodManager
+import androidx.core.content.edit
 import rocks.pkb.plektra.commands.CommandJson
 import rocks.pkb.plektra.commands.CommandLaunchSpec
 import rocks.pkb.plektra.commands.CommandSourceId
@@ -6831,6 +6832,6 @@ object SettingsManager {
 
     fun setPrivilegedAccessBackend(context: Context, value: String) {
         val normalized = if (value in PRIVILEGED_ACCESS_VALUES) value else PRIVILEGED_ACCESS_AUTO
-        getPreferences(context).edit().putString(KEY_PRIVILEGED_ACCESS_BACKEND, normalized).apply()
+        getPreferences(context).edit { putString(KEY_PRIVILEGED_ACCESS_BACKEND, normalized) }
     }
 }
