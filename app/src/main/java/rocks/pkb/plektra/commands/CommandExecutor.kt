@@ -182,45 +182,28 @@ class CommandExecutor(
         return runShizukuCommand(arrayOf("cmd", "statusbar", verb), unavailableReason = "Shade unavailable")
     }
 
-    private fun runShizukuCommand(command: Array<String>, unavailableReason: String): CommandExecutionResult {
-        return try {
-            val shizukuAvailable = Shizuku.pingBinder() &&
-                Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
-            if (!shizukuAvailable) {
-                return fail(unavailableReason)
-            }
-            val newProcessMethod = Shizuku::class.java.getDeclaredMethod(
-                "newProcess",
-                Array<String>::class.java,
-                Array<String>::class.java,
-                String::class.java
-            )
-            newProcessMethod.isAccessible = true
-            val process = newProcessMethod.invoke(null, command, null, null) as Process
-            if (process.waitFor() == 0) {
-                CommandExecutionResult.Success
-            } else {
-                fail("Command failed")
-            }
-        } catch (error: Exception) {
-            Log.e(TAG, "Failed to run ${command.joinToString(" ")} through Shizuku", error)
-            fail("Command failed")
-        }
+    private fun sendShellKeyEvent(keyCode: Int): CommandExecutionResult {
+        return runShizukuCommand(
+            arrayOf("input", "keyevent", keyCode.toString()),
+            unavailableReason = "Shizuku required"
+        )
     }
 
     /**
-     * Sends `input keyevent` through Shizuku. The process is spawned and awaited off the
-     * calling thread, so Success only means the key event was dispatched; a non-zero exit
-     * is logged rather than reported to the caller.
+     * Runs a command through Shizuku. The process is spawned and awaited off the calling
+     * thread (5 s limit, then the process is destroyed and its streams closed), so Success
+     * only means the command was dispatched; a timeout or non-zero exit is logged rather
+     * than reported to the caller.
      */
-    private fun sendShellKeyEvent(keyCode: Int): CommandExecutionResult {
+    private fun runShizukuCommand(command: Array<String>, unavailableReason: String): CommandExecutionResult {
         val shizukuAvailable = runCatching {
             Shizuku.pingBinder() && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
         }.getOrDefault(false)
         if (!shizukuAvailable) {
-            return fail("Shizuku required")
+            return fail(unavailableReason)
         }
         shellExecutor.execute {
+            val description = command.joinToString(" ")
             try {
                 val newProcessMethod = Shizuku::class.java.getDeclaredMethod(
                     "newProcess",
@@ -229,18 +212,25 @@ class CommandExecutor(
                     String::class.java
                 )
                 newProcessMethod.isAccessible = true
-                val process = newProcessMethod.invoke(
-                    null,
-                    arrayOf("input", "keyevent", keyCode.toString()),
-                    null,
-                    null
-                ) as Process
-                val exitCode = process.waitFor()
-                if (exitCode != 0) {
-                    Log.w(TAG, "Shell keyevent $keyCode exited with $exitCode")
+                val process = newProcessMethod.invoke(null, command, null, null) as Process
+                try {
+                    // A hung process must not block every later command queued behind it.
+                    if (process.waitFor(SHELL_TIMEOUT_SECONDS, java.util.concurrent.TimeUnit.SECONDS)) {
+                        val exitCode = process.exitValue()
+                        if (exitCode != 0) {
+                            Log.w(TAG, "Shizuku command '$description' exited with $exitCode")
+                        }
+                    } else {
+                        Log.w(TAG, "Shizuku command '$description' timed out after ${SHELL_TIMEOUT_SECONDS}s")
+                    }
+                } finally {
+                    process.destroy()
+                    runCatching { process.inputStream.close() }
+                    runCatching { process.errorStream.close() }
+                    runCatching { process.outputStream.close() }
                 }
             } catch (error: Exception) {
-                Log.e(TAG, "Failed to send shell keyevent $keyCode", error)
+                Log.e(TAG, "Failed to run '$description' through Shizuku", error)
             }
         }
         return CommandExecutionResult.Success
@@ -265,6 +255,7 @@ class CommandExecutor(
 
     companion object {
         private val shellExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+        private const val SHELL_TIMEOUT_SECONDS = 5L
         private const val TAG = "CommandExecutor"
     }
 }
