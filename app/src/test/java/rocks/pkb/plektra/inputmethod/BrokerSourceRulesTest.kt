@@ -61,7 +61,7 @@ class BrokerSourceRulesTest {
     )
 
     private val callPattern = Regex(
-        "PrivilegedShell\\.(run|runSession)\\b|EmbeddedAdbShell\\.(execute|verify)\\b|" +
+        "PrivilegedShell\\.(run|runSession)\\b|EmbeddedAdbShell\\.(execute|verify\\w*)\\b|" +
             "PrivilegedSetup\\.(applyAll|resetToStock|setWriteSecureSettingsNeeded|finishSetup|queueFinishSetup)\\b|" +
             "BrokerStatusMonitor\\.refresh\\b"
     )
@@ -104,5 +104,30 @@ class BrokerSourceRulesTest {
         assertTrue(Regex("private fun runSession\\(").containsMatchIn(shell))
         assertTrue(Regex("internal fun execute\\(\\s*context: Context,\\s*commands: List<PrivilegedCommand>").containsMatchIn(shell))
         assertTrue("no string-taking runShell is left", !Regex("fun runShell\\w*\\(").containsMatchIn(shell))
+        // plk/shizuku-backend: the Shizuku route is the door's private last step too.
+        assertTrue(Regex("private fun runViaShizuku\\(").containsMatchIn(shell))
+    }
+
+    /**
+     * plk/shizuku-backend: Shizuku's string runner ([ShizukuShell.runLine]) is called only by the
+     * door, after its checks, and the UserService binder is touched only by its client and itself.
+     */
+    @Test
+    fun theShizukuStringRunnerIsReachedOnlyThroughTheDoor() {
+        val runLine = Regex("\\.runLine\\(")
+        val callers = sources().filter { it.extension == "kt" && runLine.containsMatchIn(code(it)) }
+            .map { relative(it) }.toSet()
+        assertEquals(setOf("java/rocks/pkb/plektra/inputmethod/EmbeddedAdbShell.kt"), callers)
+
+        val binder = Regex("\\bIPrivilegedShellService\\b")
+        val users = sources().filter { it.extension == "kt" && binder.containsMatchIn(code(it)) }
+            .map { relative(it) }.toSet()
+        assertEquals(
+            setOf(
+                "java/rocks/pkb/plektra/shizuku/ShizukuUserServiceShell.kt",
+                "java/rocks/pkb/plektra/shizuku/PrivilegedShellService.kt",
+            ),
+            users
+        )
     }
 }
