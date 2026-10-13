@@ -2067,7 +2067,6 @@ Each key can be configured as Keycode, Action, Native Ctrl, or None. Use overrid
     <string name="screen_trackpad_enabled_title">Enable screen trackpad</string>
     <string name="screen_trackpad_enabled_description">Turns the whole display into a cursor trackpad while the trigger key is active</string>
     <string name="screen_trackpad_permission_title">Display over other apps</string>
-    <string name="screen_trackpad_permission_description">Required so the trackpad can capture swipes on top of the current app</string>
     <string name="screen_trackpad_permission_granted">Permission granted</string>
     <string name="screen_trackpad_permission_missing">Permission not granted — tap to open system settings</string>
     <string name="screen_trackpad_permission_toast">Screen trackpad needs “Display over other apps”. Enable it in Plektra settings.</string>

@@ -214,8 +214,12 @@ internal class ScreenTrackpadController(
         val view = object : FrameLayout(service) {
             override fun onTouchEvent(event: MotionEvent): Boolean {
                 handleTouch(event)
+                // A tap that moved nothing counts as a click for accessibility services.
+                if (event.actionMasked == MotionEvent.ACTION_UP && !movedDuringGesture) performClick()
                 return true
             }
+
+            override fun performClick(): Boolean = super.performClick()
         }
         view.setBackgroundColor(Color.TRANSPARENT)
         view.isClickable = true

@@ -5617,7 +5617,7 @@ object SettingsManager {
         getPreferences(context).getBoolean(KEY_SCREEN_TRACKPAD_ENABLED, false)
 
     fun setScreenTrackpadEnabled(context: Context, enabled: Boolean) {
-        getPreferences(context).edit().putBoolean(KEY_SCREEN_TRACKPAD_ENABLED, enabled).commit()
+        getPreferences(context).edit().putBoolean(KEY_SCREEN_TRACKPAD_ENABLED, enabled).apply()
     }
 
     fun getScreenTrackpadTriggerKey(context: Context): String {
@@ -5627,7 +5627,7 @@ object SettingsManager {
 
     fun setScreenTrackpadTriggerKey(context: Context, value: String) {
         val normalized = if (SCREEN_TRACKPAD_TRIGGER_VALUES.contains(value)) value else SCREEN_TRACKPAD_TRIGGER_SPACE
-        getPreferences(context).edit().putString(KEY_SCREEN_TRACKPAD_TRIGGER_KEY, normalized).commit()
+        getPreferences(context).edit().putString(KEY_SCREEN_TRACKPAD_TRIGGER_KEY, normalized).apply()
     }
 
     fun getScreenTrackpadActivation(context: Context): String {
@@ -5637,7 +5637,7 @@ object SettingsManager {
 
     fun setScreenTrackpadActivation(context: Context, value: String) {
         val normalized = if (SCREEN_TRACKPAD_ACTIVATION_VALUES.contains(value)) value else SCREEN_TRACKPAD_ACTIVATION_HOLD
-        getPreferences(context).edit().putString(KEY_SCREEN_TRACKPAD_ACTIVATION, normalized).commit()
+        getPreferences(context).edit().putString(KEY_SCREEN_TRACKPAD_ACTIVATION, normalized).apply()
     }
 
     fun getScreenTrackpadStepPx(context: Context): Int =
@@ -5647,14 +5647,14 @@ object SettingsManager {
     fun setScreenTrackpadStepPx(context: Context, stepPx: Int) {
         getPreferences(context).edit()
             .putInt(KEY_SCREEN_TRACKPAD_STEP_PX, stepPx.coerceIn(MIN_SCREEN_TRACKPAD_STEP_PX, MAX_SCREEN_TRACKPAD_STEP_PX))
-            .commit()
+            .apply()
     }
 
     fun isScreenTrackpadHintEnabled(context: Context): Boolean =
         getPreferences(context).getBoolean(KEY_SCREEN_TRACKPAD_SHOW_HINT, true)
 
     fun setScreenTrackpadHintEnabled(context: Context, enabled: Boolean) {
-        getPreferences(context).edit().putBoolean(KEY_SCREEN_TRACKPAD_SHOW_HINT, enabled).commit()
+        getPreferences(context).edit().putBoolean(KEY_SCREEN_TRACKPAD_SHOW_HINT, enabled).apply()
     }
     // djb/screen-trackpad: end
 
