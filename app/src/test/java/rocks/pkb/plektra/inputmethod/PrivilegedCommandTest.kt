@@ -2,18 +2,137 @@ package rocks.pkb.plektra.inputmethod
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
-/**
- * The broker runs whatever string it is given as the shell user, so the only strings it may be
- * given are the ones [PrivilegedCommand] builds from constants. These tests pin the exact command
- * lines, so a change to one is a visible diff in review, and pin the package-name validation.
- */
+/** The closed command set (finding 1.3g) and the broker's own commands (1.3b, 1.3c, 1.3e, 1.3f). */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [33])
 class PrivilegedCommandTest {
 
-    private val app = "rocks.pkb.plektra.djb"
+    private val pkg = "rocks.pkb.plektra.djb"
+    private val fp = "AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89"
+
+    // plk/main's tests below name the package `app`.
+    private val app = pkg
+
+    private fun everyCase(): List<PrivilegedCommand> = listOfNotNull(
+        PrivilegedCommand.Verify,
+        PrivilegedCommand.GrantWriteSecureSettings,
+        PrivilegedCommand.RevokeWriteSecureSettings,
+        PrivilegedCommand.DisableWirelessDebugging,
+        PrivilegedCommand.UnpairSelf.forThisDevice(fp),
+        // djb/backlight
+        PrivilegedCommand.ReadBacklightTimeout,
+        // djb/ring
+        PrivilegedCommand.RingGrants(PrivilegedCommand.RingGrant.entries),
+        // djb/toolbox
+        PrivilegedCommand.ListPackageStates,
+        PrivilegedCommand.DisablePackage("com.agui.factorytest"),
+        PrivilegedCommand.UninstallPackage("com.agui.factorytest"),
+        PrivilegedCommand.InstallExistingPackage("com.agui.factorytest"),
+        PrivilegedCommand.EnablePackage("com.agui.factorytest"),
+        PrivilegedCommand.ReadDensity,
+        PrivilegedCommand.ResetDensity,
+        PrivilegedCommand.SetDensity(320),
+        PrivilegedCommand.ReadSystemTweaks,
+        PrivilegedCommand.SetAnimationSpeed(rocks.pkb.plektra.toolbox.SystemTweaks.AnimationSpeed.entries.first()),
+        PrivilegedCommand.SetTweak(rocks.pkb.plektra.toolbox.SystemTweaks.Toggle.entries.first(), true),
+        PrivilegedCommand.ResetSystemTweaks,
+        PrivilegedCommand.SetFnProgrammableKey(1, 1),
+    ) + PrivilegedCommand.BacklightTimeout.entries.map { PrivilegedCommand.WriteBacklightTimeout(it) } +
+        AppNotificationListener.entries.map { PrivilegedCommand.DisallowNotificationListener(it) }
+
+    @Test
+    fun brokerCommandLinesAreConstantsPlusValidatedValues() {
+        assertEquals("echo pastiera_verify", PrivilegedCommand.Verify.commandLine(pkg))
+        assertEquals(
+            "pm grant $pkg android.permission.WRITE_SECURE_SETTINGS",
+            PrivilegedCommand.GrantWriteSecureSettings.commandLine(pkg)
+        )
+        assertEquals(
+            "pm revoke $pkg android.permission.WRITE_SECURE_SETTINGS",
+            PrivilegedCommand.RevokeWriteSecureSettings.commandLine(pkg)
+        )
+        assertEquals("settings put global adb_wifi_enabled 0", PrivilegedCommand.DisableWirelessDebugging.commandLine(pkg))
+        assertEquals("service call adb 7 s16 $fp", PrivilegedCommand.UnpairSelf.forThisDevice(fp)!!.commandLine(pkg))
+    }
+
+    @Test
+    fun anInvalidPackageNameNeverReachesTheShell() {
+        listOf("x; reboot", "rocks.pkb.plektra && id", "").forEach { bad ->
+            try {
+                PrivilegedCommand.RevokeWriteSecureSettings.commandLine(bad)
+                fail("accepted '$bad'")
+            } catch (_: IllegalArgumentException) {
+            }
+        }
+    }
+
+    @Test
+    fun unpairIsOnlyOfferedOnSdksWhoseTransactionCodeWasChecked() {
+        // IAdbManager.unpairDevice is method 7 from android-11.0.0_r1 to android16-qpr2 and main.
+        assertEquals(7, PrivilegedCommand.TXN_UNPAIR_DEVICE)
+        (30..36).forEach { assertNotNull("sdk $it", PrivilegedCommand.UnpairSelf.forThisDevice(fp, it)) }
+        assertNull(PrivilegedCommand.UnpairSelf.forThisDevice(fp, 29))
+        assertNull(PrivilegedCommand.UnpairSelf.forThisDevice(fp, 37))
+    }
+
+    @Test
+    fun unpairRefusesAnythingButAFingerprint() {
+        listOf("", "ab:cd", "AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89; reboot", fp.lowercase())
+            .forEach { assertNull(it, PrivilegedCommand.UnpairSelf.forThisDevice(it, 36)) }
+    }
+
+    @Test
+    fun unpairReplyIsReadFromTheParcelsExceptionWord() {
+        assertTrue(PrivilegedCommand.UnpairSelf.replyIsSuccess("Result: Parcel(00000000    '....')\n"))
+        assertTrue(PrivilegedCommand.UnpairSelf.replyIsSuccess("Result: Parcel(00000000)"))
+        assertFalse(
+            PrivilegedCommand.UnpairSelf.replyIsSuccess(
+                "Result: Parcel(ffffffff 0000004c 00650067 'L...g.e.')"
+            )
+        )
+        assertFalse(PrivilegedCommand.UnpairSelf.replyIsSuccess(""))
+        assertFalse(PrivilegedCommand.UnpairSelf.replyIsSuccess(null))
+    }
+
+    @Test
+    fun onlyUnpairAndWirelessOffEndTheSession() {
+        val terminal = everyCase().filter { it.terminal }.map { it.id }.toSet()
+        assertEquals(setOf("unpair_self", "wireless_debugging_off"), terminal)
+    }
+
+    @Test
+    fun everyCaseHasAStableDistinctAuditId() {
+        val ids = everyCase().map { it.id }
+        assertEquals(ids.size, ids.toSet().size)
+        ids.forEach { assertTrue(it, Regex("^[a-z_]+$").matches(it)) }
+    }
+
+    /** Finding 1.3f: the broker never touches the 7-day key expiry. */
+    @Test
+    fun noCommandWritesTheAdbKeyExpirySetting() {
+        everyCase().forEach { command ->
+            assertFalse(command.id, command.commandLine(pkg).contains("adb_allowed_connection_time"))
+        }
+    }
+
+    @Test
+    fun writeSecureSettingsIsHeldOnlyWhileNeeded() {
+        assertEquals(PrivilegedCommand.GrantWriteSecureSettings, WriteSecureSettingsHolders.action(needed = true, held = false))
+        assertEquals(PrivilegedCommand.RevokeWriteSecureSettings, WriteSecureSettingsHolders.action(needed = false, held = true))
+        assertNull(WriteSecureSettingsHolders.action(needed = true, held = true))
+        assertNull(WriteSecureSettingsHolders.action(needed = false, held = false))
+    }
+
+    // djb/backlight (plk/main): exact command lines and package-name validation.
 
     @Test
     fun grantIsExactlyPmGrantOfWriteSecureSettingsToTheAppItself() {

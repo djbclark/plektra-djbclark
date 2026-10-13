@@ -34,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -45,10 +46,13 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import rocks.pkb.plektra.inputmethod.BrokerTrigger
 import rocks.pkb.plektra.inputmethod.EmbeddedAdbShell
+import rocks.pkb.plektra.inputmethod.PrivilegedSetup
 import rocks.pkb.plektra.ui.BrokerStatusMonitor
 import rocks.pkb.plektra.ui.rememberVerifiedBrokerStatus
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import moe.shizuku.manager.adb.AdbPairingService
@@ -91,6 +95,12 @@ fun DeviceSetupCard(modifier: Modifier = Modifier) {
     // could reach the system while the home tile said "needs pairing" at the same moment.
     val brokerStatus by rememberVerifiedBrokerStatus(paired)
     val doNotDisturbOn = remember(statusTick) { doNotDisturbActive(context) }
+
+    // "Forget pairing" first has the broker unpair itself (finding 1.3b) and give back what it was
+    // granted (1.3c); the outcome decides whether the user still has a step to do by hand.
+    val scope = rememberCoroutineScope()
+    var forgetting by remember { mutableStateOf(false) }
+    var forgetOutcome by rememberSaveable { mutableStateOf<String?>(null) }
 
     // > 0 while the watcher is armed; bumped on every tap so each tap restarts the timeout.
     var armToken by rememberSaveable { mutableIntStateOf(0) }
@@ -177,6 +187,18 @@ fun DeviceSetupCard(modifier: Modifier = Modifier) {
                 )
             }
 
+            if (forgetting) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = stringResource(R.string.broker_forgetting),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            forgetOutcome?.let { outcome ->
+                ForgetOutcomeNotice(outcome = outcome, onOpenWireless = { openWirelessDebugging(context) })
+            }
+
             if (paired) {
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
@@ -184,6 +206,7 @@ fun DeviceSetupCard(modifier: Modifier = Modifier) {
                         when (brokerStatus) {
                             EmbeddedAdbShell.BrokerStatus.OK -> R.string.device_setup_ready_body
                             EmbeddedAdbShell.BrokerStatus.REJECTED -> R.string.device_setup_rejected_body
+                            EmbeddedAdbShell.BrokerStatus.PIN_MISMATCH -> R.string.broker_pin_mismatch_body
                             EmbeddedAdbShell.BrokerStatus.WIRELESS_DEBUGGING_OFF ->
                                 R.string.broker_blocked_wireless_debugging
                             EmbeddedAdbShell.BrokerStatus.NO_SERVICE ->
@@ -209,10 +232,18 @@ fun DeviceSetupCard(modifier: Modifier = Modifier) {
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                     }
-                    TextButton(onClick = {
-                        EmbeddedAdbShell.forgetPairing(context)
-                        BrokerStatusMonitor.invalidate()
-                        statusTick++
+                    TextButton(enabled = !forgetting, onClick = {
+                        val trigger = BrokerTrigger.fromTap(context, "forget_pairing")
+                        forgetting = true
+                        scope.launch {
+                            val result = withContext(Dispatchers.IO) {
+                                PrivilegedSetup.resetToStock(context, trigger)
+                            }
+                            forgetOutcome = forgetOutcomeOf(result)
+                            forgetting = false
+                            BrokerStatusMonitor.invalidate()
+                            statusTick++
+                        }
                     }) {
                         Text(
                             stringResource(
@@ -260,6 +291,7 @@ fun DeviceSetupCard(modifier: Modifier = Modifier) {
 
             Spacer(modifier = Modifier.height(12.dp))
             Button(onClick = {
+                forgetOutcome = null
                 armPairing(context)
                 armToken++
                 if (developerOptionsOn) openWirelessDebugging(context) else openAboutPhone(context)
@@ -274,6 +306,40 @@ fun DeviceSetupCard(modifier: Modifier = Modifier) {
                     )
                 )
             }
+        }
+    }
+}
+
+private const val OUTCOME_UNPAIRED = "unpaired"
+private const val OUTCOME_MANUAL = "manual"
+private const val SUFFIX_PERMISSION_KEPT = "+permission"
+
+private fun forgetOutcomeOf(result: PrivilegedSetup.ResetResult): String =
+    (if (result.unpaired) OUTCOME_UNPAIRED else OUTCOME_MANUAL) +
+        (if (result.writeSecureSettingsStillHeld) SUFFIX_PERMISSION_KEPT else "")
+
+/** What "Forget pairing" achieved, and the step left to the user when the broker could not unpair. */
+@Composable
+private fun ForgetOutcomeNotice(outcome: String, onOpenWireless: () -> Unit) {
+    val manual = outcome.startsWith(OUTCOME_MANUAL)
+    Spacer(modifier = Modifier.height(6.dp))
+    Text(
+        text = stringResource(if (manual) R.string.broker_forget_manual else R.string.broker_forget_done),
+        style = MaterialTheme.typography.bodyMedium,
+        color = if (manual) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    if (outcome.endsWith(SUFFIX_PERMISSION_KEPT)) {
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = stringResource(R.string.broker_forget_permission_kept),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.error
+        )
+    }
+    if (manual) {
+        Spacer(modifier = Modifier.height(6.dp))
+        Button(onClick = onOpenWireless) {
+            Text(stringResource(R.string.device_setup_open_wireless))
         }
     }
 }

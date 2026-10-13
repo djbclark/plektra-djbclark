@@ -6,10 +6,6 @@
 package moe.shizuku.manager.adb
 
 import android.util.Log
-import moe.shizuku.manager.adb.AdbProtocol.ADB_AUTH_RSAPUBLICKEY
-import moe.shizuku.manager.adb.AdbProtocol.ADB_AUTH_SIGNATURE
-import moe.shizuku.manager.adb.AdbProtocol.ADB_AUTH_TOKEN
-import moe.shizuku.manager.adb.AdbProtocol.A_AUTH
 import moe.shizuku.manager.adb.AdbProtocol.A_CLSE
 import moe.shizuku.manager.adb.AdbProtocol.A_CNXN
 import moe.shizuku.manager.adb.AdbProtocol.A_MAXDATA
@@ -19,15 +15,20 @@ import moe.shizuku.manager.adb.AdbProtocol.A_STLS
 import moe.shizuku.manager.adb.AdbProtocol.A_STLS_VERSION
 import moe.shizuku.manager.adb.AdbProtocol.A_VERSION
 import moe.shizuku.manager.adb.AdbProtocol.A_WRTE
-import android.os.Build
 import java.io.Closeable
 import java.io.DataInputStream
 import java.io.DataOutputStream
+import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.ScheduledThreadPoolExecutor
+import java.util.concurrent.TimeUnit
+import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLSocket
+import javax.net.ssl.X509TrustManager
 
 private const val TAG = "AdbClient"
 
@@ -40,13 +41,52 @@ private const val READ_TIMEOUT_MS = 10_000
 /** Largest payload the ADB protocol allows (AOSP MAX_PAYLOAD, 1 MiB); a larger declared length is rejected. */
 private const val MAX_PAYLOAD = 1024 * 1024
 
-class AdbClient(private val host: String, private val port: Int, private val key: AdbKey) : Closeable {
+/**
+ * Most shell output one command may return (adversary review 2026-10-12, finding 1.2). Every
+ * broker command prints a few lines at most; a peer streaming without end must not grow the
+ * buffer until the keyboard process dies of OOM.
+ */
+const val MAX_SHELL_OUTPUT_BYTES = 256 * 1024
+
+/**
+ * Longest one client may live, connect and commands together. The per-read timeout cannot catch
+ * a peer that trickles a byte every few seconds, and the caller holds the broker lock meanwhile.
+ */
+const val CLIENT_DEADLINE_MS = 30_000L
+
+/** Closes sockets whose deadline passed; one daemon thread for every client. */
+private val deadlineTimer = ScheduledThreadPoolExecutor(1) { r ->
+    Thread(r, "AdbClient-deadline").apply { isDaemon = true }
+}.apply { removeOnCancelPolicy = true }
+
+/**
+ * @param sslContextFor builds the TLS context around the trust manager this client pins adbd with
+ *   (normally [AdbKey.sslContext]).
+ * @param pins adbd's server-certificate pins; see [AdbServerPinStore].
+ * @param deadlineMs overall bound on connect plus commands; the socket is closed when it passes.
+ */
+class AdbClient(
+    private val host: String,
+    private val port: Int,
+    private val sslContextFor: (X509TrustManager) -> SSLContext,
+    private val pins: AdbServerPinStore,
+    private val deadlineMs: Long = CLIENT_DEADLINE_MS,
+) : Closeable {
+
+    constructor(host: String, port: Int, key: AdbKey, pins: AdbServerPinStore) :
+        this(host, port, key::sslContext, pins)
+
+    @Volatile
+    private var deadlinePassed = false
+    private var deadline: ScheduledFuture<*>? = null
 
     private lateinit var socket: Socket
     private lateinit var plainInputStream: DataInputStream
     private lateinit var plainOutputStream: DataOutputStream
 
     private var useTls = false
+
+    private var nextLocalId = 1
 
     private lateinit var tlsSocket: SSLSocket
     private lateinit var tlsInputStream: DataInputStream
@@ -55,11 +95,15 @@ class AdbClient(private val host: String, private val port: Int, private val key
     private val inputStream get() = if (useTls) tlsInputStream else plainInputStream
     private val outputStream get() = if (useTls) tlsOutputStream else plainOutputStream
 
-    fun connect() {
+    fun connect() = withinDeadline {
         // Bound both phases. A phone that never accepts our key simply stops answering, and an
         // unbounded read would then block this thread forever while holding the broker lock,
         // deadlocking every later privileged call rather than failing.
         socket = Socket()
+        deadline = deadlineTimer.schedule({
+            deadlinePassed = true
+            close()
+        }, deadlineMs, TimeUnit.MILLISECONDS)
         socket.connect(InetSocketAddress(host, port), CONNECT_TIMEOUT_MS)
         socket.soTimeout = READ_TIMEOUT_MS
         socket.tcpNoDelay = true
@@ -69,38 +113,44 @@ class AdbClient(private val host: String, private val port: Int, private val key
         write(A_CNXN, A_VERSION, A_MAXDATA, "host::")
 
         var message = read()
-        if (message.command == A_STLS) {
-            if (Build.VERSION.SDK_INT < 29) {
-                error("Connect to adb with TLS is not supported before Android 9")
-            }
-            write(A_STLS, A_STLS_VERSION, 0)
+        // Wireless debugging (the only adbd this client is pointed at) is TLS-only. Never answer
+        // the legacy A_AUTH token challenge: signing a peer's token is a signing oracle, because
+        // a fake adbd can relay the token from adbd's legacy TCP port and get a shell with our
+        // signature (adversary review 2026-10-12, finding 1.1).
+        if (message.command != A_STLS) error("adbd did not offer TLS")
+        write(A_STLS, A_STLS_VERSION, 0)
 
-            val sslContext = key.sslContext
-            tlsSocket = sslContext.socketFactory.createSocket(socket, host, port, true) as SSLSocket
+        val trustManager = PinnedAdbServerTrustManager(pins)
+        tlsSocket = sslContextFor(trustManager).socketFactory.createSocket(socket, host, port, true) as SSLSocket
+        try {
             tlsSocket.startHandshake()
-            Log.d(TAG, "Handshake succeeded.")
-
-            tlsInputStream = DataInputStream(tlsSocket.inputStream)
-            tlsOutputStream = DataOutputStream(tlsSocket.outputStream)
-            useTls = true
-
-            message = read()
-        } else if (message.command == A_AUTH) {
-            if (message.command != A_AUTH && message.arg0 != ADB_AUTH_TOKEN) error("not A_AUTH ADB_AUTH_TOKEN")
-            write(A_AUTH, ADB_AUTH_SIGNATURE, 0, key.sign(message.data))
-
-            message = read()
-            if (message.command != A_CNXN) {
-                write(A_AUTH, ADB_AUTH_RSAPUBLICKEY, 0, key.adbPublicKey)
-                message = read()
-            }
+        } catch (e: IOException) {
+            if (trustManager.mismatchSeen) throw AdbServerPinMismatchException(e)
+            throw e
         }
+        Log.d(TAG, "Handshake succeeded.")
 
+        tlsInputStream = DataInputStream(tlsSocket.inputStream)
+        tlsOutputStream = DataOutputStream(tlsSocket.outputStream)
+        useTls = true
+
+        message = read()
         if (message.command != A_CNXN) error("not A_CNXN")
+        trustManager.commitFirstUse()
     }
 
-    fun shellCommand(command: String, listener: ((ByteArray) -> Unit)?) {
-        val localId = 1
+    /**
+     * Runs [command] and hands its output to [listener]. Fails, closing the connection, once the
+     * output passes [maxOutputBytes] or the client's deadline passes.
+     */
+    fun shellCommand(
+        command: String,
+        maxOutputBytes: Int = MAX_SHELL_OUTPUT_BYTES,
+        listener: ((ByteArray) -> Unit)?,
+    ) = withinDeadline {
+        // One stream per command, so a broker session can run several commands on one connection.
+        val localId = nextLocalId++
+        var outputBytes = 0L
         write(A_OPEN, localId, 0, "shell:$command")
 
         var message = read()
@@ -110,6 +160,11 @@ class AdbClient(private val host: String, private val port: Int, private val key
                     message = read()
                     val remoteId = message.arg0
                     if (message.command == A_WRTE) {
+                        outputBytes += message.data_length.coerceAtLeast(0)
+                        if (outputBytes > maxOutputBytes) {
+                            close()
+                            error("shell output exceeded $maxOutputBytes bytes")
+                        }
                         if (message.data_length > 0) {
                             listener?.invoke(message.data!!)
                         }
@@ -129,6 +184,16 @@ class AdbClient(private val host: String, private val port: Int, private val key
             else -> {
                 error("not A_OKAY or A_CLSE")
             }
+        }
+    }
+
+    /** Reports a socket the deadline closed as that, not as whatever IOException surfaced. */
+    private inline fun <T> withinDeadline(block: () -> T): T {
+        try {
+            return block()
+        } catch (e: Exception) {
+            if (deadlinePassed) throw IOException("adbd did not finish within $deadlineMs ms", e)
+            throw e
         }
     }
 
@@ -171,6 +236,7 @@ class AdbClient(private val host: String, private val port: Int, private val key
     }
 
     override fun close() {
+        deadline?.cancel(false)
         try {
             plainInputStream.close()
         } catch (e: Throwable) {

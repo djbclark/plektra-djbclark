@@ -2043,6 +2043,20 @@ Each key can be configured as Keycode, Action, Native Ctrl, or None. Use overrid
     <string name="broker_blocked_no_service">Wireless debugging is on but the phone is not advertising it. Turn it off and on again in Developer options.</string>
     <string name="broker_blocked_not_paired">Not paired. Follow the steps to set up wireless debugging.</string>
     <string name="broker_repair">Re-pair</string>
+    <string name="broker_pin_mismatch_body">adbd\'s certificate changed. Forget the pairing and pair again.</string>
+    <string name="broker_forgetting">Forgetting the pairing…</string>
+    <string name="broker_forget_done">Unpaired. Plektra removed its key from Wireless debugging and deleted it here.</string>
+    <string name="broker_forget_manual">Plektra deleted its key here but could not remove it from your phone. Open Wireless debugging, tap plektra-djb under Paired devices, then tap Forget.</string>
+    <string name="broker_forget_permission_kept">Plektra still holds permission to change secure settings, because the phone could not be reached to take it back. Pair again and forget the pairing, or uninstall Plektra, to remove it.</string>
+    <string name="broker_wireless_off_after_setup_title">Turn Wireless debugging off after setup</string>
+    <string name="broker_wireless_off_after_setup_description">When Plektra finishes a setup step, it turns Wireless debugging off again, so nothing on your network can reach it. Plektra can\'t reach the system again until you turn Wireless debugging back on in Developer options.</string>
+    <string name="broker_auth_timeout_help">Leave \"Disable adb authorization timeout\" in Developer options off. Android then forgets a paired key that has not been used for 7 days, so a pairing you no longer use stops working by itself. Plektra never changes this setting.</string>
+    <string name="broker_audit_title">Broker activity</string>
+    <string name="broker_audit_description">Every command Plektra ran through wireless debugging, and every permission it granted or took back. Kept on this phone only, last 200 entries.</string>
+    <string name="broker_audit_empty">Nothing yet.</string>
+    <string name="broker_audit_clear">Clear log</string>
+    <string name="broker_audit_ok">ok</string>
+    <string name="broker_audit_failed">failed</string>
     <string name="kw_main_titan2_elite_tools">titan, elite, t2e, device setup, broker, adb, wireless debugging, pairing, privileged</string>
     <string name="kw_titan2_elite_tools_device_setup">adb, wireless debugging, pair, pairing, broker, shizuku, grant, secure settings</string>
     <!-- Exact Typing: per-app raw mode (no autocorrect, suggestions or auto-capitalisation) -->

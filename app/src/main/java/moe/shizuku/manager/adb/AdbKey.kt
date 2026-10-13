@@ -2,192 +2,89 @@
  * Vendored from Shizuku (https://github.com/RikkaApps/Shizuku) by RikkaApps.
  * Licensed under the Apache License, Version 2.0. See
  * app/src/main/java/moe/shizuku/manager/adb/NOTICE and third_party/licenses/Apache-2.0.txt.
+ *
+ * Plektra djb: the key no longer lives here as a heap RSA key wrapped by an AES Keystore key. It
+ * comes from an [AdbKeySource], in production AndroidKeyStore (AdbKeyStoreSource.kt), so the
+ * private key is a non-exportable handle (adversary review 2026-10-12, finding 1.3d).
  */
 package moe.shizuku.manager.adb
 
-import android.annotation.SuppressLint
-import android.content.SharedPreferences
-import android.os.Build
-import android.security.keystore.KeyGenParameterSpec
-import android.security.keystore.KeyProperties
 import android.util.Base64
 import android.util.Log
-import androidx.annotation.RequiresApi
-import androidx.core.content.edit
-import org.bouncycastle.asn1.x500.X500Name
-import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo
-import org.bouncycastle.cert.X509v3CertificateBuilder
-import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
-import java.io.ByteArrayInputStream
-import java.io.IOException
 import java.math.BigInteger
 import java.net.Socket
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.security.*
-import java.security.cert.CertificateFactory
+import java.security.MessageDigest
+import java.security.Principal
+import java.security.PrivateKey
+import java.security.SecureRandom
 import java.security.cert.X509Certificate
-import java.security.interfaces.RSAPrivateKey
 import java.security.interfaces.RSAPublicKey
-import java.security.spec.PKCS8EncodedKeySpec
-import java.security.spec.RSAKeyGenParameterSpec
-import java.security.spec.RSAPublicKeySpec
-import java.util.*
-import javax.crypto.Cipher
-import javax.crypto.KeyGenerator
-import javax.crypto.spec.GCMParameterSpec
 import javax.net.ssl.SSLContext
-import javax.net.ssl.SSLEngine
 import javax.net.ssl.X509ExtendedKeyManager
-import javax.net.ssl.X509ExtendedTrustManager
+import javax.net.ssl.X509TrustManager
 
 private const val TAG = "AdbKey"
 
-class AdbKey(private val adbKeyStore: AdbKeyStore, name: String) {
+/**
+ * The ADB identity: an RSA-2048 private key and the self-signed certificate that carries its
+ * public half. [privateKey] may be an opaque handle (AndroidKeyStore); nothing here reads its
+ * encoding. adbd checks only the public key in the certificate, not the certificate itself.
+ */
+class AdbKeyMaterial(val privateKey: PrivateKey, val certificate: X509Certificate) {
+    val publicKey: RSAPublicKey = certificate.publicKey as? RSAPublicKey
+        ?: throw AdbKeyException("ADB key is not RSA", IllegalArgumentException(certificate.publicKey.algorithm))
+}
+
+/**
+ * Where the ADB key lives. Production uses [AndroidKeyStoreAdbKeySource]: the key is generated
+ * inside AndroidKeyStore and never leaves it. The interface lets the TLS and adb-format code be
+ * tested on the JVM with a software key, because Robolectric has no AndroidKeyStore.
+ */
+interface AdbKeySource {
+
+    /** True when a key is held. Must be cheap: screens poll it. */
+    fun exists(): Boolean
+
+    /** The held key, or null when none is held. Throws [AdbKeyException] when it cannot be read. */
+    fun load(): AdbKeyMaterial?
+
+    /** Generates and stores a new key, replacing any held one. */
+    fun generate(): AdbKeyMaterial
+
+    /** Deletes the held key, if any. Never throws. */
+    fun delete()
+}
+
+class AdbKey(private val material: AdbKeyMaterial, name: String) {
 
     companion object {
 
-        private const val ANDROID_KEYSTORE = "AndroidKeyStore"
-        private const val ENCRYPTION_KEY_ALIAS = "_adbkey_encryption_key_"
-        private const val TRANSFORMATION = "AES/GCM/NoPadding"
+        /** The held key, generating one when none is held. Only pairing may generate. */
+        fun loadOrGenerate(source: AdbKeySource, name: String): AdbKey =
+            AdbKey(source.load() ?: source.generate(), name)
 
-        private const val IV_SIZE_IN_BYTES = 12
-        private const val TAG_SIZE_IN_BYTES = 16
-
-        private val PADDING = byteArrayOf(
-                0x00, 0x01, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0x00,
-                0x30, 0x21, 0x30, 0x09, 0x06, 0x05, 0x2b, 0x0e, 0x03, 0x02, 0x1a, 0x05, 0x00,
-                0x04, 0x14)
+        /** The held key. Throws [AdbKeyException] when none is held or it cannot be read. */
+        fun existing(source: AdbKeySource, name: String): AdbKey =
+            AdbKey(
+                source.load() ?: throw AdbKeyException("No ADB key is held; pair first", IllegalStateException()),
+                name
+            )
     }
 
-    private val encryptionKey: Key
-
-    private val privateKey: RSAPrivateKey
-    private val publicKey: RSAPublicKey
-    private val certificate: X509Certificate
-
-    init {
-        this.encryptionKey = getOrCreateEncryptionKey() ?: error("Failed to generate encryption key with AndroidKeyManager.")
-
-        this.privateKey = getOrCreatePrivateKey()
-        this.publicKey = KeyFactory.getInstance("RSA").generatePublic(RSAPublicKeySpec(privateKey.modulus, RSAKeyGenParameterSpec.F4)) as RSAPublicKey
-
-        val signer = JcaContentSignerBuilder("SHA256withRSA").build(privateKey)
-        val x509Certificate = X509v3CertificateBuilder(X500Name("CN=00"),
-                BigInteger.ONE,
-                Date(0),
-                Date(2461449600 * 1000),
-                Locale.ROOT,
-                X500Name("CN=00"),
-                SubjectPublicKeyInfo.getInstance(publicKey.encoded)
-        ).build(signer)
-        this.certificate = CertificateFactory.getInstance("X.509")
-                .generateCertificate(ByteArrayInputStream(x509Certificate.encoded)) as X509Certificate
-
-    }
-
+    /** The public key in adbd's format (`<base64> <name>\0`), as sent at pairing. */
     val adbPublicKey: ByteArray by lazy(LazyThreadSafetyMode.NONE) {
-        publicKey.adbEncoded(name)
+        material.publicKey.adbEncoded(name)
     }
 
-    private fun getOrCreateEncryptionKey(): Key? {
-        val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE)
-        keyStore.load(null)
-
-        return keyStore.getKey(ENCRYPTION_KEY_ALIAS, null) ?: run {
-            val parameterSpec = KeyGenParameterSpec.Builder(ENCRYPTION_KEY_ALIAS, KeyProperties.PURPOSE_DECRYPT or KeyProperties.PURPOSE_ENCRYPT)
-                    .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-                    .setKeySize(256)
-                    .build()
-            val keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
-            keyGenerator.init(parameterSpec)
-            keyGenerator.generateKey()
-        }
-    }
-
-    private fun encrypt(plaintext: ByteArray, aad: ByteArray?): ByteArray? {
-        if (plaintext.size > Int.MAX_VALUE - IV_SIZE_IN_BYTES - TAG_SIZE_IN_BYTES) {
-            return null
-        }
-        val ciphertext = ByteArray(IV_SIZE_IN_BYTES + plaintext.size + TAG_SIZE_IN_BYTES)
-        val cipher = Cipher.getInstance(TRANSFORMATION)
-        cipher.init(Cipher.ENCRYPT_MODE, encryptionKey)
-        cipher.updateAAD(aad)
-        cipher.doFinal(plaintext, 0, plaintext.size, ciphertext, IV_SIZE_IN_BYTES)
-        System.arraycopy(cipher.iv, 0, ciphertext, 0, IV_SIZE_IN_BYTES)
-        return ciphertext
-    }
-
-    private fun decrypt(ciphertext: ByteArray, aad: ByteArray?): ByteArray? {
-        if (ciphertext.size < IV_SIZE_IN_BYTES + TAG_SIZE_IN_BYTES) {
-            return null
-        }
-        val params = GCMParameterSpec(8 * TAG_SIZE_IN_BYTES, ciphertext, 0, IV_SIZE_IN_BYTES)
-        val cipher = Cipher.getInstance(TRANSFORMATION)
-        cipher.init(Cipher.DECRYPT_MODE, encryptionKey, params)
-        cipher.updateAAD(aad)
-        return cipher.doFinal(ciphertext, IV_SIZE_IN_BYTES, ciphertext.size - IV_SIZE_IN_BYTES)
-    }
-
-    private fun getOrCreatePrivateKey(): RSAPrivateKey {
-        var privateKey: RSAPrivateKey? = null
-
-        val aad = ByteArray(16)
-        "adbkey".toByteArray().copyInto(aad)
-
-        var ciphertext = adbKeyStore.get()
-        if (ciphertext != null) {
-            try {
-                val plaintext = decrypt(ciphertext, aad)
-
-                val keyFactory = KeyFactory.getInstance("RSA")
-                privateKey = keyFactory.generatePrivate(PKCS8EncodedKeySpec(plaintext)) as RSAPrivateKey
-            } catch (e: GeneralSecurityException) {
-                Log.e(TAG, "Stored ADB key could not be read", e)
-                // The phone still trusts the old key; regenerating here would leave the app
-                // thinking it is paired while every connection is refused.
-                throw AdbKeyException("Stored ADB key could not be read; pair again", e)
-            } catch (e: IOException) {
-                Log.e(TAG, "Stored ADB key could not be read", e)
-                throw AdbKeyException("Stored ADB key could not be read; pair again", e)
-            }
-        }
-        if (privateKey == null) {
-            val keyPairGenerator = KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_RSA)
-            keyPairGenerator.initialize(RSAKeyGenParameterSpec(2048, RSAKeyGenParameterSpec.F4))
-            val keyPair = keyPairGenerator.generateKeyPair()
-            privateKey = keyPair.private as RSAPrivateKey
-
-            ciphertext = encrypt(privateKey.encoded, aad)
-            if (ciphertext != null) {
-                adbKeyStore.put(ciphertext)
-            }
-        }
-        return privateKey
-    }
-
-    fun sign(data: ByteArray?): ByteArray {
-        val cipher = Cipher.getInstance("RSA/ECB/NoPadding")
-        cipher.init(Cipher.ENCRYPT_MODE, privateKey)
-        cipher.update(PADDING)
-        return cipher.doFinal(data)
+    /**
+     * The fingerprint adbd and Settings use for this key: MD5 of the decoded key blob, uppercase
+     * hex pairs joined by colons (AOSP AdbDebuggingManager.getFingerprints). It names this key in
+     * `IAdbManager.unpairDevice`.
+     */
+    val adbFingerprint: String by lazy(LazyThreadSafetyMode.NONE) {
+        adbFingerprintOf(material.publicKey.adbStruct())
     }
 
     private val keyManager
@@ -204,12 +101,15 @@ class AdbKey(private val adbKeyStore: AdbKeyStore, name: String) {
 
             override fun getCertificateChain(alias: String?): Array<X509Certificate>? {
                 Log.d(TAG, "getCertificateChain: alias=$alias")
-                return if (alias == this.alias) arrayOf(certificate) else null
+                return if (alias == this.alias) arrayOf(material.certificate) else null
             }
 
+            // An AndroidKeyStore key is a handle with no encoding; it is handed over as is. Conscrypt
+            // signs with it through CryptoUpcalls, and TLS 1.3 RSA-PSS reaches Keystore as raw
+            // RSA/ECB/NoPadding, which is why the key allows ENCRYPTION_PADDING_NONE (conscrypt #718).
             override fun getPrivateKey(alias: String?): PrivateKey? {
                 Log.d(TAG, "getPrivateKey: alias=$alias")
-                return if (alias == this.alias) privateKey else null
+                return if (alias == this.alias) material.privateKey else null
             }
 
             override fun getClientAliases(keyType: String?, issuers: Array<out Principal>?): Array<String>? {
@@ -226,73 +126,27 @@ class AdbKey(private val adbKeyStore: AdbKeyStore, name: String) {
         }
 
 
-    private val trustManager
-        get() =
-            @RequiresApi(Build.VERSION_CODES.R)
-            object : X509ExtendedTrustManager() {
-
-                @SuppressLint("TrustAllX509TrustManager")
-                override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?, socket: Socket?) {
-                }
-
-                @SuppressLint("TrustAllX509TrustManager")
-                override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?, engine: SSLEngine?) {
-                }
-
-                @SuppressLint("TrustAllX509TrustManager")
-                override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {
-                }
-
-                @SuppressLint("TrustAllX509TrustManager")
-                override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?, socket: Socket?) {
-                }
-
-                @SuppressLint("TrustAllX509TrustManager")
-                override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?, engine: SSLEngine?) {
-                }
-
-                @SuppressLint("TrustAllX509TrustManager")
-                override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {
-                }
-
-                override fun getAcceptedIssuers(): Array<X509Certificate> {
-                    return emptyArray()
-                }
-            }
-
-    @delegate:RequiresApi(Build.VERSION_CODES.R)
-    val sslContext: SSLContext by lazy(LazyThreadSafetyMode.NONE) {
+    /**
+     * A TLS 1.3 context that presents this key as the client certificate and judges adbd's server
+     * certificate with [trustManager]: [PairingAdbServerTrustManager] on the pairing port (the
+     * pairing code authenticates that session), [PinnedAdbServerTrustManager] on the connect port.
+     * Never install it as a process default.
+     *
+     * The legacy non-TLS `A_AUTH` signer that used to live here is gone (adversary review
+     * 2026-10-12, finding 1.1): it signed any token a peer sent, which made the app a signing
+     * oracle for a key adbd treats as shell.
+     */
+    fun sslContext(trustManager: X509TrustManager): SSLContext {
         val sslContext = SSLContext.getInstance("TLSv1.3")
         sslContext.init(arrayOf(keyManager), arrayOf(trustManager), SecureRandom())
-        sslContext
+        return sslContext
     }
 }
 
-interface AdbKeyStore {
-
-    fun put(bytes: ByteArray)
-
-    fun get(): ByteArray?
-}
-
-class PreferenceAdbKeyStore(private val preference: SharedPreferences) : AdbKeyStore {
-
-    private val preferenceKey = "adbkey"
-
-    override fun put(bytes: ByteArray) {
-        preference.edit { putString(preferenceKey, String(Base64.encode(bytes, Base64.NO_WRAP))) }
-    }
-
-    override fun get(): ByteArray? {
-        if (!preference.contains(preferenceKey)) return null
-        return Base64.decode(preference.getString(preferenceKey, null), Base64.NO_WRAP)
-    }
-
-    /** Forgets a stored key that can no longer be read, so the next pairing starts fresh. */
-    fun clear() {
-        preference.edit { remove(preferenceKey) }
-    }
-}
+/** The fingerprint of a decoded key blob, computed exactly as AOSP AdbDebuggingManager does. */
+internal fun adbFingerprintOf(keyBlob: ByteArray): String =
+    MessageDigest.getInstance("MD5").digest(keyBlob)
+        .joinToString(":") { "%02X".format(it.toInt() and 0xFF) }
 
 const val ANDROID_PUBKEY_MODULUS_SIZE = 2048 / 8
 const val ANDROID_PUBKEY_MODULUS_SIZE_WORDS = ANDROID_PUBKEY_MODULUS_SIZE / 4
@@ -313,7 +167,8 @@ private fun BigInteger.toAdbEncoded(): IntArray {
     return endcoded
 }
 
-private fun RSAPublicKey.adbEncoded(name: String): ByteArray {
+/** The key in Android's mincrypt `RSAPublicKey` layout, before base64. */
+private fun RSAPublicKey.adbStruct(): ByteArray {
     // https://cs.android.com/android/platform/superproject/+/android-10.0.0_r30:system/core/libcrypto_utils/android_pubkey.c
 
     /*
@@ -337,8 +192,11 @@ private fun RSAPublicKey.adbEncoded(name: String): ByteArray {
     modulus.toAdbEncoded().forEach { buffer.putInt(it) }
     rr.toAdbEncoded().forEach { buffer.putInt(it) }
     buffer.putInt(publicExponent.toInt())
+    return buffer.array()
+}
 
-    val base64Bytes = Base64.encode(buffer.array(), Base64.NO_WRAP)
+private fun RSAPublicKey.adbEncoded(name: String): ByteArray {
+    val base64Bytes = Base64.encode(adbStruct(), Base64.NO_WRAP)
     val nameBytes = " $name\u0000".toByteArray()
     val bytes = ByteArray(base64Bytes.size + nameBytes.size)
     base64Bytes.copyInto(bytes)

@@ -14,6 +14,7 @@ import java.io.DataOutputStream
 import java.net.Socket
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.security.cert.X509Certificate
 import javax.net.ssl.SSLSocket
 
 private const val TAG = "AdbPairClient"
@@ -183,6 +184,14 @@ class AdbPairingClient(private val host: String, private val port: Int, private 
     private lateinit var pairingContext: PairingContext
     private var state: State = State.Ready
 
+    /**
+     * [AdbServerPin] of the certificate adbd presented on the pairing port, known once the TLS
+     * handshake is done. It is adbd's only once [start] returns true: the pairing code is what
+     * authenticates this session, so the caller records it as the pairing pin only then.
+     */
+    var serverPin: String? = null
+        private set
+
     fun start(): Boolean {
         setupTlsConnection()
 
@@ -208,10 +217,12 @@ class AdbPairingClient(private val host: String, private val port: Int, private 
         socket = Socket(host, port)
         socket.tcpNoDelay = true
 
-        val sslContext = key.sslContext
+        val sslContext = key.sslContext(PairingAdbServerTrustManager)
         val sslSocket = sslContext.socketFactory.createSocket(socket, host, port, true) as SSLSocket
         sslSocket.startHandshake()
         Log.d(TAG, "Handshake succeeded.")
+        serverPin = (sslSocket.session.peerCertificates.firstOrNull() as? X509Certificate)
+            ?.let(AdbServerPin::of)
 
         inputStream = DataInputStream(sslSocket.inputStream)
         outputStream = DataOutputStream(sslSocket.outputStream)

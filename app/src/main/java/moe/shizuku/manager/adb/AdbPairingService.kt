@@ -5,7 +5,6 @@
  */
 package moe.shizuku.manager.adb
 
-import android.annotation.TargetApi
 import android.app.*
 import android.content.Context
 import android.content.Intent
@@ -13,17 +12,20 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import androidx.annotation.RequiresApi
 import androidx.lifecycle.Observer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import rocks.pkb.plektra.R
+import rocks.pkb.plektra.inputmethod.BrokerAuditLog
+import rocks.pkb.plektra.inputmethod.BrokerTrigger
 import rocks.pkb.plektra.inputmethod.PrivilegedSetup
 import rocks.pkb.plektra.ui.BrokerStatusMonitor
 import rocks.pkb.plektra.inputmethod.EmbeddedAdbShell
 import java.net.ConnectException
 
-@TargetApi(Build.VERSION_CODES.R)
+@RequiresApi(Build.VERSION_CODES.R)
 class AdbPairingService : Service() {
 
     companion object {
@@ -163,35 +165,56 @@ class AdbPairingService : Service() {
         GlobalScope.launch(Dispatchers.IO) {
             val host = "127.0.0.1"
 
-            val keyStore = PreferenceAdbKeyStore(EmbeddedAdbInit.prefs(this@AdbPairingService))
-            // Constructing AdbKey GENERATES AND STORES a key when none is held, and isPaired()
-            // is nothing more than "a key is stored". So an attempt that never gets past the
+            val keyStore = EmbeddedAdbInit.keySource(this@AdbPairingService)
+            // loadOrGenerate GENERATES AND STORES a key when none is held, and isPaired() is
+            // nothing more than "a key is stored". So an attempt that never gets past the
             // pairing code would otherwise leave the app permanently believing it is paired.
             // Remember whether the key predates this attempt: only a key minted here may be
             // discarded on failure, because an existing one may back a working pairing.
-            // Read through the same predicate the rest of the app gates on, and one that cannot
-            // throw: keyStore.get() base64-decodes and would blow up here on a corrupt value.
+            // Read through the same predicate the rest of the app gates on (it also drops a
+            // legacy wrapped key, finding 1.3d, so this pairing mints a Keystore key).
             val keyExistedBeforeAttempt =
                 EmbeddedAdbShell.isPaired(this@AdbPairingService)
             val key = try {
                 try {
-                    AdbKey(keyStore, EmbeddedAdbInit.KEY_NAME)
+                    AdbKey.loadOrGenerate(keyStore, EmbeddedAdbInit.KEY_NAME)
                 } catch (e: AdbKeyException) {
                     // Pairing is the one place a stored key may be replaced: the phone is about
                     // to be told the new public key anyway, so an unreadable old one is dropped.
                     Log.e(tag, "Stored ADB key unreadable, generating a new one for this pairing", e)
-                    keyStore.clear()
-                    AdbKey(keyStore, EmbeddedAdbInit.KEY_NAME)
+                    keyStore.delete()
+                    AdbKey.loadOrGenerate(keyStore, EmbeddedAdbInit.KEY_NAME)
                 }
             } catch (e: Throwable) {
                 Log.e(tag, "Unable to load ADB key", e)
+                BrokerAuditLog.record(
+                    this@AdbPairingService, BrokerAuditLog.Kind.KEY, "generate", ok = false,
+                    detail = e.javaClass.simpleName
+                )
                 discardUnprovenKey(keyStore, keyExistedBeforeAttempt)
                 handleResult(false, e)
                 return@launch
             }
 
+            if (!keyExistedBeforeAttempt) {
+                BrokerAuditLog.record(
+                    this@AdbPairingService, BrokerAuditLog.Kind.KEY, "generated", ok = true,
+                    detail = (keyStore as? AndroidKeyStoreAdbKeySource)?.backing
+                )
+            }
+
             runCatching {
-                AdbPairingClient(host, port, code, key).use { it.start() }
+                AdbPairingClient(host, port, code, key).use { client ->
+                    val paired = client.start()
+                    if (paired) {
+                        // The pairing code just authenticated this server cert as adbd's. Record it
+                        // before handleResult, whose privileged setup makes the first connect.
+                        val pin = client.serverPin ?: error("adbd presented no certificate")
+                        EmbeddedAdbInit.pinStore(this@AdbPairingService)
+                            .recordPairing(pin)
+                    }
+                    paired
+                }
             }.onFailure {
                 discardUnprovenKey(keyStore, keyExistedBeforeAttempt)
                 handleResult(false, it)
@@ -212,10 +235,10 @@ class AdbPairingService : Service() {
      * gates the backlight, the overlay grant, the trackpad and every other privileged step. A key
      * that predates the attempt is left alone: it may be backing a pairing that still works.
      */
-    private fun discardUnprovenKey(keyStore: PreferenceAdbKeyStore, keyExistedBeforeAttempt: Boolean) {
+    private fun discardUnprovenKey(keyStore: AdbKeySource, keyExistedBeforeAttempt: Boolean) {
         if (keyExistedBeforeAttempt) return
         Log.w(tag, "Pairing failed; discarding the key it generated so the app does not read as paired")
-        keyStore.clear()
+        keyStore.delete()
     }
 
     private fun handleResult(success: Boolean, exception: Throwable?) {
@@ -229,8 +252,13 @@ class AdbPairingService : Service() {
 
         if (success) {
             Log.i(tag, "Pair succeed")
-            // One pairing, every privileged step: backlight, overlay permission, trackpad.
-            PrivilegedSetup.applyAll(this, reason = "pairing_succeeded")
+            BrokerAuditLog.record(this, BrokerAuditLog.Kind.PAIRING, "paired", ok = true)
+            // One pairing, every privileged step. The user typing the code is the user action.
+            PrivilegedSetup.applyAll(
+                this,
+                reason = "pairing_succeeded",
+                trigger = BrokerTrigger.fromPairingCode(this)
+            )
 
             title = getString(R.string.notification_adb_pairing_succeed_title)
             text = getString(R.string.notification_adb_pairing_succeed_text)
@@ -254,6 +282,10 @@ class AdbPairingService : Service() {
                 }
             }
 
+            BrokerAuditLog.record(
+                this, BrokerAuditLog.Kind.PAIRING, "paired", ok = false,
+                detail = exception?.javaClass?.simpleName
+            )
             if (exception != null) {
                 Log.w(tag, "Pair failed", exception)
             } else {
