@@ -135,8 +135,9 @@ fun DeviceSetupCard(modifier: Modifier = Modifier) {
 
     // Asked for separately, and never as a precondition for arming. The pairing code arrives as a
     // notification, so a denied permission means no code - but the watcher itself still has to run.
+    // POST_NOTIFICATIONS is a runtime permission only from Android 13; below that it is implied.
     LaunchedEffect(Unit) {
-        if (!notificationsAllowed) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !notificationsAllowed) {
             notifPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
