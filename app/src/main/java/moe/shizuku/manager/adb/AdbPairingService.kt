@@ -5,7 +5,6 @@
  */
 package moe.shizuku.manager.adb
 
-import android.annotation.TargetApi
 import android.app.*
 import android.content.Context
 import android.content.Intent
@@ -13,6 +12,7 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import androidx.annotation.RequiresApi
 import androidx.lifecycle.Observer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -23,7 +23,7 @@ import rocks.pkb.plektra.ui.BrokerStatusMonitor
 import rocks.pkb.plektra.inputmethod.EmbeddedAdbShell
 import java.net.ConnectException
 
-@TargetApi(Build.VERSION_CODES.R)
+@RequiresApi(Build.VERSION_CODES.R)
 class AdbPairingService : Service() {
 
     companion object {
