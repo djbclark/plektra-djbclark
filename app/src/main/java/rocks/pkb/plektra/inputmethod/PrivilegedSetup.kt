@@ -188,7 +188,13 @@ object PrivilegedSetup {
         return true
     }
 
-    /** Audit a grant or revoke by what Android now says, never by what the shell printed. */
+    /**
+     * Audit a grant or revoke by what Android now says, never by what the shell printed. Android
+     * settles `checkSelfPermission` a few ms after `pm grant`/`pm revoke` returns (device test:
+     * a granted permission was audited as failed 2 ms after the shell finished), so wait for the
+     * expected state first. Blocks up to [PERMISSION_SETTLE_MS]: callers are all off the main
+     * thread ([PrivilegedShell.runAsync] and [resetToStock]'s contract).
+     */
     private fun recordPermissionOutcome(
         context: Context,
         commands: List<PrivilegedCommand>,
@@ -198,7 +204,7 @@ object PrivilegedSetup {
             val failure = results.getOrNull(i)?.failure
             when (command) {
                 PrivilegedCommand.GrantWriteSecureSettings -> {
-                    val granted = hasWriteSecureSettings(context)
+                    val granted = awaitState(expected = true) { hasWriteSecureSettings(context) }
                     BrokerAuditLog.record(
                         context, BrokerAuditLog.Kind.GRANT, "write_secure_settings",
                         ok = granted, detail = failure
@@ -215,11 +221,37 @@ object PrivilegedSetup {
                 }
                 PrivilegedCommand.RevokeWriteSecureSettings -> BrokerAuditLog.record(
                     context, BrokerAuditLog.Kind.REVOKE, "write_secure_settings",
-                    ok = !hasWriteSecureSettings(context), detail = failure
+                    ok = !awaitState(expected = false) { hasWriteSecureSettings(context) },
+                    detail = failure
                 )
                 else -> Unit
             }
         }
+    }
+
+    private const val PERMISSION_SETTLE_MS = 1_000L
+    private const val PERMISSION_POLL_MS = 50L
+
+    /**
+     * Polls [read] until it returns [expected] or [timeoutMs] passes, and returns the last value
+     * read (so a command that really failed is reported as such, after the wait). The clock and
+     * sleep are parameters so the unit test needs no real time.
+     */
+    internal fun awaitState(
+        expected: Boolean,
+        timeoutMs: Long = PERMISSION_SETTLE_MS,
+        pollMs: Long = PERMISSION_POLL_MS,
+        now: () -> Long = SystemClock::elapsedRealtime,
+        sleep: (Long) -> Unit = Thread::sleep,
+        read: () -> Boolean,
+    ): Boolean {
+        val deadline = now() + timeoutMs
+        var value = read()
+        while (value != expected && now() < deadline) {
+            sleep(pollMs)
+            value = read()
+        }
+        return value
     }
 
     // ---- reset to stock / forget pairing (findings 1.3b, 1.3c) ---------------------------------
