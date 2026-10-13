@@ -4812,7 +4812,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             return true
         }
 
-        // djb/sym-shortcuts: Sym+C/V/X/A edit the text before any app shortcut or symbol chord gets the key.
+        // Sym+C/V/X/A edit the text before any app shortcut or symbol chord gets the key.
         if (
             hasEditableField &&
             (symTogglePendingOnKeyUp || event?.isSymPressed == true) &&
