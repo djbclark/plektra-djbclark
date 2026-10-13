@@ -1644,7 +1644,7 @@ Jede Taste kann als Keycode, Aktion, Native Ctrl oder Keine konfiguriert werden.
     <string name="toolbox_group_system">Geräte-Tools</string>
     <string name="keymap_title">Tastenbelegung</string>
     <string name="keymap_row_description">Jede physische Taste und was sie aktuell tut</string>
-    <string name="keymap_intro">Belegungen leben an zwei Orten, die nie miteinander reden: Zeilen, die die Firmware liest, bevor irgendeine App die Taste sieht, und Plektras eigene Verarbeitung. Hier siehst du beides, pro Taste – auch die, die mit nichts belegt sind.</string>
+    <string name="keymap_intro">Belegungen leben an zwei Orten, die nie miteinander reden: Zeilen, welche die Firmware liest, bevor irgendeine App die Taste sieht, und Plektras eigene Verarbeitung. Hier siehst du beides, pro Taste – auch die, die mit nichts belegt sind.</string>
     <string name="keymap_footnote">Tasten mit einem Pfeil lassen sich ändern. Der Rest ist durch das Telefon oder die Hardware festgelegt.</string>
     <string name="tweaks_title">System-Tweaks</string>
     <string name="tweaks_row_description">Einstellungen, die Android unterstützt, dieses Telefon dir aber nie zeigt</string>
