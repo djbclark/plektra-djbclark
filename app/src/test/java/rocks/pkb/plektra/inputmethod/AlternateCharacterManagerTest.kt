@@ -52,12 +52,17 @@ class AlternateCharacterManagerTest {
         DeferredPunctuationSpaceTracker.clear()
     }
 
-    private fun pressT(manager: AlternateCharacterManager, inputConnection: InputConnection) {
+    private fun pressT(
+        manager: AlternateCharacterManager,
+        inputConnection: InputConnection,
+        shiftOneShot: Boolean = false
+    ) {
         manager.handleKeyWithAltMapping(
             keyCode = KeyEvent.KEYCODE_T,
             inputConnection = inputConnection,
             event = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_T),
             capsLockEnabled = false,
+            shiftOneShot = shiftOneShot,
             layoutChar = 't'
         )
     }
@@ -211,6 +216,32 @@ class AlternateCharacterManagerTest {
         assertEquals("(", recorder.text)
         idle(500)
         assertEquals("(", recorder.text)
+    }
+
+    @Test
+    fun shiftLongPress_autoCapitalizedLetterTogglesToLowercase() {
+        val recorder = RecordingInputConnection()
+        val inputConnection = recorder.asProxy()
+        val manager = cycleManager(first = "shift", next = "off", end = "stop")
+
+        // Auto-capitalization arrives as a one-shot Shift on the typed letter.
+        pressT(manager, inputConnection, shiftOneShot = true)
+        assertEquals("T", recorder.text)
+        idle(60)
+        assertEquals("t", recorder.text)
+        idle(500)
+        assertEquals("t", recorder.text)
+    }
+
+    @Test
+    fun shiftLongPress_lowercaseLetterStillGivesUppercase() {
+        val recorder = RecordingInputConnection()
+        val inputConnection = recorder.asProxy()
+        val manager = cycleManager(first = "shift", next = "off", end = "stop")
+
+        pressT(manager, inputConnection)
+        idle(60)
+        assertEquals("T", recorder.text)
     }
 
     @Test
