@@ -6,14 +6,19 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -22,15 +27,58 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import rocks.pkb.plektra.inputmethod.BrokerAuditLog
+import rocks.pkb.plektra.inputmethod.BrokerSettings
 import java.util.Date
 
 /**
- * The broker's audit log, newest first, with a clear button, below the device setup card
- * (adversary review 2026-10-12, finding 1.3h).
+ * The broker's safety settings and its audit log, below the device setup card (adversary review
+ * 2026-10-12, findings 1.3e, 1.3f, 1.3h).
+ *
+ * 1. "Turn Wireless debugging off after setup", on by default.
+ * 2. Why "Disable adb authorization timeout" should stay off: an unused key then expires after
+ *    7 days. Nothing in the app writes that setting.
+ * 3. The audit log, newest first, with a clear button.
  */
 @Composable
 fun BrokerSafetySection(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    var turnOff by remember { mutableStateOf(BrokerSettings.turnOffWirelessDebuggingAfterSetup(context)) }
+
     Column(modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.broker_wireless_off_after_setup_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = stringResource(R.string.broker_wireless_off_after_setup_description),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Switch(
+                checked = turnOff,
+                onCheckedChange = { on ->
+                    turnOff = on
+                    BrokerSettings.setTurnOffWirelessDebuggingAfterSetup(context, on)
+                }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.broker_auth_timeout_help),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
         BrokerAuditLogList()
     }
 }

@@ -22,7 +22,7 @@ import org.robolectric.annotation.Config
 
 /**
  * The one door to the broker (finding 1.3g), its audit trail (1.3h), the reset flow (1.3b, 1.3c)
-. Nothing here reaches a network: every case is
+ * and the Wireless-debugging setting (1.3e). Nothing here reaches a network: every case is
  * decided before discovery.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -47,8 +47,6 @@ class BrokerGateTest {
     fun tearDown() {
         EmbeddedAdbInit.keySourceFactory = savedFactory
     }
-
-    private val FP = "AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89"
 
     private fun refusals() = BrokerAuditLog.entries(context).filter { it.kind == BrokerAuditLog.Kind.REFUSED }
 
@@ -83,7 +81,7 @@ class BrokerGateTest {
         val tap = BrokerTrigger.forTest(BrokerTrigger.Kind.TAP)
         val results = PrivilegedShell.runSession(
             context,
-            listOf(PrivilegedCommand.UnpairSelf.forThisDevice(FP)!!, PrivilegedCommand.Verify),
+            listOf(PrivilegedCommand.DisableWirelessDebugging, PrivilegedCommand.Verify),
             tap
         )
         assertEquals(2, results.size)
@@ -149,7 +147,7 @@ class BrokerGateTest {
         assertFalse("the local key is forgotten anyway", source.exists())
     }
 
-    // ---- WRITE_SECURE_SETTINGS holders -----------------------------------------------------
+    // ---- WRITE_SECURE_SETTINGS holders and the Wireless debugging setting ------------------
 
     @Test
     fun holdersAreTrackedPerFeature() {
@@ -160,5 +158,20 @@ class BrokerGateTest {
         assertEquals(setOf("b"), WriteSecureSettingsHolders.holders(context))
         WriteSecureSettingsHolders.set(context, "b", false)
         assertFalse(WriteSecureSettingsHolders.anyNeeded(context))
+    }
+
+    @Test
+    fun wirelessDebuggingOffAfterSetupIsOnByDefault() {
+        assertTrue(BrokerSettings.turnOffWirelessDebuggingAfterSetup(context))
+        BrokerSettings.setTurnOffWirelessDebuggingAfterSetup(context, false)
+        assertFalse(BrokerSettings.turnOffWirelessDebuggingAfterSetup(context))
+    }
+
+    @Test
+    fun finishSetupLeavesWirelessDebuggingAloneWhenTheUserSaidSo() {
+        BrokerSettings.setTurnOffWirelessDebuggingAfterSetup(context, false)
+        PrivilegedSetup.finishSetup(context, BrokerTrigger.forTest(BrokerTrigger.Kind.TAP))
+        assertTrue(EmbeddedAdbShell.isWirelessDebuggingEnabled(context))
+        assertTrue(BrokerAuditLog.entries(context).isEmpty())
     }
 }

@@ -33,7 +33,8 @@ internal sealed class PrivilegedCommand {
     abstract fun commandLine(appPackage: String): String
 
     /**
-     * True for a command that may end the connection (unpairing this key). It must be the last command of its session, and its outcome is checked
+     * True for a command that may end the connection (unpairing this key, switching Wireless
+     * debugging off). It must be the last command of its session, and its outcome is checked
      * afterwards rather than read from the shell.
      */
     open val terminal: Boolean get() = false
@@ -105,6 +106,16 @@ internal sealed class PrivilegedCommand {
             fun replyIsSuccess(output: String?): Boolean =
                 output != null && Regex("Result: Parcel\\(0{8}[\\s)]").containsMatchIn(output)
         }
+    }
+
+    /**
+     * Switches Wireless debugging off (finding 1.3e). adbd stops listening and the connection ends,
+     * so this is terminal; the outcome is read back from the `adb_wifi_enabled` global.
+     */
+    object DisableWirelessDebugging : PrivilegedCommand() {
+        override val id = "wireless_debugging_off"
+        override val terminal: Boolean get() = true
+        override fun commandLine(appPackage: String): String = "settings put global $ADB_WIFI_ENABLED 0"
     }
 
     companion object {

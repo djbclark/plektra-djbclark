@@ -11,7 +11,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** The closed command set (finding 1.3g) and the broker's own commands (1.3b, 1.3c). */
+/** The closed command set (finding 1.3g) and the broker's own commands (1.3b, 1.3c, 1.3e, 1.3f). */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33])
 class PrivilegedCommandTest {
@@ -23,6 +23,7 @@ class PrivilegedCommandTest {
         PrivilegedCommand.Verify,
         PrivilegedCommand.GrantWriteSecureSettings,
         PrivilegedCommand.RevokeWriteSecureSettings,
+        PrivilegedCommand.DisableWirelessDebugging,
         PrivilegedCommand.UnpairSelf.forThisDevice(fp),
     ) + AppNotificationListener.entries.map { PrivilegedCommand.DisallowNotificationListener(it) }
 
@@ -37,6 +38,7 @@ class PrivilegedCommandTest {
             "pm revoke $pkg android.permission.WRITE_SECURE_SETTINGS",
             PrivilegedCommand.RevokeWriteSecureSettings.commandLine(pkg)
         )
+        assertEquals("settings put global adb_wifi_enabled 0", PrivilegedCommand.DisableWirelessDebugging.commandLine(pkg))
         assertEquals("service call adb 7 s16 $fp", PrivilegedCommand.UnpairSelf.forThisDevice(fp)!!.commandLine(pkg))
     }
 
@@ -80,9 +82,9 @@ class PrivilegedCommandTest {
     }
 
     @Test
-    fun onlyUnpairEndsTheSession() {
+    fun onlyUnpairAndWirelessOffEndTheSession() {
         val terminal = everyCase().filter { it.terminal }.map { it.id }.toSet()
-        assertEquals(setOf("unpair_self"), terminal)
+        assertEquals(setOf("unpair_self", "wireless_debugging_off"), terminal)
     }
 
     @Test
@@ -90,6 +92,14 @@ class PrivilegedCommandTest {
         val ids = everyCase().map { it.id }
         assertEquals(ids.size, ids.toSet().size)
         ids.forEach { assertTrue(it, Regex("^[a-z_]+$").matches(it)) }
+    }
+
+    /** Finding 1.3f: the broker never touches the 7-day key expiry. */
+    @Test
+    fun noCommandWritesTheAdbKeyExpirySetting() {
+        everyCase().forEach { command ->
+            assertFalse(command.id, command.commandLine(pkg).contains("adb_allowed_connection_time"))
+        }
     }
 
     @Test

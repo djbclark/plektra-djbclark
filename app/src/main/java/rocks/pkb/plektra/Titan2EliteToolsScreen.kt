@@ -84,7 +84,7 @@ fun Titan2EliteToolsScreen(
 
             DeviceSetupCard(modifier = Modifier.settingRow(SettingLinkIds.TITAN2_ELITE_TOOLS_DEVICE_SETUP))
 
-            // What the broker did (finding 1.3h).
+            // Broker safety: Wireless debugging off after setup, the key-expiry advice, the audit log.
             BrokerSafetySection()
 
             // djb/broker: add one section per feature below, each a composable in its own file

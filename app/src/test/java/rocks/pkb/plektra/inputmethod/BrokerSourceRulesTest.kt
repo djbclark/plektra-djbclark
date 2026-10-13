@@ -6,7 +6,7 @@ import org.junit.Test
 import java.io.File
 
 /**
- * Source-level rules for the broker (adversary review 2026-10-12, finding 1.3g). A new
+ * Source-level rules for the broker (adversary review 2026-10-12, findings 1.3f and 1.3g). A new
  * caller makes this fail on purpose: check it is a user action in the app's screens, then add it.
  */
 class BrokerSourceRulesTest {
@@ -24,6 +24,14 @@ class BrokerSourceRulesTest {
             .replace(Regex("/\\*.*?\\*/", RegexOption.DOT_MATCHES_ALL), "")
             .replace(Regex("//[^\\n]*"), "")
 
+    /** Finding 1.3f: nothing writes the ADB key expiry ("Disable adb authorization timeout"). */
+    @Test
+    fun nothingTouchesTheAdbKeyExpirySetting() {
+        val offenders = sources().filter { it.readText().contains("adb_allowed_connection_time", ignoreCase = true) }
+            .map { relative(it) }.toList()
+        assertEquals(emptyList<String>(), offenders)
+    }
+
     /** Every place that can make the broker connect. Each is a user action, or the broker itself. */
     private val brokerCallers = mapOf(
         // The door, the closed command set and the setup and reset flows.
@@ -38,7 +46,7 @@ class BrokerSourceRulesTest {
 
     private val callPattern = Regex(
         "PrivilegedShell\\.(run|runSession)\\b|EmbeddedAdbShell\\.(execute|verify)\\b|" +
-            "PrivilegedSetup\\.(applyAll|resetToStock|setWriteSecureSettingsNeeded)\\b|" +
+            "PrivilegedSetup\\.(applyAll|resetToStock|setWriteSecureSettingsNeeded|finishSetup)\\b|" +
             "BrokerStatusMonitor\\.refresh\\b"
     )
 

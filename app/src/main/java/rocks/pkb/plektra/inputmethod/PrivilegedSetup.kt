@@ -3,6 +3,7 @@ package rocks.pkb.plektra.inputmethod
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.SystemClock
 import android.util.Log
 
 /**
@@ -14,11 +15,14 @@ import android.util.Log
  * so calling this repeatedly is harmless. Every call needs a [BrokerTrigger] (finding 1.3g).
  *
  * djb/broker: no feature step lives here yet. A feature that needs a privileged grant adds one
- * guarded step inside [applyAll], queued with [PrivilegedShell.runAsync], and
+ * guarded step inside [applyAll], queued with [PrivilegedShell.runAsync] before [finishSetup], and
  * registers in [WriteSecureSettingsHolders] if it needs WRITE_SECURE_SETTINGS.
  */
 object PrivilegedSetup {
     private const val TAG = "PrivilegedSetup"
+
+    /** How long [finishSetup] waits for `adb_wifi_enabled` to read 0 after the shell wrote it. */
+    private const val WIRELESS_OFF_CONFIRM_MS = 3_000L
 
     fun applyAll(context: Context, reason: String, trigger: BrokerTrigger?) {
         val appContext = context.applicationContext
@@ -39,7 +43,26 @@ object PrivilegedSetup {
             val results = PrivilegedShell.runSession(appContext, commands, trigger)
             recordPermissionOutcome(appContext, commands, results)
         }
-        // djb/<feature>: queue feature steps here.
+        // djb/<feature>: queue feature steps here, before finishSetup.
+        PrivilegedShell.runAsync { finishSetup(appContext, trigger) }
+    }
+
+    /**
+     * The end of a setup run (finding 1.3e): when the user keeps "Turn Wireless debugging off after
+     * setup" on (the default), switch Wireless debugging off through the shell, as the last
+     * command. The outcome is read back from the global, not from the shell. BLOCKING.
+     */
+    internal fun finishSetup(context: Context, trigger: BrokerTrigger?) {
+        val app = context.applicationContext
+        if (!BrokerSettings.turnOffWirelessDebuggingAfterSetup(app)) return
+        if (!EmbeddedAdbShell.isWirelessDebuggingEnabled(app)) return
+        PrivilegedShell.run(app, PrivilegedCommand.DisableWirelessDebugging, trigger)
+        val deadline = SystemClock.elapsedRealtime() + WIRELESS_OFF_CONFIRM_MS
+        while (EmbeddedAdbShell.isWirelessDebuggingEnabled(app) && SystemClock.elapsedRealtime() < deadline) {
+            runCatching { Thread.sleep(100) }
+        }
+        val off = !EmbeddedAdbShell.isWirelessDebuggingEnabled(app)
+        BrokerAuditLog.record(app, BrokerAuditLog.Kind.WIRELESS_DEBUGGING, "turned_off_after_setup", ok = off)
     }
 
     // ---- WRITE_SECURE_SETTINGS, held only while needed (finding 1.3c) ---------------------------
