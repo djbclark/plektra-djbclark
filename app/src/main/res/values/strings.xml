@@ -2055,7 +2055,8 @@ Each key can be configured as Keycode, Action, Native Ctrl, or None. Use overrid
     <string name="broker_audit_description">Every command Plektra ran through wireless debugging, and every permission it granted or took back. Kept on this phone only, last 200 entries.</string>
     <string name="broker_audit_empty">Nothing yet.</string>
     <string name="broker_audit_clear">Clear log</string>
-    <string name="broker_audit_ok">ok</string>
+    <!-- A result word in the broker activity list, not a button label. -->
+    <string name="broker_audit_ok" tools:ignore="ButtonCase,Typos">ok</string>
     <string name="broker_audit_failed">failed</string>
     <string name="kw_main_titan2_elite_tools">titan, elite, t2e, device setup, broker, adb, wireless debugging, pairing, privileged</string>
     <string name="kw_titan2_elite_tools_device_setup">adb, wireless debugging, pair, pairing, broker, shizuku, grant, secure settings</string>

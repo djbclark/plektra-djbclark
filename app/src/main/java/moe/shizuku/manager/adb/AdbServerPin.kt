@@ -130,7 +130,14 @@ object AdbServerPin {
  *
  * The check runs inside the TLS handshake, so a peer that fails it never receives our client
  * certificate or a CertificateVerify signature.
+ *
+ * Lint's CustomX509TrustManager is suppressed on purpose. adbd's certificate is self-signed, so
+ * the platform manager would refuse it outright; trust comes from the stored pin instead. With no
+ * pin yet (the first connect after pairing) the certificate is remembered and pinned only once the
+ * ADB handshake completes (trust on first use, see the file header); a certificate that does not
+ * match a stored pin is refused, and client-certificate checks always throw.
  */
+@SuppressLint("CustomX509TrustManager")
 class PinnedAdbServerTrustManager(private val pins: AdbServerPinStore) : X509ExtendedTrustManager() {
 
     @Volatile
