@@ -924,7 +924,11 @@ Chaque touche peut être configurée comme Keycode, Action, Native Ctrl ou Aucun
     <string name="density_keep">Conserver</string>
     <string name="density_revert">Annuler maintenant</string>
     <string name="density_confirm_title">Arrivez-vous encore à lire ceci ?</string>
-    <string name="density_confirm_message">Retour à la densité d\'origine dans %1$d secondes sauf si vous la conservez. Si l\'écran est inutilisable, attendez simplement : cela s\'annule tout seul.</string>
+    <plurals name="density_confirm_message">
+        <item quantity="one">Retour à la densité d\'origine dans %1$d seconde sauf si vous la conservez. Si l\'écran est inutilisable, attendez simplement : cela s\'annule tout seul.</item>
+        <item quantity="many">Retour à la densité d\'origine dans %1$d de secondes sauf si vous la conservez. Si l\'écran est inutilisable, attendez simplement : cela s\'annule tout seul.</item>
+        <item quantity="other">Retour à la densité d\'origine dans %1$d secondes sauf si vous la conservez. Si l\'écran est inutilisable, attendez simplement : cela s\'annule tout seul.</item>
+    </plurals>
     <string name="bloat_title">Supprimer les bloatwares</string>
     <string name="bloat_row_description">Désactivez ou désinstallez les applications Unihertz qu\'Android ne vous laisse pas retirer</string>
     <string name="bloat_wrong_device">Cette liste a été écrite pour le Titan 2 Elite et reste désactivée sur les autres téléphones, car elle retire des paquets par nom.</string>
@@ -939,7 +943,11 @@ Chaque touche peut être configurée comme Keycode, Action, Native Ctrl ou Aucun
     <string name="bloat_preset_privacy_description">Paquets qui rapportent ou enregistrent : télémétrie de batterie pour le constructeur, détails APN de l\'opérateur, un journaliseur du chipset qui écrit en continu et l\'enregistrement automatique des appels. Certains figurent aussi dans les lots ci-dessus : un paquet peut être à la fois outil d\'usine et question de confidentialité.</string>
     <string name="bloat_preset_description">Unihertz livre plusieurs outils dont le rôle est d\'empêcher les applications en arrière-plan de tourner : un gestionnaire de téléphone, un gel d\'applications, un bloqueur, un nettoyeur et un journaliseur du chipset qui écrit sans arrêt. Android Auto est une session longue, exactement ce que ces outils interrompent.\n\nSoyons francs : c\'est la cause la plus probable des décrochages d\'Android Auto, pas une cause prouvée. Ce qui est certain, c\'est ce que font ces applications. La désactivation est réversible, et c\'est ce qui rend l\'essai intéressant.</string>
     <string name="bloat_preset_action">Désactiver les %1$d</string>
-    <string name="bloat_unknown_title">%1$d applications constructeur hors de cette liste</string>
+    <plurals name="bloat_unknown_title">
+        <item quantity="one">%1$d application constructeur hors de cette liste</item>
+        <item quantity="many">%1$d d\'applications constructeur hors de cette liste</item>
+        <item quantity="other">%1$d applications constructeur hors de cette liste</item>
+    </plurals>
     <string name="bloat_unknown_description">Tous les Titan 2 Elite sont livrés à l\'identique, donc celles-ci viennent d\'une mise à jour du firmware postérieure à cette liste, ou ce n\'est pas un Titan 2 Elite. Affichées, pas touchées : une application que personne n\'a vérifiée n\'est pas à retirer.</string>
     <string name="bloat_tier_safe">Outils d\'usine</string>
     <string name="bloat_tier_safe_blurb">Applications de test et de calibration restées de la chaîne de production. Rien ne les utilise.</string>
@@ -954,7 +962,11 @@ Chaque touche peut être configurée comme Keycode, Action, Native Ctrl ou Aucun
     <string name="bloat_uninstall">Désinstaller</string>
     <string name="bloat_restore">Restaurer</string>
     <string name="bloat_restore_all">Tout restaurer</string>
-    <string name="bloat_restore_all_summary">%1$d paquet(s) modifié(s) par Plektra</string>
+    <plurals name="bloat_restore_all_summary">
+        <item quantity="one">%1$d paquet modifié par Plektra</item>
+        <item quantity="many">%1$d de paquets modifiés par Plektra</item>
+        <item quantity="other">%1$d paquets modifiés par Plektra</item>
+    </plurals>
     <string name="bloat_uninstall_confirm_title">Désinstaller %1$s ?</string>
     <string name="bloat_uninstall_confirm_message">Désactiver suffit généralement : l\'application est masquée, cesse de tourner, et c\'est réversible immédiatement. Désinstaller la retire pour cet utilisateur ; Plektra peut toujours la restaurer car l\'application reste dans le stockage système, mais une mise à jour du firmware peut la ramener, et si le débogage sans fil devient indisponible, vous ne pourrez pas annuler depuis ici.</string>
     <string name="fn_ctrl_map_title">Régler la touche Fn sur Ctrl</string>

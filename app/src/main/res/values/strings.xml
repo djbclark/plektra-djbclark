@@ -2006,7 +2006,10 @@ Each key can be configured as Keycode, Action, Native Ctrl, or None. Use overrid
     <string name="density_keep">Keep it</string>
     <string name="density_revert">Undo now</string>
     <string name="density_confirm_title">Can you still read this?</string>
-    <string name="density_confirm_message">Reverting to the stock density in %1$d seconds unless you keep it. If the screen is unusable, just wait — this undoes itself.</string>
+    <plurals name="density_confirm_message">
+        <item quantity="one">Reverting to the stock density in %1$d second unless you keep it. If the screen is unusable, just wait — this undoes itself.</item>
+        <item quantity="other">Reverting to the stock density in %1$d seconds unless you keep it. If the screen is unusable, just wait — this undoes itself.</item>
+    </plurals>
     <string name="bloat_title">Remove bloat</string>
     <string name="bloat_row_description">Disable or uninstall the Unihertz apps Android won\'t let you remove</string>
     <string name="bloat_intro">Unihertz ships apps that cannot be removed the normal way. Plektra can use the wireless-debugging pairing from the device setup card at the top of this screen, so it can disable or uninstall them for you — and put every one of them back.</string>
@@ -2023,7 +2026,10 @@ Each key can be configured as Keycode, Action, Native Ctrl, or None. Use overrid
     <string name="bloat_preset_privacy_description">Packages that report or record: battery telemetry for the vendor, carrier APN details, a chipset logger that writes continuously, and automatic call recording. Some of these also appear in the sets above — a package can be factory tooling and a privacy question at the same time.</string>
     <string name="bloat_preset_description">Unihertz ships several tools whose job is stopping background apps from running: a phone manager, an app freezer, a blocker, a junk cleaner and a chipset logger that writes constantly. Android Auto is a long-running session, which is exactly what those interrupt.\n\nWorth being straight with you: this is the most likely cause of Android Auto dropping, not a proven one. What is certain is what these apps do. Disabling is reversible, which is what makes it worth trying.</string>
     <string name="bloat_preset_action">Disable all %1$d</string>
-    <string name="bloat_unknown_title">%1$d vendor apps not in this list</string>
+    <plurals name="bloat_unknown_title">
+        <item quantity="one">%1$d vendor app not in this list</item>
+        <item quantity="other">%1$d vendor apps not in this list</item>
+    </plurals>
     <string name="bloat_unknown_description">Every Titan 2 Elite ships identically, so these came from a firmware update after this list was written — or this is not a Titan 2 Elite. Shown, not touched: an app nobody has checked is not one to remove.</string>
     <string name="bloat_tier_safe">Factory tools</string>
     <string name="bloat_tier_safe_blurb">Test and calibration apps left over from the production line. Nothing uses them.</string>
@@ -2038,7 +2044,10 @@ Each key can be configured as Keycode, Action, Native Ctrl, or None. Use overrid
     <string name="bloat_uninstall">Uninstall</string>
     <string name="bloat_restore">Restore</string>
     <string name="bloat_restore_all">Restore all</string>
-    <string name="bloat_restore_all_summary">%1$d package(s) changed by Plektra</string>
+    <plurals name="bloat_restore_all_summary">
+        <item quantity="one">%1$d package changed by Plektra</item>
+        <item quantity="other">%1$d packages changed by Plektra</item>
+    </plurals>
     <string name="bloat_uninstall_confirm_title">Uninstall %1$s?</string>
     <string name="bloat_uninstall_confirm_message">Disabling is usually enough: it hides the app and stops it running, and is instantly reversible. Uninstalling removes it for this user — Plektra can still restore it because the app stays in system storage, but a firmware update may bring it back, and if wireless debugging is ever unavailable you cannot undo it from here.</string>
     <string name="fn_ctrl_map_title">Set Fn key to Ctrl</string>

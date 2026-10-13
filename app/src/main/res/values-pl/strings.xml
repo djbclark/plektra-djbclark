@@ -924,7 +924,12 @@ Każdy klawisz można skonfigurować jako Keycode, Akcja, Native Ctrl lub Brak. 
     <string name="density_keep">Zachowaj</string>
     <string name="density_revert">Cofnij teraz</string>
     <string name="density_confirm_title">Czy nadal da się to przeczytać?</string>
-    <string name="density_confirm_message">Powrót do fabrycznej gęstości za %1$d s, chyba że ją zachowasz. Jeśli ekran jest nieużywalny, po prostu poczekaj — cofnie się samo.</string>
+    <plurals name="density_confirm_message">
+        <item quantity="one">Powrót do fabrycznej gęstości za %1$d s, chyba że ją zachowasz. Jeśli ekran jest nieużywalny, po prostu poczekaj — cofnie się samo.</item>
+        <item quantity="few">Powrót do fabrycznej gęstości za %1$d s, chyba że ją zachowasz. Jeśli ekran jest nieużywalny, po prostu poczekaj — cofnie się samo.</item>
+        <item quantity="many">Powrót do fabrycznej gęstości za %1$d s, chyba że ją zachowasz. Jeśli ekran jest nieużywalny, po prostu poczekaj — cofnie się samo.</item>
+        <item quantity="other">Powrót do fabrycznej gęstości za %1$d s, chyba że ją zachowasz. Jeśli ekran jest nieużywalny, po prostu poczekaj — cofnie się samo.</item>
+    </plurals>
     <string name="bloat_title">Usuń bloatware</string>
     <string name="bloat_row_description">Wyłącz lub odinstaluj aplikacje Unihertz, których Android nie pozwala usunąć</string>
     <string name="bloat_wrong_device">Ta lista została napisana dla Titana 2 Elite i pozostaje wyłączona na innych telefonach, bo usuwa pakiety po nazwie.</string>
@@ -939,7 +944,12 @@ Każdy klawisz można skonfigurować jako Keycode, Akcja, Native Ctrl lub Brak. 
     <string name="bloat_preset_privacy_description">Pakiety, które raportują lub rejestrują: telemetria baterii dla producenta, dane APN operatora, logger chipsetu piszący bez przerwy i automatyczne nagrywanie rozmów. Niektóre z nich pojawiają się też w zestawach powyżej — pakiet może być jednocześnie narzędziem fabrycznym i kwestią prywatności.</string>
     <string name="bloat_preset_description">Unihertz dostarcza kilka narzędzi, których zadaniem jest zatrzymywanie aplikacji działających w tle: menedżer telefonu, zamrażarkę aplikacji, bloker, czyszczenie śmieci i logger chipsetu piszący bez przerwy. Android Auto to długo działająca sesja — dokładnie to, co one przerywają.\n\nUczciwie: to najbardziej prawdopodobna przyczyna zrywania Android Auto, ale nie udowodniona. Pewne jest to, co te aplikacje robią. Wyłączenie jest odwracalne i dlatego warto spróbować.</string>
     <string name="bloat_preset_action">Wyłącz wszystkie (%1$d)</string>
-    <string name="bloat_unknown_title">Aplikacje producenta spoza tej listy: %1$d</string>
+    <plurals name="bloat_unknown_title">
+        <item quantity="one">Aplikacje producenta spoza tej listy: %1$d</item>
+        <item quantity="few">Aplikacje producenta spoza tej listy: %1$d</item>
+        <item quantity="many">Aplikacje producenta spoza tej listy: %1$d</item>
+        <item quantity="other">Aplikacje producenta spoza tej listy: %1$d</item>
+    </plurals>
     <string name="bloat_unknown_description">Każdy Titan 2 Elite jest dostarczany identycznie, więc te pochodzą z aktualizacji firmware wydanej po napisaniu tej listy — albo to nie jest Titan 2 Elite. Pokazane, nie ruszane: aplikacji, której nikt nie sprawdził, nie należy usuwać.</string>
     <string name="bloat_tier_safe">Narzędzia fabryczne</string>
     <string name="bloat_tier_safe_blurb">Aplikacje testowe i kalibracyjne pozostałe z linii produkcyjnej. Nic ich nie używa.</string>
@@ -954,7 +964,12 @@ Każdy klawisz można skonfigurować jako Keycode, Akcja, Native Ctrl lub Brak. 
     <string name="bloat_uninstall">Odinstaluj</string>
     <string name="bloat_restore">Przywróć</string>
     <string name="bloat_restore_all">Przywróć wszystkie</string>
-    <string name="bloat_restore_all_summary">Pakiety zmienione przez Plektra: %1$d</string>
+    <plurals name="bloat_restore_all_summary">
+        <item quantity="one">Pakiety zmienione przez Plektra: %1$d</item>
+        <item quantity="few">Pakiety zmienione przez Plektra: %1$d</item>
+        <item quantity="many">Pakiety zmienione przez Plektra: %1$d</item>
+        <item quantity="other">Pakiety zmienione przez Plektra: %1$d</item>
+    </plurals>
     <string name="bloat_uninstall_confirm_title">Odinstalować %1$s?</string>
     <string name="bloat_uninstall_confirm_message">Wyłączenie zwykle wystarcza: ukrywa aplikację, zatrzymuje ją i jest natychmiast odwracalne. Odinstalowanie usuwa ją dla tego użytkownika — Plektra nadal może ją przywrócić, bo aplikacja pozostaje w pamięci systemowej, ale aktualizacja firmware może ją przywrócić, a jeśli debugowanie bezprzewodowe będzie kiedyś niedostępne, nie cofniesz tego stąd.</string>
     <string name="fn_ctrl_map_title">Ustaw klawisz Fn jako Ctrl</string>

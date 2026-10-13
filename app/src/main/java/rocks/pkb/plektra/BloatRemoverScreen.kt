@@ -7,6 +7,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -207,7 +208,7 @@ fun BloatRemoverScreen(
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text(
-                            text = stringResource(R.string.bloat_restore_all_summary, journalCount),
+                            text = pluralStringResource(R.plurals.bloat_restore_all_summary, journalCount, journalCount),
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.weight(1f)
                         )
@@ -244,7 +245,7 @@ fun BloatRemoverScreen(
             if (unrecognised.isNotEmpty()) {
                 Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
                     Text(
-                        text = stringResource(R.string.bloat_unknown_title, unrecognised.size),
+                        text = pluralStringResource(R.plurals.bloat_unknown_title, unrecognised.size, unrecognised.size),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold
                     )
