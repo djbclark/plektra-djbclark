@@ -16,9 +16,10 @@ mkdir -p "$fast"
 mount -o loop,noatime "$img" "$fast"
 mkdir -p "$fast/ws" "$fast/gradle"
 cp -a "$GITHUB_WORKSPACE/." "$fast/ws/"
-# Each later step's shell starts with the directory under this mount as its cwd (Java, resolving
-# the path by name, sees the mount; a relative open() in bash or Python does not), so every later
-# run step must begin with `cd "$PWD"`.
+# Hyades runs every step in the job's initial cwd (SIPB's crun krun exec ignores the step's working
+# directory, and with it `working-directory:`), which is now the directory under this mount. Java,
+# resolving the path by name, sees the mount; a relative open() in bash or Python does not. So
+# every later run step must begin with `cd "$PWD"` (or cd to an absolute path).
 mount --bind "$fast/ws" "$GITHUB_WORKSPACE"
 echo "GRADLE_USER_HOME=$fast/gradle" >> "$GITHUB_ENV"
 df -hT "$GITHUB_WORKSPACE" "$fast"

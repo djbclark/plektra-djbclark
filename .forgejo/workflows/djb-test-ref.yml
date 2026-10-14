@@ -50,10 +50,11 @@ jobs:
 
       - name: Gradle ${{ inputs.tasks }}
         timeout-minutes: 90
-        working-directory: target
         env:
           TASKS: ${{ inputs.tasks }}
         run: |
-          cd "$PWD"
+          # Hyades ignores `working-directory:` (every step starts in the job's initial cwd).
+          cd "$GITHUB_WORKSPACE/target"
+          echo "building $(git rev-parse HEAD) in $(pwd -P)"
           # TASKS is split on spaces on purpose: it holds several tasks and flags.
           ./gradlew --init-script "$GITHUB_WORKSPACE/.forgejo/known-failures.gradle" $TASKS
