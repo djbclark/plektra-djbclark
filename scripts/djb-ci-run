@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# djb-ci-run — run Gradle for any branch or commit on forgejo.mit.edu, never on the Mac.
+#
+#   scripts/djb-ci-run [--no-wait] REF [GRADLE_ARGS...]
+#   scripts/djb-ci-run plk/pr-foo
+#   scripts/djb-ci-run plk/main :app:testStableDebugUnitTest --tests 'rocks.pkb.plektra.core.*'
+#
+# Fork-only (plk/base). A local branch REF is pushed to the `forgejo` remote first
+# (fast-forward only, never forced); any other REF must already be there. GRADLE_ARGS default
+# to :app:testStableDebugUnitTest. Dispatches .forgejo/workflows/djb-test-ref.yml, waits for
+# the run (every 30 s, up to DJB_CI_WAIT seconds, default 5400), saves the job log to
+# ~/.local/state/plektra-ci/run-<N>.log and prints its tail. Exit 0 = success, 1 = failure or
+# timeout. A run takes 10-20 minutes: start it in the background.
+set -euo pipefail
+
+repo=djbclark/plektra-djbclark
+scripts="${FORGEJO_SCRIPTS:-$HOME/src/djbclark-ade/skills/forgejo/scripts}"
+api="$scripts/forgejo-api"
+var=DJBCLARK_FORGEJO_MIT_EDU_TOKEN
+
+if [ $# -lt 1 ] || { [ "$1" = "--no-wait" ] && [ $# -lt 2 ]; }; then
+  gsed -n '2,13p' "$0" >&2
+  exit 2
+fi
+
+# One sudo-secretspec session for the dispatch and every poll.
+if [ -z "${!var:-}" ] && [ -z "${DJB_CI_REEXEC:-}" ]; then
+  DJB_CI_REEXEC=1 exec sudo-secretspec run --reason "dispatch a Plektra CI run" -- "$0" "$@"
+fi
+
+wait=1
+if [ "$1" = "--no-wait" ]; then
+  wait=0
+  shift
+fi
+ref=$1
+shift
+tasks="${*:-:app:testStableDebugUnitTest}"
+top=$(git rev-parse --show-toplevel)
+
+if git -C "$top" show-ref --verify --quiet "refs/heads/$ref"; then
+  "$scripts/git-forgejo" -C "$top" push forgejo "$ref"
+fi
+
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+jq -n --arg ref "$ref" --arg tasks "$tasks" \
+  '{ref: "plk/main", return_run_info: true, inputs: {ref: $ref, tasks: $tasks}}' > "$work/dispatch.json"
+[ -s "$work/dispatch.json" ]
+"$api" POST "/repos/$repo/actions/workflows/djb-test-ref.yml/dispatches" \
+  --data "@$work/dispatch.json" --yes > "$work/run.json"
+run_id=$(jq -r .id "$work/run.json")
+run_number=$(jq -r .run_number "$work/run.json")
+url="https://forgejo.mit.edu/$repo/actions/runs/$run_number"
+echo "dispatched run $run_number for $ref: $tasks"
+echo "$url"
+[ "$wait" = 1 ] || exit 0
+
+deadline=$(( $(date +%s) + ${DJB_CI_WAIT:-5400} ))
+while :; do
+  "$api" GET "/repos/$repo/actions/runs/$run_id" > "$work/status.json"
+  status=$(jq -r .status "$work/status.json")
+  case "$status" in
+    waiting|running|blocked|unknown) ;;
+    *) break ;;
+  esac
+  if [ "$(date +%s)" -ge "$deadline" ]; then
+    echo "djb-ci-run: run $run_number still $status after ${DJB_CI_WAIT:-5400} s: $url" >&2
+    exit 1
+  fi
+  sleep 30
+done
+
+logdir="$HOME/.local/state/plektra-ci"
+mkdir -p "$logdir"
+log="$logdir/run-$run_number.log"
+"$api" GET "/repos/$repo/actions/runs/$run_id/jobs" > "$work/jobs.json"
+job_id=$(jq -r '.[0].id' "$work/jobs.json")
+"$api" GET "/repos/$repo/actions/jobs/$job_id/logs" > "$log"
+grep -E 'FAILED|tests completed|BUILD (SUCCESSFUL|FAILED)' "$log" | tail -n 40 || true
+echo "run $run_number: $status ($url, log $log)"
+[ "$status" = success ]

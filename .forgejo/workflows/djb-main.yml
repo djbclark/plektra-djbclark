@@ -1,0 +1,60 @@
+name: Plektra djb build and release
+
+# Fork-only (plk/base): every push to plk/main runs the stable debug unit tests on SIPB's
+# Hyades runner, builds the "Plektra djb" APK (rocks.pkb.plektra.djb) and publishes it as a
+# Forgejo release; scripts/djb-install-latest installs it on the phone. Plektra is never built
+# on the Mac. Runner, image and shim: https://forgejo.mit.edu/djbclark/loopback-port-shim
+
+on:
+  push:
+    branches: ['plk/main']
+
+jobs:
+  build-release:
+    runs-on: ubuntu
+    container:
+      # ci-image-plektra: android-sdk 36, JDK 17, node 18, /usr/local/lib/portshim.so.
+      image: ghcr.io/djbclark/ci-image-plektra@sha256:90a5de59e4a7efaa70b4de6af3221023151a2087cfb2689cecfe18a6a1cf602e
+    env:
+      # The phone's installed app is signed by this debug key; any other key makes the update fail.
+      DJB_SIGNER_SHA256: 5ca8d5fcce4bad08206eb7e112b5c9d63b35b0a8874e3d25af48e8e332a9596a
+      APK: app/build/outputs/apk/stable/debug/app-stable-debug.apk
+
+    steps:
+      - name: Checkout
+        uses: https://github.com/actions/checkout@v4
+
+      - name: Loopback shim and debug signing key
+        env:
+          DJB_DEBUG_KEYSTORE_B64: ${{ secrets.DJB_DEBUG_KEYSTORE_B64 }}
+        run: |
+          set -euo pipefail
+          # libkrun TSI loopback bugs hang or flake okhttp MockWebServer tests without it.
+          echo /usr/local/lib/portshim.so >> /etc/ld.so.preload
+          keydir="${ANDROID_USER_HOME:-$HOME/.android}"
+          mkdir -p "$keydir"
+          printf '%s' "$DJB_DEBUG_KEYSTORE_B64" | base64 -d > "$keydir/debug.keystore"
+          [ -s "$keydir/debug.keystore" ]
+          chmod +x ./gradlew
+          java -version
+
+      - name: Test and assemble stable debug
+        timeout-minutes: 60
+        run: |
+          ./gradlew --init-script .forgejo/known-failures.gradle \
+            :app:testStableDebugUnitTest :app:assembleStableDebug
+
+      - name: Check the APK signer
+        run: |
+          set -euo pipefail
+          build_tools=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)
+          "$build_tools/apksigner" verify --print-certs "$APK" > /tmp/signer.txt
+          cat /tmp/signer.txt
+          grep -q "certificate SHA-256 digest: $DJB_SIGNER_SHA256" /tmp/signer.txt
+
+      - name: Publish the Forgejo release
+        env:
+          FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
+        run: |
+          export COMMIT_SUBJECT="$(git log -1 --format=%s)" SIGNER_SHA256="$DJB_SIGNER_SHA256"
+          python3 .forgejo/scripts/djb_release.py "$APK"

@@ -1,0 +1,53 @@
+name: Gradle on any ref
+
+# Fork-only (plk/base): run Gradle tasks on any branch or commit of this repository, including
+# upstream PR branches that carry no .forgejo/ directory. Dispatch it from the Actions page or
+# with scripts/djb-ci-run REF [GRADLE_ARGS...].
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch, tag or commit SHA to check out (must be pushed to this repository)"
+        required: true
+        type: string
+      tasks:
+        description: "Gradle tasks and arguments, split on spaces"
+        required: true
+        default: ":app:testStableDebugUnitTest"
+        type: string
+
+jobs:
+  gradle:
+    runs-on: ubuntu
+    container:
+      # ci-image-plektra: android-sdk 36, JDK 17, node 18, /usr/local/lib/portshim.so.
+      image: ghcr.io/djbclark/ci-image-plektra@sha256:90a5de59e4a7efaa70b4de6af3221023151a2087cfb2689cecfe18a6a1cf602e
+
+    steps:
+      - name: Checkout the workflow's own branch
+        uses: https://github.com/actions/checkout@v4
+
+      - name: Checkout ${{ inputs.ref }}
+        uses: https://github.com/actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          path: target
+
+      - name: Loopback shim
+        run: |
+          set -euo pipefail
+          # libkrun TSI loopback bugs hang or flake okhttp MockWebServer tests without it.
+          echo /usr/local/lib/portshim.so >> /etc/ld.so.preload
+          chmod +x target/gradlew
+          echo "ref ${{ inputs.ref }} is $(git -C target rev-parse HEAD)"
+          git -C target log -1 --format='%h %s'
+
+      - name: Gradle ${{ inputs.tasks }}
+        timeout-minutes: 90
+        working-directory: target
+        env:
+          TASKS: ${{ inputs.tasks }}
+        run: |
+          # TASKS is split on spaces on purpose: it holds several tasks and flags.
+          ./gradlew --init-script "$GITHUB_WORKSPACE/.forgejo/known-failures.gradle" $TASKS
