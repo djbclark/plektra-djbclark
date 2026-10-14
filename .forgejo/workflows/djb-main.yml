@@ -24,6 +24,9 @@ jobs:
       - name: Checkout
         uses: https://github.com/actions/checkout@v4
 
+      - name: Workspace and Gradle home on an ext4 loop image
+        run: bash .forgejo/scripts/fast-disk.sh
+
       - name: Loopback shim and debug signing key
         env:
           DJB_DEBUG_KEYSTORE_B64: ${{ secrets.DJB_DEBUG_KEYSTORE_B64 }}

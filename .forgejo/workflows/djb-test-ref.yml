@@ -34,6 +34,9 @@ jobs:
           ref: ${{ inputs.ref }}
           path: target
 
+      - name: Workspace and Gradle home on an ext4 loop image
+        run: bash .forgejo/scripts/fast-disk.sh
+
       - name: Loopback shim
         run: |
           set -euo pipefail
