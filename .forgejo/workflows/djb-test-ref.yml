@@ -40,6 +40,8 @@ jobs:
       - name: Loopback shim
         run: |
           set -euo pipefail
+          # The step's cwd is the directory hidden by fast-disk.sh's mount; re-enter it by name.
+          cd "$PWD"
           # libkrun TSI loopback bugs hang or flake okhttp MockWebServer tests without it.
           echo /usr/local/lib/portshim.so >> /etc/ld.so.preload
           chmod +x target/gradlew
@@ -52,5 +54,6 @@ jobs:
         env:
           TASKS: ${{ inputs.tasks }}
         run: |
+          cd "$PWD"
           # TASKS is split on spaces on purpose: it holds several tasks and flags.
           ./gradlew --init-script "$GITHUB_WORKSPACE/.forgejo/known-failures.gradle" $TASKS

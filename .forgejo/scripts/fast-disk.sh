@@ -16,7 +16,9 @@ mkdir -p "$fast"
 mount -o loop,noatime "$img" "$fast"
 mkdir -p "$fast/ws" "$fast/gradle"
 cp -a "$GITHUB_WORKSPACE/." "$fast/ws/"
-# Later steps start in $GITHUB_WORKSPACE, so they land on the loop image.
+# Each later step's shell starts with the directory under this mount as its cwd (Java, resolving
+# the path by name, sees the mount; a relative open() in bash or Python does not), so every later
+# run step must begin with `cd "$PWD"`.
 mount --bind "$fast/ws" "$GITHUB_WORKSPACE"
 echo "GRADLE_USER_HOME=$fast/gradle" >> "$GITHUB_ENV"
 df -hT "$GITHUB_WORKSPACE" "$fast"

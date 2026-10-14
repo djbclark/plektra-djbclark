@@ -32,6 +32,9 @@ jobs:
           DJB_DEBUG_KEYSTORE_B64: ${{ secrets.DJB_DEBUG_KEYSTORE_B64 }}
         run: |
           set -euo pipefail
+          # The step's cwd is the directory hidden by fast-disk.sh's mount; re-enter it by name.
+          echo "cwd on device $(stat -c %d .), workspace mount on $(stat -c %d "$PWD")"
+          cd "$PWD"
           # libkrun TSI loopback bugs hang or flake okhttp MockWebServer tests without it.
           echo /usr/local/lib/portshim.so >> /etc/ld.so.preload
           keydir="${ANDROID_USER_HOME:-$HOME/.android}"
@@ -44,12 +47,14 @@ jobs:
       - name: Test and assemble stable debug
         timeout-minutes: 60
         run: |
+          cd "$PWD"
           ./gradlew --init-script .forgejo/known-failures.gradle \
             :app:testStableDebugUnitTest :app:assembleStableDebug
 
       - name: Check the APK signer
         run: |
           set -euo pipefail
+          cd "$PWD"
           build_tools=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)
           "$build_tools/apksigner" verify --print-certs "$APK" > /tmp/signer.txt
           cat /tmp/signer.txt
@@ -59,5 +64,6 @@ jobs:
         env:
           FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
         run: |
+          cd "$PWD"
           export COMMIT_SUBJECT="$(git log -1 --format=%s)" SIGNER_SHA256="$DJB_SIGNER_SHA256"
           python3 .forgejo/scripts/djb_release.py "$APK"
