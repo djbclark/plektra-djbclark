@@ -3,7 +3,10 @@
 # Gradle home off the job's virtiofs root (small-file operations at 0.03-0.2x of a laptop) onto an
 # ext4 image on a loop device. Same commit, 2026-10-14: 458 s as-is, 393 s on a guest tmpfs, 324 s
 # on the loop image. Not /dev/shm (noexec: aapt2 would not run); not podman --tmpfs (served by the
-# host through the same virtiofs). Details: docs/comparison.md and docs/hyades-disk-research.md in
+# host through the same virtiofs). @xy (SIPB/hyades#2) recommends a guest tmpfs (CI RAM limit 64 GB);
+# keep the loop: it measured faster, and it does not pin the Gradle home in guest RAM. libkrun#924
+# (slp): the other transient-data option is virtio-blk; crun has no scratch-disk annotation yet.
+# Details: docs/comparison.md and docs/hyades-disk-research.md in
 # https://forgejo.mit.edu/djbclark/loopback-port-shim
 set -euo pipefail
 
