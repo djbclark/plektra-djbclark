@@ -57,4 +57,5 @@ jobs:
           cd "$GITHUB_WORKSPACE/target"
           echo "building $(git rev-parse HEAD) in $(pwd -P)"
           # TASKS is split on spaces on purpose: it holds several tasks and flags.
-          ./gradlew --init-script "$GITHUB_WORKSPACE/.forgejo/known-failures.gradle" $TASKS
+          ./gradlew --init-script "$GITHUB_WORKSPACE/.forgejo/known-failures.gradle" \
+            --init-script "$GITHUB_WORKSPACE/.forgejo/central-mirror.gradle" $TASKS

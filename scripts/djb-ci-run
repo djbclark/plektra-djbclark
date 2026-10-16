@@ -10,7 +10,8 @@
 # to :app:testStableDebugUnitTest. Dispatches .forgejo/workflows/djb-test-ref.yml, waits for
 # the run (every 30 s, up to DJB_CI_WAIT seconds, default 5400), saves the job log to
 # ~/.local/state/plektra-ci/run-<N>.log and prints its tail. Exit 0 = success, 1 = failure or
-# timeout. A run takes 10-20 minutes: start it in the background.
+# timeout. A run takes 10-20 minutes: start it in the background. Start at most about 4 at once:
+# Hyades jobs share one address, and a burst of 13+ got Maven Central 429s for hours (2026-10-16).
 set -euo pipefail
 
 repo=djbclark/plektra-djbclark
@@ -19,7 +20,7 @@ api="$scripts/forgejo-api"
 var=DJBCLARK_FORGEJO_MIT_EDU_TOKEN
 
 if [ $# -lt 1 ] || { [ "$1" = "--no-wait" ] && [ $# -lt 2 ]; }; then
-  gsed -n '2,13p' "$0" >&2
+  gsed -n '2,14p' "$0" >&2
   exit 2
 fi
 
