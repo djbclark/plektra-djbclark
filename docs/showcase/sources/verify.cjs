@@ -13,6 +13,10 @@ const {createHash}=require('node:crypto');
   const dir=path.join(root,'exports',channel,format),files=fs.readdirSync(dir).filter(n=>n.endsWith('.png'));assert.equal(files.length,21);
   for(const file of files){const p=path.join(dir,file),m=await sharp(p).metadata();assert.equal(m.width,format==='landscape'?1920:1080);assert.equal(m.height,format==='landscape'?1080:1920);const rgb=await sharp(p).extract({left:0,top:0,width:1,height:1}).removeAlpha().raw().toBuffer();assert.deepEqual([...rgb],channel==='nightly'?[207,221,231]:[244,241,233]);}
  }
+ for(const channel of ['stable','nightly']){
+  const files=fs.readdirSync(path.join(root,'exports',channel,'visuals')).filter(f=>f.endsWith('.png'));assert.equal(files.length,21);
+  for(const file of files){const m=await sharp(path.join(root,'exports',channel,'visuals',file)).metadata();assert.equal(m.width,1100);assert.equal(m.height,830);}
+ }
  for(const name of ['r6-config-full','r5-config-suggestions','r5-config-leds','r5-slim']){
   const cropFile=assets.find(p=>p.includes('/titan-2-elite-'+name+'-bar-')),
    crop=await sharp(path.join(root,cropFile)).ensureAlpha().raw().toBuffer({resolveWithObject:true}),

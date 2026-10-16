@@ -6,6 +6,7 @@ import android.view.KeyEvent
 import android.view.inputmethod.ExtractedText
 import android.view.inputmethod.InputConnection
 import rocks.pkb.plektra.SettingsManager
+import rocks.pkb.plektra.data.layout.LayoutMappingRepository
 import rocks.pkb.plektra.core.DeferredPunctuationSpaceTracker
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -425,32 +426,6 @@ class AlternateCharacterManagerTest {
     }
 
     @Test
-    fun shiftLongPress_autoCapitalizedLetterTogglesToLowercase() {
-        val recorder = RecordingInputConnection()
-        val inputConnection = recorder.asProxy()
-        val manager = cycleManager(first = "shift", next = "off", end = "stop")
-
-        // Auto-capitalization arrives as a one-shot Shift on the typed letter.
-        pressT(manager, inputConnection, shiftOneShot = true)
-        assertEquals("T", recorder.text)
-        idle(60)
-        assertEquals("t", recorder.text)
-        idle(500)
-        assertEquals("t", recorder.text)
-    }
-
-    @Test
-    fun shiftLongPress_lowercaseLetterStillGivesUppercase() {
-        val recorder = RecordingInputConnection()
-        val inputConnection = recorder.asProxy()
-        val manager = cycleManager(first = "shift", next = "off", end = "stop")
-
-        pressT(manager, inputConnection)
-        idle(60)
-        assertEquals("T", recorder.text)
-    }
-
-    @Test
     fun variationsLongPress_replacesFirstCharacterUsingComposingRegion() {
         val recorder = RecordingInputConnection()
         val inputConnection = recorder.asProxy()
@@ -619,6 +594,75 @@ class AlternateCharacterManagerTest {
         assertTrue(handled)
         assertTrue(requested.isEmpty())
         assertEquals("l'", recorder.text)
+    }
+
+    @Test
+    fun shiftLongPress_autoCapitalizedLetterTogglesToLowercase() {
+        val recorder = RecordingInputConnection()
+        val inputConnection = recorder.asProxy()
+        val manager = cycleManager(first = "shift", next = "off", end = "stop")
+
+        // Auto-capitalization arrives as a one-shot Shift on the typed letter.
+        pressT(manager, inputConnection, shiftOneShot = true)
+        assertEquals("T", recorder.text)
+        idle(60)
+        assertEquals("t", recorder.text)
+        idle(500)
+        assertEquals("t", recorder.text)
+    }
+
+    @Test
+    fun shiftLongPress_lowercaseLetterStillGivesUppercase() {
+        val recorder = RecordingInputConnection()
+        val inputConnection = recorder.asProxy()
+        val manager = cycleManager(first = "shift", next = "off", end = "stop")
+
+        pressT(manager, inputConnection)
+        idle(60)
+        assertEquals("T", recorder.text)
+    }
+
+
+    @Test
+    fun shiftLongPress_togglesGermanMultiTapCharactersWithoutChangingTheLetter() {
+        assertMultiTapCasePairs("german_multitap_qwertz", listOf(
+            Triple(KeyEvent.KEYCODE_A, "ä", "Ä"),
+            Triple(KeyEvent.KEYCODE_O, "ö", "Ö"),
+            Triple(KeyEvent.KEYCODE_U, "ü", "Ü"),
+            Triple(KeyEvent.KEYCODE_S, "ß", "ẞ")
+        ))
+    }
+
+    @Test
+    fun shiftLongPress_preservesTurkishMultiTapCasePairs() {
+        assertMultiTapCasePairs("turkish_multitap", listOf(
+            Triple(KeyEvent.KEYCODE_I, "i", "İ"),
+            Triple(KeyEvent.KEYCODE_I, "ı", "I"),
+            Triple(KeyEvent.KEYCODE_I, "î", "Î"),
+            Triple(KeyEvent.KEYCODE_S, "ş", "Ş")
+        ))
+    }
+
+    private fun assertMultiTapCasePairs(layoutName: String, pairs: List<Triple<Int, String, String>>) {
+        val previousLayout = LayoutMappingRepository.getLayout()
+        try {
+            LayoutMappingRepository.loadLayout(context.assets, layoutName, context)
+            SettingsManager.setLongPressModifier(context, "shift")
+            for ((keyCode, lower, upper) in pairs) {
+                for ((typed, expected) in listOf(lower to upper, upper to lower)) {
+                    val recorder = RecordingInputConnection()
+                    val inputConnection = recorder.asProxy()
+                    val manager = AlternateCharacterManager(context.assets, prefs, context)
+                    inputConnection.commitText(typed, 1)
+                    manager.scheduleLongPressOnly(keyCode, inputConnection, typed)
+                    shadowOf(Looper.getMainLooper()).idleFor(60, TimeUnit.MILLISECONDS)
+                    assertEquals("$layoutName: $typed", expected, recorder.text)
+                    manager.handleKeyUp(keyCode, symKeyActive = false)
+                }
+            }
+        } finally {
+            LayoutMappingRepository.setLayout(previousLayout)
+        }
     }
 
     private class RecordingInputConnection(

@@ -11,6 +11,7 @@ import android.view.inputmethod.ExtractedTextRequest
 import android.view.inputmethod.InputConnection
 import rocks.pkb.plektra.SettingsManager
 import rocks.pkb.plektra.data.layout.LayoutMappingRepository
+import rocks.pkb.plektra.data.layout.isRealMultiTap
 import rocks.pkb.plektra.data.mappings.KeyMappingLoader
 import rocks.pkb.plektra.data.mappings.AltModifierMappingResolver
 import rocks.pkb.plektra.data.mappings.DeviceSymMappingRepository
@@ -426,10 +427,16 @@ class AlternateCharacterManager(
      */
     private fun resolveShiftLongPressText(keyCode: Int, typedText: String?): String? {
         if (LayoutMappingRepository.isMapped(keyCode)) {
-            val upper = LayoutMappingRepository.getUppercase(keyCode) ?: return null
+            val mapping = LayoutMappingRepository.getMapping(keyCode) ?: return null
+            val tap = if (mapping.isRealMultiTap) {
+                mapping.taps.firstOrNull { typedText == it.lowercase || typedText == it.uppercase }
+            } else {
+                null
+            }
+            val upper = tap?.uppercase ?: mapping.uppercase
             if (typedText != null && typedText == upper) {
-                val lower = LayoutMappingRepository.getLowercase(keyCode)
-                    ?.takeIf { it.isNotEmpty() && it != upper }
+                val lower = (tap?.lowercase ?: mapping.lowercase)
+                    .takeIf { it.isNotEmpty() && it != upper }
                     ?: upper.lowercase().takeIf { it != upper }
                 if (lower != null) return lower
             }

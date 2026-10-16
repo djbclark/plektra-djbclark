@@ -145,9 +145,9 @@ async function contents(card,box,portrait){
    const n=card.items.length,gap=portrait?28:32,cell=(w-gap*(n-1))/n;
    for(let i=0;i<n;i++){const p=await frame(card.items[i]);out+=await fit(p,x+i*(cell+gap),y,cell,h-55);out+=text(card.items[i][2],x+i*(cell+gap)+cell/2,y+h-12,portrait?25:26,'#565B60',400,'middle');}
  }else if(card.layout==='frame-crop'){
-   const item=card.items[0],p=await frame(item),cp=await crop(item,card.id==='08-snippet-selection'?'snippet':card.id==='13-selection'?'context':'bar');
-   if(portrait){out+=await fit(p,x+110,y,w-220,h*.64);out+=text(item[2],x,y+h*.71,27);out+=await fit(cp,x,y+h*.73,w,h*.27);}
-   else{out+=await fit(p,x,y,w*.44,h);let cm=await dimensions(cp),ih=Math.min(h*.58,w*.51*cm.height/cm.width),iy=y+(h-ih)/2;out+=text(item[2],x+w*.49,iy-28,26);out+=await fit(cp,x+w*.49,iy,w*.51,ih);}
+   const item=card.items[0],label=card.title.join(' ').toLowerCase()===item[2].toLowerCase()?'':item[2],p=await frame(item),cp=await crop(item,card.id==='08-snippet-selection'?'snippet':card.id==='13-selection'?'context':'bar');
+   if(portrait){out+=await fit(p,x+110,y,w-220,h*.64);out+=text(label,x,y+h*.71,27);out+=await fit(cp,x,y+h*.73,w,h*.27);}
+   else{out+=await fit(p,x,y,w*.44,h);let cm=await dimensions(cp),ih=Math.min(h*.58,w*.51*cm.height/cm.width),iy=y+(h-ih)/2;out+=text(label,x+w*.49,iy-28,26);out+=await fit(cp,x+w*.49,iy,w*.51,ih);}
  }else if(card.layout==='bar-configs'){
    // Every row shares one width and scale, the screen bottom as bottom edge, and the same gap below each row.
    const shots=[];for(const item of card.items)shots.push(item[1].endsWith('hidden')?null:await crop(item));
@@ -187,7 +187,13 @@ async function contents(card,box,portrait){
        bodyLines.forEach((s,i)=>body+=text(s,portrait?72:76,by+i*43,portrait?29:28,'#535960'));
        const bodyEnd=by+(bodyLines.length-1)*43;
        body+=`<rect x="${portrait?72:76}" y="${bodyEnd+28}" width="64" height="5" fill="${accent}"/>`;
-       const box=portrait?[72,bodyEnd+65,936,H-(bodyEnd+65)-175]:[794,148,1048,790];body+=await contents(card,box,portrait);
+       const box=portrait?[72,bodyEnd+65,936,H-(bodyEnd+65)-175]:[794,148,1048,790];const artwork=await contents(card,box,portrait);body+=artwork;
+       if(!portrait){
+         const visualDir=path.join(root,'exports',channel,'visuals');fs.mkdirSync(visualDir,{recursive:true});
+         const visual=`<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="830" viewBox="770 130 1100 830"><rect x="770" y="130" width="1100" height="830" fill="${channel==='nightly'?'#CFDDE7':'#F4F1E9'}"/>${artwork}</svg>`;
+         const visualPath=path.join(visualDir,card.id+'.svg');fs.writeFileSync(visualPath,visual);
+         execFileSync('rsvg-convert',['-o',path.join(visualDir,card.id+'.png'),visualPath]);
+       }
        body+=text('Open source software under GPLv3',portrait?72:76,H-(portrait?94:55),portrait?25:25,'#535960');
        const gx=portrait?72:1460,gy=H-(portrait?65:82);
        body+=image(path.join(__dirname,'github.svg'),gx,gy,30,30)+text('pkb-rocks/plektra',gx+44,gy+25,portrait?27:27,'#292B2C',500);

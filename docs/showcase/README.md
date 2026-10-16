@@ -16,11 +16,11 @@ npm --prefix docs/showcase run render
 npm --prefix docs/showcase run verify
 ```
 
-`render` creates all 21 images for both channels in landscape and portrait formats, plus SVGs and contact sheets. Landscape PNGs are the canonical gallery files. Portrait images, SVGs, crops, composed frames and contact sheets are ignored build outputs. Rendering does not create PDFs.
+`render` creates all 21 images for both channels in landscape and portrait formats, plus SVGs and contact sheets. Visual-only PNGs are embedded in the READMEs; landscape PNGs remain the complete presentation slides. Portrait images, SVGs, crops, composed frames and contact sheets are ignored build outputs. Rendering does not create PDFs.
 
 The renderer uses the recorded inputs under `raw/`, processed frames and display geometry under `frames/`, the presentation catalog under `sources/`, and branding from `../branding/`. It does not connect to a device. Private capture-session backups and original full photographs stay local.
 
-The verifier checks all 84 image dimensions and channel backgrounds, checks native transparent exports and retained foreground colors, and checks that the Titan 2 Elite frame retains the captured bottom LEDs. These checks validate the presentation, not device behavior.
+The verifier checks all 84 slide dimensions and channel backgrounds, plus 42 visual-only exports, checks native transparent exports and retained foreground colors, and checks that the Titan 2 Elite frame retains the captured bottom LEDs. These checks validate the presentation, not device behavior.
 
 Capture versions and source hashes are in [provenance.json](provenance.json). Input and published-image hashes are in [checksums.json](checksums.json). The processed frames retain photographic hardware and key lettering; no generated hardware or reconstructed key legends are used.
 
@@ -30,127 +30,127 @@ Capture versions and source hashes are in [provenance.json](provenance.json). In
 
 Free software under GPLv3, with source code you can inspect, modify and share.
 
-![Advanced (hardware) keyboard control on Android](exports/stable/landscape/01-devices.png)
+![Advanced (hardware) keyboard control on Android](exports/stable/visuals/01-devices.png)
 
 ### Modular toolbar configuration
 
 Configure suggestions, character variations and menu buttons independently.
 
-![Modular toolbar configuration](exports/stable/landscape/02-keyboard-bar.png)
+![Modular toolbar configuration](exports/stable/visuals/02-keyboard-bar.png)
 
 ### Adjustable interface density
 
 Choose a full bar, compact controls, a modifier LED strip or a hidden bar.
 
-![Adjustable interface density](exports/stable/landscape/03-bar-configurations.png)
+![Adjustable interface density](exports/stable/visuals/03-bar-configurations.png)
 
 ### Dual profiles: Normal and Slim
 
 Configure Normal and Slim independently, then switch between the two profiles.
 
-![Dual profiles: Normal and Slim](exports/stable/landscape/04-slim-profile.png)
+![Dual profiles: Normal and Slim](exports/stable/visuals/04-slim-profile.png)
 
 ### Flexible toolbar layouts
 
 Place suggestions and actions in a shared row or arrange them in stacked rows.
 
-![Flexible toolbar layouts](exports/stable/landscape/05-shared-row.png)
+![Flexible toolbar layouts](exports/stable/visuals/05-shared-row.png)
 
 ### Predictive text and completions
 
 Complete words from suggestions as you type. Dictionaries and locally learned next words are supported.
 
-![Predictive text and completions](exports/stable/landscape/06-suggestions.png)
+![Predictive text and completions](exports/stable/visuals/06-suggestions.png)
 
 ### Contextual character variations
 
 Select accented letters and symbols from the variations for the current character.
 
-![Contextual character variations](exports/stable/landscape/07-variations.png)
+![Contextual character variations](exports/stable/visuals/07-variations.png)
 
 ### Expandable text snippets & templates
 
 Save reusable text such as addresses, email addresses and dates. Find snippets with a short prefix.
 
-![Expandable text snippets & templates](exports/stable/landscape/08-snippet-selection.png)
+![Expandable text snippets & templates](exports/stable/visuals/08-snippet-selection.png)
 
 ### Text shortcut expansion
 
 Expand a snippet shortcut into its saved text.
 
-![Text shortcut expansion](exports/stable/landscape/09-snippet-result.png)
+![Text shortcut expansion](exports/stable/visuals/09-snippet-result.png)
 
 ### Direct SYM layer mapping
 
 Open SYM pages and enter symbols using the corresponding physical keys.
 
-![Direct SYM layer mapping](exports/stable/landscape/10-symbols.png)
+![Direct SYM layer mapping](exports/stable/visuals/10-symbols.png)
 
 ### Integrated, low-profile emoji picker
 
 Browse and insert emoji from the keyboard.
 
-![Integrated, low-profile emoji picker](exports/stable/landscape/11-emoji.png)
+![Integrated, low-profile emoji picker](exports/stable/visuals/11-emoji.png)
 
 ### Integrated clipboard manager
 
 Browse clipboard history and insert a saved entry.
 
-![Integrated clipboard manager](exports/stable/landscape/12-clipboard.png)
+![Integrated clipboard manager](exports/stable/visuals/12-clipboard.png)
 
 ### Keyboard text selection
 
 Select text using physical keyboard controls.
 
-![Keyboard text selection](exports/stable/landscape/13-selection.png)
+![Keyboard text selection](exports/stable/visuals/13-selection.png)
 
 ### Live modifier state indicators
 
 See active and locked modifiers in the keyboard bar or Android status bar.
 
-![Live modifier state indicators](exports/stable/landscape/14-modifiers.png)
+![Live modifier state indicators](exports/stable/visuals/14-modifiers.png)
 
 ### Nine built-in interface themes
 
 Choose from nine built-in keyboard bar themes.
 
-![Nine built-in interface themes](exports/stable/landscape/15-hardware-themes.png)
+![Nine built-in interface themes](exports/stable/visuals/15-hardware-themes.png)
 
 ### Standalone software keyboard mode
 
 Use the software keyboard on phones without physical keys, with suggestions, symbols and snippets.
 
-![Standalone software keyboard mode](exports/stable/landscape/16-software-keyboard.png)
+![Standalone software keyboard mode](exports/stable/visuals/16-software-keyboard.png)
 
 ### Native QWERTY, AZERTY and QWERTZ support
 
 Select QWERTY, AZERTY or QWERTZ, including German umlauts.
 
-![Native QWERTY, AZERTY and QWERTZ support](exports/stable/landscape/17-layouts.png)
+![Native QWERTY, AZERTY and QWERTZ support](exports/stable/visuals/17-layouts.png)
 
 ### High-contrast mode for improved visibility
 
 Use a high-contrast theme with clear key outlines and distinct modifier indicators.
 
-![High-contrast mode for improved visibility](exports/stable/landscape/18-high-contrast.png)
+![High-contrast mode for improved visibility](exports/stable/visuals/18-high-contrast.png)
 
 ### Long-press secondary characters
 
 Long-press a software key to select its secondary characters.
 
-![Long-press secondary characters](exports/stable/landscape/19-key-popup.png)
+![Long-press secondary characters](exports/stable/visuals/19-key-popup.png)
 
 ### Ortholinear and staggered key geometries
 
 Choose ortholinear or staggered rows for the software keyboard.
 
-![Ortholinear and staggered key geometries](exports/stable/landscape/20-key-arrangement.png)
+![Ortholinear and staggered key geometries](exports/stable/visuals/20-key-arrangement.png)
 
 ### Terminal-style Ctrl navigation and selection
 
 Use Ctrl shortcuts to move the cursor, select text, copy and paste.
 
-![Terminal-style Ctrl navigation and selection](exports/stable/landscape/21-ctrl-navigation.png)
+![Terminal-style Ctrl navigation and selection](exports/stable/visuals/21-ctrl-navigation.png)
 
 ## Nightly gallery
 
@@ -158,127 +158,127 @@ Use Ctrl shortcuts to move the cursor, select text, copy and paste.
 
 Free software under GPLv3, with source code you can inspect, modify and share.
 
-![Advanced (hardware) keyboard control on Android](exports/nightly/landscape/01-devices.png)
+![Advanced (hardware) keyboard control on Android](exports/nightly/visuals/01-devices.png)
 
 ### Modular toolbar configuration
 
 Configure suggestions, character variations and menu buttons independently.
 
-![Modular toolbar configuration](exports/nightly/landscape/02-keyboard-bar.png)
+![Modular toolbar configuration](exports/nightly/visuals/02-keyboard-bar.png)
 
 ### Adjustable interface density
 
 Choose a full bar, compact controls, a modifier LED strip or a hidden bar.
 
-![Adjustable interface density](exports/nightly/landscape/03-bar-configurations.png)
+![Adjustable interface density](exports/nightly/visuals/03-bar-configurations.png)
 
 ### Dual profiles: Normal and Slim
 
 Configure Normal and Slim independently, then switch between the two profiles.
 
-![Dual profiles: Normal and Slim](exports/nightly/landscape/04-slim-profile.png)
+![Dual profiles: Normal and Slim](exports/nightly/visuals/04-slim-profile.png)
 
 ### Flexible toolbar layouts
 
 Place suggestions and actions in a shared row or arrange them in stacked rows.
 
-![Flexible toolbar layouts](exports/nightly/landscape/05-shared-row.png)
+![Flexible toolbar layouts](exports/nightly/visuals/05-shared-row.png)
 
 ### Predictive text and completions
 
 Complete words from suggestions as you type. Dictionaries and locally learned next words are supported.
 
-![Predictive text and completions](exports/nightly/landscape/06-suggestions.png)
+![Predictive text and completions](exports/nightly/visuals/06-suggestions.png)
 
 ### Contextual character variations
 
 Select accented letters and symbols from the variations for the current character.
 
-![Contextual character variations](exports/nightly/landscape/07-variations.png)
+![Contextual character variations](exports/nightly/visuals/07-variations.png)
 
 ### Expandable text snippets & templates
 
 Save reusable text such as addresses, email addresses and dates. Find snippets with a short prefix.
 
-![Expandable text snippets & templates](exports/nightly/landscape/08-snippet-selection.png)
+![Expandable text snippets & templates](exports/nightly/visuals/08-snippet-selection.png)
 
 ### Text shortcut expansion
 
 Expand a snippet shortcut into its saved text.
 
-![Text shortcut expansion](exports/nightly/landscape/09-snippet-result.png)
+![Text shortcut expansion](exports/nightly/visuals/09-snippet-result.png)
 
 ### Direct SYM layer mapping
 
 Open SYM pages and enter symbols using the corresponding physical keys.
 
-![Direct SYM layer mapping](exports/nightly/landscape/10-symbols.png)
+![Direct SYM layer mapping](exports/nightly/visuals/10-symbols.png)
 
 ### Integrated, low-profile emoji picker
 
 Browse and insert emoji from the keyboard.
 
-![Integrated, low-profile emoji picker](exports/nightly/landscape/11-emoji.png)
+![Integrated, low-profile emoji picker](exports/nightly/visuals/11-emoji.png)
 
 ### Integrated clipboard manager
 
 Browse clipboard history and insert a saved entry.
 
-![Integrated clipboard manager](exports/nightly/landscape/12-clipboard.png)
+![Integrated clipboard manager](exports/nightly/visuals/12-clipboard.png)
 
 ### Keyboard text selection
 
 Select text using physical keyboard controls.
 
-![Keyboard text selection](exports/nightly/landscape/13-selection.png)
+![Keyboard text selection](exports/nightly/visuals/13-selection.png)
 
 ### Live modifier state indicators
 
 See active and locked modifiers in the keyboard bar or Android status bar.
 
-![Live modifier state indicators](exports/nightly/landscape/14-modifiers.png)
+![Live modifier state indicators](exports/nightly/visuals/14-modifiers.png)
 
 ### Nine built-in interface themes
 
 Choose from nine built-in keyboard bar themes.
 
-![Nine built-in interface themes](exports/nightly/landscape/15-hardware-themes.png)
+![Nine built-in interface themes](exports/nightly/visuals/15-hardware-themes.png)
 
 ### Standalone software keyboard mode
 
 Use the software keyboard on phones without physical keys, with suggestions, symbols and snippets.
 
-![Standalone software keyboard mode](exports/nightly/landscape/16-software-keyboard.png)
+![Standalone software keyboard mode](exports/nightly/visuals/16-software-keyboard.png)
 
 ### Native QWERTY, AZERTY and QWERTZ support
 
 Select QWERTY, AZERTY or QWERTZ, including German umlauts.
 
-![Native QWERTY, AZERTY and QWERTZ support](exports/nightly/landscape/17-layouts.png)
+![Native QWERTY, AZERTY and QWERTZ support](exports/nightly/visuals/17-layouts.png)
 
 ### High-contrast mode for improved visibility
 
 Use a high-contrast theme with clear key outlines and distinct modifier indicators.
 
-![High-contrast mode for improved visibility](exports/nightly/landscape/18-high-contrast.png)
+![High-contrast mode for improved visibility](exports/nightly/visuals/18-high-contrast.png)
 
 ### Long-press secondary characters
 
 Long-press a software key to select its secondary characters.
 
-![Long-press secondary characters](exports/nightly/landscape/19-key-popup.png)
+![Long-press secondary characters](exports/nightly/visuals/19-key-popup.png)
 
 ### Ortholinear and staggered key geometries
 
 Choose ortholinear or staggered rows for the software keyboard.
 
-![Ortholinear and staggered key geometries](exports/nightly/landscape/20-key-arrangement.png)
+![Ortholinear and staggered key geometries](exports/nightly/visuals/20-key-arrangement.png)
 
 ### Terminal-style Ctrl navigation and selection
 
 Use Ctrl shortcuts to move the cursor, select text, copy and paste.
 
-![Terminal-style Ctrl navigation and selection](exports/nightly/landscape/21-ctrl-navigation.png)
+![Terminal-style Ctrl navigation and selection](exports/nightly/visuals/21-ctrl-navigation.png)
 
 ## Capture new screenshots
 
