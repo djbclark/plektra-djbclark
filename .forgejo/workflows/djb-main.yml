@@ -49,6 +49,7 @@ jobs:
         run: |
           cd "$PWD"
           ./gradlew --init-script .forgejo/known-failures.gradle \
+            --init-script .forgejo/central-mirror.gradle \
             :app:testStableDebugUnitTest :app:assembleStableDebug
 
       - name: Check the APK signer
