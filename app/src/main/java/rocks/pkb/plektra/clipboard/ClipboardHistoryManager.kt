@@ -48,6 +48,7 @@ class ClipboardHistoryManager internal constructor(
         }
         override fun onHistoryLoaded() {
             externalHistoryListener?.onHistoryLoaded()
+            notifyHistoryChanged()
         }
     }
     private fun notifyHistoryChanged() = historyChangeListeners.forEach { it() }
@@ -134,8 +135,12 @@ class ClipboardHistoryManager internal constructor(
     fun canRemove(index: Int) = isHistoryAccessible() && dao?.isPinned(index) == false
 
     fun removeEntry(index: Int, force: Boolean = false) {
-        if (!isHistoryAccessible()) return
         val entry = getHistoryEntry(index) ?: return
+        removeEntryById(entry.id, force)
+    }
+
+    fun removeEntryById(id: Long, force: Boolean = false) {
+        val entry = getHistoryEntryContent(id) ?: return
 
         // For UX: allow deleting pinned entries when explicitly requested (force=true)
         if (entry.isPinned && !force) return
@@ -229,12 +234,7 @@ class ClipboardHistoryManager internal constructor(
                 toggleClipPinned(entry.id)
             }
             setOnDeleteClickListener { entry ->
-                val index = getHistoryEntry(0)?.let {
-                    (0 until getHistorySize()).find { idx ->
-                        getHistoryEntry(idx)?.id == entry.id
-                    }
-                }
-                index?.let { removeEntry(it, force = true) }
+                removeEntryById(entry.id, force = true)
             }
             setOnClearAllClickListener {
                 clearHistory()

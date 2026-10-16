@@ -6,6 +6,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
@@ -17,7 +18,10 @@ import java.util.concurrent.atomic.AtomicLong
  * thread (guarded by its own lock); every SQLite touch, including the initial load, runs
  * on [dbExecutor] so the clipboard listener never blocks the IME main thread.
  */
-class ClipboardDao internal constructor(private val db: ClipboardDatabase) {
+class ClipboardDao @VisibleForTesting internal constructor(
+    private val db: ClipboardDatabase,
+    private val beforeLoadMerge: (() -> Unit)? = null
+) {
 
     interface Listener {
         fun onClipInserted(position: Int)
@@ -30,8 +34,7 @@ class ClipboardDao internal constructor(private val db: ClipboardDatabase) {
     @Volatile
     var listener: Listener? = null
 
-    // All of the following are guarded by the cache lock: clearOldClips can run on the main
-    // thread and the database thread.
+    // Guarded by the cache lock: main-thread expiry sweeps share this state with the load.
     private var lastClearOldClips = 0L
     private var nextExpiry = 0L
     private var lastRetention: Pair<Long, Long>? = null
@@ -42,14 +45,33 @@ class ClipboardDao internal constructor(private val db: ClipboardDatabase) {
     // before that point still owes the rows the load brings in.
     private enum class ClearedBeforeLoad { NONE, NON_PINNED, ALL }
     private var loaded = false
+    private var loadQueued = false
+    private val deletedBeforeLoad = mutableSetOf<String>()
+    private val pinnedAtClear = mutableSetOf<Long>()
     private var clearedBeforeLoad = ClearedBeforeLoad.NONE
 
     init {
-        dbExecutor.execute { loadFromDb() }
+        requestLoad()
+    }
+
+    private fun requestLoad() {
+        synchronized(cache) {
+            if (loaded || loadQueued) return
+            loadQueued = true
+        }
+        dbExecutor.execute {
+            try {
+                loadFromDb()
+            } finally {
+                // A failed load can be retried on the next read or copy.
+                synchronized(cache) { loadQueued = false }
+            }
+        }
     }
 
     private fun loadFromDb() {
         val stored = mutableListOf<ClipboardHistoryEntry>()
+        val superseded = mutableSetOf<Long>()
         db.readableDatabase.query(
             TABLE,
             arrayOf(COLUMN_ID, COLUMN_TIMESTAMP, COLUMN_PINNED, COLUMN_TEXT, COLUMN_SENSITIVE),
@@ -60,6 +82,10 @@ class ClipboardDao internal constructor(private val db: ClipboardDatabase) {
             "$COLUMN_PINNED DESC, $COLUMN_TIMESTAMP DESC"
         ).use {
             while (it.moveToNext()) {
+                if (it.isNull(3)) {
+                    superseded.add(it.getLong(0))
+                    continue
+                }
                 stored.add(
                     ClipboardHistoryEntry(
                         it.getLong(0),
@@ -71,38 +97,61 @@ class ClipboardDao internal constructor(private val db: ClipboardDatabase) {
                 )
             }
         }
-        // A clip copied before the load finished is already in the cache and queued for
-        // insert behind us, so the row from the previous session would be a duplicate. The
-        // cached entry keeps the stronger of both flags (a stored secret must stay sensitive
-        // however the same text was copied since) and its queued insert writes that state.
-        val superseded = mutableListOf<Long>()
+        beforeLoadMerge?.invoke()
+        val merged = mutableMapOf<Long, ClipboardHistoryEntry>()
         synchronized(cache) {
             for (entry in stored) {
-                // Rows a clear issued before the load already removed on disk (its delete is
-                // queued behind this task) must not reappear in the cache.
-                when (clearedBeforeLoad) {
-                    ClearedBeforeLoad.ALL -> continue
-                    ClearedBeforeLoad.NON_PINNED -> if (!entry.isPinned) continue
-                    ClearedBeforeLoad.NONE -> {}
-                }
                 val current = cache.firstOrNull { it.text == entry.text }
-                if (current == null) {
-                    cache.add(entry)
-                } else {
+                // A retry can see a row already inserted or merged by this DAO.
+                if (current?.rowId == entry.id) {
+                    merged[current.rowId] = current
+                    continue
+                }
+                if (entry.text in deletedBeforeLoad || clearedBeforeLoad == ClearedBeforeLoad.ALL) {
+                    superseded.add(entry.id)
+                    continue
+                }
+                if (current != null) {
+                    // Merge protection before applying a pre-load clear, even for skipped rows.
                     current.isSensitive = current.isSensitive || entry.isSensitive
                     current.isPinned = (current.isPinned || entry.isPinned) && !current.isSensitive
                     current.timeStamp = maxOf(current.timeStamp, entry.timeStamp)
                     superseded.add(entry.id)
+                    if (current.rowId != PENDING_ID) merged[current.rowId] = current
+                } else if (clearedBeforeLoad == ClearedBeforeLoad.NON_PINNED && !entry.isPinned) {
+                    superseded.add(entry.id)
+                } else {
+                    cache.add(entry)
+                    if (clearedBeforeLoad == ClearedBeforeLoad.NON_PINNED) pinnedAtClear.add(entry.id)
+                }
+            }
+            // Clear all kept these entries only because their stored sensitivity was unknown.
+            cache.removeAll { entry ->
+                (entry.id in pinnedAtClear && !entry.isPinned).also { remove ->
+                    if (remove && entry.rowId != PENDING_ID) superseded.add(entry.rowId)
                 }
             }
             cache.sort()
+        }
+        val database = db.writableDatabase
+        database.beginTransaction()
+        try {
+            merged.values.forEach { writeState(it) }
+            superseded.forEach { database.delete(TABLE, "$COLUMN_ID = ?", arrayOf(it.toString())) }
+            database.setTransactionSuccessful()
+        } finally {
+            database.endTransaction()
+        }
+        synchronized(cache) {
             loaded = true
+            deletedBeforeLoad.clear()
+            pinnedAtClear.clear()
+            clearedBeforeLoad = ClearedBeforeLoad.NONE
             // Expiry bookkeeping computed while the cache was incomplete is void.
             nextExpiry = 0L
             lastRetention = null
             lastClearOldClips = 0L
         }
-        superseded.forEach { db.writableDatabase.delete(TABLE, "$COLUMN_ID = $it", null) }
         mainHandler.post { listener?.onHistoryLoaded() }
     }
 
@@ -170,7 +219,12 @@ class ClipboardDao internal constructor(private val db: ClipboardDatabase) {
                     put(COLUMN_SENSITIVE, entry.isSensitive)
                 }
             }
-            entry.rowId = db.writableDatabase.insert(TABLE, null, cv)
+            try {
+                entry.rowId = db.writableDatabase.insertOrThrow(TABLE, null, cv)
+            } catch (e: Exception) {
+                // SQLite's insert() logs ContentValues, including the clipboard text.
+                Log.e(TAG, "Clipboard insert failed")
+            }
         }
     }
 
@@ -204,18 +258,20 @@ class ClipboardDao internal constructor(private val db: ClipboardDatabase) {
 
     /** Queues a write of the entry's state as it is when the task runs, not when it was queued. */
     private fun persistState(entry: ClipboardHistoryEntry) {
-        dbExecutor.execute {
-            val rowId = entry.rowId
-            if (rowId == PENDING_ID) return@execute
-            val cv = synchronized(cache) {
-                ContentValues(3).apply {
-                    put(COLUMN_TIMESTAMP, entry.timeStamp)
-                    put(COLUMN_SENSITIVE, entry.isSensitive)
-                    put(COLUMN_PINNED, entry.isPinned)
-                }
+        dbExecutor.execute { writeState(entry) }
+    }
+
+    private fun writeState(entry: ClipboardHistoryEntry) {
+        val rowId = entry.rowId
+        if (rowId == PENDING_ID) return
+        val cv = synchronized(cache) {
+            ContentValues(3).apply {
+                put(COLUMN_TIMESTAMP, entry.timeStamp)
+                put(COLUMN_SENSITIVE, entry.isSensitive)
+                put(COLUMN_PINNED, entry.isPinned)
             }
-            db.writableDatabase.update(TABLE, cv, "$COLUMN_ID = ?", arrayOf(rowId.toString()))
         }
+        db.writableDatabase.update(TABLE, cv, "$COLUMN_ID = ?", arrayOf(rowId.toString()))
     }
 
     /** Deletes by entry id, which stays valid when a background merge shifts positions. */
@@ -224,7 +280,9 @@ class ClipboardDao internal constructor(private val db: ClipboardDatabase) {
         val entry = synchronized(cache) {
             removedIndex = cache.indexOfFirst { it.id == id }
             if (removedIndex < 0) return
-            cache.removeAt(removedIndex)
+            cache.removeAt(removedIndex).also {
+                if (!loaded) deletedBeforeLoad.add(it.text)
+            }
         }
         listener?.onClipsRemoved(removedIndex, 1)
         dbExecutor.execute {
@@ -245,7 +303,10 @@ class ClipboardDao internal constructor(private val db: ClipboardDatabase) {
         retentionMinutes: Long = 0,
         sensitiveRetentionMinutes: Long = 30
     ) {
+        requestLoad()
         val removed: List<Pair<Int, ClipboardHistoryEntry>>
+        val normalCutoff: Long
+        val sensitiveCutoff: Long
         synchronized(cache) {
             if (!now && lastClearOldClips > SystemClock.elapsedRealtime() - 5_000) return
             lastClearOldClips = SystemClock.elapsedRealtime()
@@ -253,8 +314,8 @@ class ClipboardDao internal constructor(private val db: ClipboardDatabase) {
             val retention = retentionMinutes to sensitiveRetentionMinutes
             if (lastRetention == retention && currentTime < nextExpiry) return
             lastRetention = retention
-            val normalCutoff = if (retentionMinutes > 0) currentTime - retentionMinutes * 60_000L else Long.MIN_VALUE
-            val sensitiveCutoff = currentTime - sensitiveRetentionMinutes.coerceIn(1, 120) * 60_000L
+            normalCutoff = if (retentionMinutes > 0) currentTime - retentionMinutes * 60_000L else Long.MIN_VALUE
+            sensitiveCutoff = currentTime - sensitiveRetentionMinutes.coerceIn(1, 120) * 60_000L
 
             val expired = cache.indices.filter { index ->
                 val clip = cache[index]
@@ -274,9 +335,15 @@ class ClipboardDao internal constructor(private val db: ClipboardDatabase) {
                 }
             } ?: Long.MAX_VALUE
         }
-        if (removed.isEmpty()) return
         removed.forEach { (index, _) -> listener?.onClipsRemoved(index, 1) }
         dbExecutor.execute {
+            // Purge even when a failed load left the cache empty or incomplete.
+            db.writableDatabase.delete(
+                TABLE,
+                "($COLUMN_SENSITIVE = 1 AND $COLUMN_TIMESTAMP <= ?) OR " +
+                    "($COLUMN_SENSITIVE = 0 AND $COLUMN_PINNED = 0 AND $COLUMN_TIMESTAMP <= ?)",
+                arrayOf(sensitiveCutoff.toString(), normalCutoff.toString())
+            )
             removed.forEach { (_, entry) ->
                 val rowId = entry.rowId
                 if (rowId != PENDING_ID) {
@@ -290,8 +357,11 @@ class ClipboardDao internal constructor(private val db: ClipboardDatabase) {
         var firstRemoved = -1
         var removedCount = 0
         synchronized(cache) {
-            if (!loaded && clearedBeforeLoad == ClearedBeforeLoad.NONE) {
-                clearedBeforeLoad = ClearedBeforeLoad.NON_PINNED
+            if (!loaded) {
+                if (clearedBeforeLoad == ClearedBeforeLoad.NONE) {
+                    clearedBeforeLoad = ClearedBeforeLoad.NON_PINNED
+                }
+                pinnedAtClear.addAll(cache.filter { it.isPinned }.map { it.id })
             }
             firstRemoved = cache.indexOfFirst { !it.isPinned }
             if (firstRemoved >= 0) {
@@ -326,11 +396,13 @@ class ClipboardDao internal constructor(private val db: ClipboardDatabase) {
         // reach a different pending entry (paste or pin the wrong, possibly sensitive, clip).
         private val nextPendingId = AtomicLong(-2L)
 
+        @VisibleForTesting
         internal val dbWorker = Executors.newSingleThreadExecutor()
 
         private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
 
         /** Blocks until every database task queued before this call has run. For tests. */
+        @VisibleForTesting
         internal fun awaitDatabaseIdle() {
             dbWorker.submit {}.get()
         }
