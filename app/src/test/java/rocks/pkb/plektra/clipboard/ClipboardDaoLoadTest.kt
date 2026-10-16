@@ -4,6 +4,7 @@ import android.content.ClipboardManager
 import android.content.ContentValues
 import android.content.Context
 import android.os.Looper
+import android.os.SystemClock
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import rocks.pkb.plektra.SettingsManager
@@ -105,6 +106,14 @@ class ClipboardDaoLoadTest {
             buildList {
                 while (it.moveToNext()) add(Row(it.getString(0), it.getInt(1) != 0, it.getInt(2) != 0))
             }
+        }
+    }
+
+    private fun latestStoredTimestamp(): Long {
+        ClipboardDao.awaitDatabaseIdle()
+        return database.readableDatabase.rawQuery("SELECT MAX(TIMESTAMP) FROM CLIPBOARD", null).use {
+            assertTrue(it.moveToFirst())
+            it.getLong(0)
         }
     }
 
@@ -393,21 +402,82 @@ class ClipboardDaoLoadTest {
     }
 
     @Test
+    fun managerHistoryLoadFailingDuringTheWriteStillRefreshesSensitiveSnapshotsOnMain() {
+        val now = System.currentTimeMillis()
+        store("stored-secret", now - 1_000L, sensitive = true)
+        database.writableDatabase.execSQL(
+            "CREATE TRIGGER keep_stored BEFORE DELETE ON CLIPBOARD BEGIN SELECT RAISE(ABORT, 'blocked'); END"
+        )
+        try {
+            createDaoBeforeLoad()
+            val manager = createManager()
+            val snapshots = mutableListOf<List<ClipboardHistoryEntry>>()
+            val deliveredOn = mutableListOf<Thread>()
+            manager.addHistoryChangeListener {
+                deliveredOn += Thread.currentThread()
+                snapshots += (0 until manager.getHistorySize()).mapNotNull { manager.getHistoryEntry(it)?.copy() }
+            }
+            dao.addClip(now, false, "stored-secret")
+            assertFalse(snapshots.last().single().isSensitive)
+            snapshots.clear()
+            deliveredOn.clear()
+
+            gate.countDown()
+            ClipboardDao.awaitDatabaseIdle()
+            assertTrue(snapshots.isEmpty())
+            shadowOf(Looper.getMainLooper()).idle()
+
+            assertTrue(snapshots.isNotEmpty())
+            assertTrue(deliveredOn.all { it === Looper.getMainLooper().thread })
+            assertEquals(listOf("stored-secret"), snapshots.last().map { it.text })
+            assertTrue(snapshots.last().single().isSensitive)
+            assertFalse(snapshots.last().single().isPinned)
+            // The retries that the refresh triggers change nothing and stay silent.
+            val delivered = snapshots.size
+            ClipboardDao.awaitDatabaseIdle()
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(delivered, snapshots.size)
+        } finally {
+            ClipboardDao.awaitDatabaseIdle()
+            database.writableDatabase.execSQL("DROP TRIGGER keep_stored")
+        }
+    }
+
+    @Test
     fun secondCopyBeforeLoadPersistsStoredSensitivityAndLatestTimestamp() {
         val now = System.currentTimeMillis()
         store("stored-secret", now - 60_000L, sensitive = true)
-        createDaoBeforeLoad()
-        dao.addClip(now - 1_000L, false, "stored-secret")
-        val id = requireNotNull(dao.getAt(0)).id
-        dao.addClip(now, false, "stored-secret")
+        // Blocks the stored row's removal, so the first load fails after its insert has run.
+        database.writableDatabase.execSQL(
+            "CREATE TRIGGER keep_stored BEFORE DELETE ON CLIPBOARD BEGIN SELECT RAISE(ABORT, 'blocked'); END"
+        )
+        try {
+            createDaoBeforeLoad()
+            dao.addClip(now - 1_000L, false, "stored-secret")
+            val entry = requireNotNull(dao.getAt(0))
+            release()
+            assertTrue(entry.isSensitive)
+            assertTrue(entry.rowId != ClipboardDao.PENDING_ID)
 
+            // The history is still not loaded, and this copy finds an entry that has a row.
+            dao.addClip(now, false, "stored-secret")
+            ClipboardDao.awaitDatabaseIdle()
+
+            assertEquals(now, entry.timeStamp)
+            assertEquals(now, latestStoredTimestamp())
+        } finally {
+            database.writableDatabase.execSQL("DROP TRIGGER keep_stored")
+        }
+
+        dao.clearOldClips()
         release()
 
-        val entry = requireNotNull(dao.get(id))
+        val entry = requireNotNull(dao.getAt(0))
         assertEquals(1, dao.count())
         assertEquals(now, entry.timeStamp)
         assertTrue(entry.isSensitive)
         assertEquals(listOf(Row("stored-secret", pinned = false, sensitive = true)), rows())
+        assertEquals(now, latestStoredTimestamp())
     }
 
     @Test
@@ -428,22 +498,22 @@ class ClipboardDaoLoadTest {
     }
 
     @Test
-    fun managerReadAfterLoadUsesRetentionChangedBeforeTheLoad() {
+    fun sweepAfterTheLoadIsNotDebouncedByASweepBeforeIt() {
         val now = System.currentTimeMillis()
         store("old-normal", now - 10 * 60_000L)
         store("old-secret", now - 10 * 60_000L, sensitive = true)
         store("pinned", now - 10 * 60_000L, pinned = true)
         createDaoBeforeLoad()
-        val manager = createManager()
-        manager.getHistorySize()
-        SettingsManager.setClipboardRetentionTime(context, 5)
-        SettingsManager.setSensitiveClipboardRetentionTime(context, 5)
-        manager.getHistorySize()
+        // Moves the clock past the first sweep's debounce window; the clock is paused otherwise.
+        SystemClock.sleep(10_000L)
+        dao.clearOldClips(retentionMinutes = 30, sensitiveRetentionMinutes = 30)
 
         release()
+        assertEquals(3, dao.count())
+        // A shorter retention, inside the debounce window of the sweep before the load.
+        dao.clearOldClips(retentionMinutes = 5, sensitiveRetentionMinutes = 5)
 
-        assertEquals(1, manager.getHistorySize())
-        assertEquals("pinned", manager.getHistoryEntry(0)?.text)
+        assertEquals(listOf("pinned"), texts())
         assertEquals(listOf(Row("pinned", pinned = true, sensitive = false)), rows())
     }
 

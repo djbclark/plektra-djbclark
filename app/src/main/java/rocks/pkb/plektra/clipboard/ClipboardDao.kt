@@ -99,6 +99,7 @@ class ClipboardDao @VisibleForTesting internal constructor(
         }
         beforeLoadMerge?.invoke()
         val merged = mutableMapOf<Long, ClipboardHistoryEntry>()
+        var changed = false
         synchronized(cache) {
             for (entry in stored) {
                 val current = cache.firstOrNull { it.text == entry.text }
@@ -113,34 +114,46 @@ class ClipboardDao @VisibleForTesting internal constructor(
                 }
                 if (current != null) {
                     // Merge protection before applying a pre-load clear, even for skipped rows.
+                    val before = Triple(current.isSensitive, current.isPinned, current.timeStamp)
                     current.isSensitive = current.isSensitive || entry.isSensitive
                     current.isPinned = (current.isPinned || entry.isPinned) && !current.isSensitive
                     current.timeStamp = maxOf(current.timeStamp, entry.timeStamp)
+                    if (before != Triple(current.isSensitive, current.isPinned, current.timeStamp)) changed = true
                     superseded.add(entry.id)
                     if (current.rowId != PENDING_ID) merged[current.rowId] = current
                 } else if (clearedBeforeLoad == ClearedBeforeLoad.NON_PINNED && !entry.isPinned) {
                     superseded.add(entry.id)
                 } else {
                     cache.add(entry)
+                    changed = true
                     if (clearedBeforeLoad == ClearedBeforeLoad.NON_PINNED) pinnedAtClear.add(entry.id)
                 }
             }
             // Clear all kept these entries only because their stored sensitivity was unknown.
             cache.removeAll { entry ->
                 (entry.id in pinnedAtClear && !entry.isPinned).also { remove ->
+                    if (remove) changed = true
                     if (remove && entry.rowId != PENDING_ID) superseded.add(entry.rowId)
                 }
             }
             cache.sort()
         }
-        val database = db.writableDatabase
-        database.beginTransaction()
         try {
-            merged.values.forEach { writeState(it) }
-            superseded.forEach { database.delete(TABLE, "$COLUMN_ID = ?", arrayOf(it.toString())) }
-            database.setTransactionSuccessful()
-        } finally {
-            database.endTransaction()
+            val database = db.writableDatabase
+            database.beginTransaction()
+            try {
+                merged.values.forEach { writeState(it) }
+                superseded.forEach { database.delete(TABLE, "$COLUMN_ID = ?", arrayOf(it.toString())) }
+                database.setTransactionSuccessful()
+            } finally {
+                database.endTransaction()
+            }
+        } catch (e: RuntimeException) {
+            // The merged state is already in the cache (a flag may have just turned sensitive),
+            // so open views must re-read it even though the write failed. A retry that changes
+            // nothing stays silent, so a persistent failure cannot loop through the views.
+            if (changed) mainHandler.post { listener?.onHistoryLoaded() }
+            throw e
         }
         synchronized(cache) {
             loaded = true
