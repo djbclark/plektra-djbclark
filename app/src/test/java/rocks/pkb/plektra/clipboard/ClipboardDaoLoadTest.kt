@@ -405,6 +405,8 @@ class ClipboardDaoLoadTest {
     fun managerHistoryLoadFailingDuringTheWriteStillRefreshesSensitiveSnapshotsOnMain() {
         val now = System.currentTimeMillis()
         store("stored-secret", now - 1_000L, sensitive = true)
+        // Expired, so every read sweeps it out of the cache and a failed retry re-adds it.
+        store("old-secret", now - 31 * 60_000L, sensitive = true)
         database.writableDatabase.execSQL(
             "CREATE TRIGGER keep_stored BEFORE DELETE ON CLIPBOARD BEGIN SELECT RAISE(ABORT, 'blocked'); END"
         )
@@ -432,10 +434,12 @@ class ClipboardDaoLoadTest {
             assertEquals(listOf("stored-secret"), snapshots.last().map { it.text })
             assertTrue(snapshots.last().single().isSensitive)
             assertFalse(snapshots.last().single().isPinned)
-            // The retries that the refresh triggers change nothing and stay silent.
+            // The retries that the refresh triggers, and the rows they re-add, stay silent.
             val delivered = snapshots.size
-            ClipboardDao.awaitDatabaseIdle()
-            shadowOf(Looper.getMainLooper()).idle()
+            repeat(3) {
+                ClipboardDao.awaitDatabaseIdle()
+                shadowOf(Looper.getMainLooper()).idle()
+            }
             assertEquals(delivered, snapshots.size)
         } finally {
             ClipboardDao.awaitDatabaseIdle()

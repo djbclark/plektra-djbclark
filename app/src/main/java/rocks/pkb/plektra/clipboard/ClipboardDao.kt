@@ -100,6 +100,7 @@ class ClipboardDao @VisibleForTesting internal constructor(
         beforeLoadMerge?.invoke()
         val merged = mutableMapOf<Long, ClipboardHistoryEntry>()
         var changed = false
+        val addedNow = mutableSetOf<Long>()
         synchronized(cache) {
             for (entry in stored) {
                 val current = cache.firstOrNull { it.text == entry.text }
@@ -118,21 +119,25 @@ class ClipboardDao @VisibleForTesting internal constructor(
                     current.isSensitive = current.isSensitive || entry.isSensitive
                     current.isPinned = (current.isPinned || entry.isPinned) && !current.isSensitive
                     current.timeStamp = maxOf(current.timeStamp, entry.timeStamp)
-                    if (before != Triple(current.isSensitive, current.isPinned, current.timeStamp)) changed = true
+                    if (current.rowId !in addedNow &&
+                        before != Triple(current.isSensitive, current.isPinned, current.timeStamp)
+                    ) {
+                        changed = true
+                    }
                     superseded.add(entry.id)
                     if (current.rowId != PENDING_ID) merged[current.rowId] = current
                 } else if (clearedBeforeLoad == ClearedBeforeLoad.NON_PINNED && !entry.isPinned) {
                     superseded.add(entry.id)
                 } else {
                     cache.add(entry)
-                    changed = true
+                    addedNow.add(entry.id)
                     if (clearedBeforeLoad == ClearedBeforeLoad.NON_PINNED) pinnedAtClear.add(entry.id)
                 }
             }
             // Clear all kept these entries only because their stored sensitivity was unknown.
             cache.removeAll { entry ->
                 (entry.id in pinnedAtClear && !entry.isPinned).also { remove ->
-                    if (remove) changed = true
+                    if (remove && entry.rowId !in addedNow) changed = true
                     if (remove && entry.rowId != PENDING_ID) superseded.add(entry.rowId)
                 }
             }
@@ -150,8 +155,10 @@ class ClipboardDao @VisibleForTesting internal constructor(
             }
         } catch (e: RuntimeException) {
             // The merged state is already in the cache (a flag may have just turned sensitive),
-            // so open views must re-read it even though the write failed. A retry that changes
-            // nothing stays silent, so a persistent failure cannot loop through the views.
+            // so open views must re-read it even though the write failed. Only a change to an
+            // entry that was already visible counts: rows this attempt re-adds (a sweep may have
+            // dropped them since the last one) stay silent, so a persistent failure cannot loop
+            // through the views.
             if (changed) mainHandler.post { listener?.onHistoryLoaded() }
             throw e
         }
