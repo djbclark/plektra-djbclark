@@ -31,7 +31,7 @@ import kotlin.math.abs
  * Holding Shift during the drag extends the selection (Shift+DPAD).
  *
  * The overlay opens only over an editable field, or in an app on the user's terminal-app list
- * ([ScreenTrackpadTerminalApps]) that has an input connection but no editable field (TYPE_NULL).
+ * ([ScreenTrackpadTerminalApps]) that has a started input connection but no editable field (TYPE_NULL).
  *
  * Key consumption contract: [onKeyDown]/[onKeyUp] return true when the event must be swallowed
  * by the IME. In hold mode the trigger key's down is swallowed and *replayed* through the normal
@@ -47,6 +47,12 @@ internal class ScreenTrackpadController(
     private val replayKey: (downKeyCode: Int, downEvent: KeyEvent, upEvent: KeyEvent?) -> Unit,
     /** True while the focused app is on the user's "also without a text field" list. */
     private val isTerminalApp: () -> Boolean = { false },
+    /**
+     * True only while an input session is started with a connection of its own, not the service's
+     * binding fallback (which is non-null whenever any client is bound). Gates the overlay in a
+     * listed app without an editable field.
+     */
+    private val hasStartedInputConnection: () -> Boolean = { inputConnectionProvider() != null },
 ) {
     private enum class State { IDLE, PENDING_HOLD, ABORTED, ACTIVE_HOLD, ACTIVE_STICKY }
 
@@ -236,27 +242,7 @@ internal class ScreenTrackpadController(
         view.isClickable = true
 
         if (shouldShowHint(sticky, SettingsManager.isScreenTrackpadHintEnabled(service), withoutField)) {
-            val hint = TextView(service).apply {
-                setTextColor(Color.WHITE)
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-                val padH = dp(14); val padV = dp(7)
-                setPadding(padH, padV, padH, padV)
-                background = GradientDrawable().apply {
-                    cornerRadius = dp(20).toFloat()
-                    setColor(Color.argb(200, 20, 20, 20))
-                }
-                if (sticky) setOnClickListener { deactivate() }
-            }
-            val lp = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-                topMargin = dp(56)
-            }
-            view.addView(hint, lp)
-            hintView = hint
-            updateHint(sticky)
+            addHint(view, sticky)
         }
 
         val params = WindowManager.LayoutParams(
@@ -280,6 +266,34 @@ internal class ScreenTrackpadController(
             false
         }
     }
+
+    private fun addHint(view: FrameLayout, sticky: Boolean) {
+        val hint = TextView(service).apply {
+            setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            val padH = dp(14); val padV = dp(7)
+            setPadding(padH, padV, padH, padV)
+            background = GradientDrawable().apply {
+                cornerRadius = dp(20).toFloat()
+                setColor(Color.argb(200, 20, 20, 20))
+            }
+            if (sticky) setOnClickListener { deactivate() }
+        }
+        val lp = FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            topMargin = dp(56)
+        }
+        view.addView(hint, lp)
+        hintView = hint
+        updateHint(sticky)
+    }
+
+    /** True while the "trackpad on" pill is on the overlay. */
+    internal val hintVisible: Boolean
+        get() = hintView != null
 
     fun deactivate() {
         handler.removeCallbacks(holdRunnable)
@@ -309,13 +323,19 @@ internal class ScreenTrackpadController(
     // Drag → DPAD
     // ---------------------------------------------------------------------------------------
 
-    private fun handleTouch(event: MotionEvent) {
+    internal fun handleTouch(event: MotionEvent) {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 // The editor went away without a key-up reaching us: never leave the overlay up.
                 if (inputConnectionProvider() == null || !mayOpenOverlay()) {
                     deactivate()
                     return
+                }
+                // The field may have gone away under a restartInput (no onFinishInput): the pill
+                // must then appear even though it was not needed when the overlay opened.
+                val view = overlayView
+                if (view != null && hintView == null && !isEditableFieldFocused()) {
+                    addHint(view, sticky = state == State.ACTIVE_STICKY)
                 }
                 tracking = true
                 movedDuringGesture = false
@@ -354,7 +374,7 @@ internal class ScreenTrackpadController(
 
     private fun mayOpenOverlay(): Boolean = ScreenTrackpadTerminalApps.mayOpenOverlay(
         editableFieldFocused = isEditableFieldFocused(),
-        hasInputConnection = inputConnectionProvider() != null,
+        hasInputConnection = hasStartedInputConnection(),
         appListed = isTerminalApp(),
     )
 

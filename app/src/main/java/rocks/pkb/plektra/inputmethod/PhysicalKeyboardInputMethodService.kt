@@ -333,6 +333,11 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
     // a replayed trigger key bypasses the key filters that already saw it
     private var screenTrackpadReplaying = false
     private lateinit var screenTrackpadController: ScreenTrackpadController
+    /**
+     * True between onStartInput and onFinishInput/onUnbindInput. InputMethodService keeps the
+     * previous EditorInfo after a finish, so the screen trackpad must not trust it outside a session.
+     */
+    private var inputStarted = false
     private val uiHandler = Handler(Looper.getMainLooper())
     private var inputManager: InputManager? = null
     private var lastObservedAutoSoftwareKeyboardMode: SettingsManager.SoftwareKeyboardMode? = null
@@ -1861,12 +1866,18 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             inputConnectionProvider = { currentInputConnection },
             isShiftActive = { modifierStateController.shiftHeldByUser || shiftLayerLatched },
             isEditableFieldFocused = {
-                currentInputConnection != null &&
+                inputStarted && currentInputConnection != null &&
                     (currentInputEditorInfo?.inputType ?: EditorInfo.TYPE_NULL) != EditorInfo.TYPE_NULL
             },
             replayKey = { keyCode, downEvent, upEvent -> replayScreenTrackpadTriggerKey(keyCode, downEvent, upEvent) },
             isTerminalApp = {
-                SettingsManager.isScreenTrackpadTerminalApp(this, currentInputEditorInfo?.packageName)
+                inputStarted &&
+                    SettingsManager.isScreenTrackpadTerminalApp(this, currentInputEditorInfo?.packageName)
+            },
+            hasStartedInputConnection = {
+                ScreenTrackpadTerminalApps.hasStartedInputConnection(
+                    inputStarted, currentInputConnection, currentInputBinding?.connection
+                )
             }
         )
         typingSoundPlayer = TypingSoundPlayer(this).apply { reload() }
@@ -3568,6 +3579,8 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         pendingKeyboardSurfaceTransition = null
         isInputViewActive = false
         if (::keyboardVisibilityController.isInitialized) keyboardVisibilityController.onInputUnbound()
+        inputStarted = false
+        if (::screenTrackpadController.isInitialized) screenTrackpadController.deactivate()
         traceImeVisibility("onUnbindInput")
         super.onUnbindInput()
     }
@@ -3585,6 +3598,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             ++speechEditorSession
         }
         super.onStartInput(info, restarting)
+        inputStarted = true
         if (::textExpansionController.isInitialized) textExpansionController.clear()
         if (
             !restarting ||
@@ -3762,6 +3776,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         pendingKeyboardSurfaceTransition = null
         super.onFinishInput()
         // The text field session ended: a lost key-up must not leave the overlay up.
+        inputStarted = false
         if (::screenTrackpadController.isInitialized) screenTrackpadController.deactivate()
         if (::textExpansionController.isInitialized) textExpansionController.clear()
         keyboardVisibilityController.cancelPendingSurfaceTransition()
