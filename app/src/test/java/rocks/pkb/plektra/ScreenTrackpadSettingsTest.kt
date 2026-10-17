@@ -126,4 +126,20 @@ class ScreenTrackpadSettingsTest {
         SettingsManager.setScreenTrackpadTerminalApp(context, " ", true)
         assertEquals(ScreenTrackpadTerminalApps.DEFAULT_PACKAGES, SettingsManager.getScreenTrackpadTerminalApps(context))
     }
+
+    @Test
+    fun aRestoredListKeepsOnlyValidPackageNamesUpToTheCap() {
+        val context = RuntimeEnvironment.getApplication()
+        val restored = mutableSetOf("com.termux", "not a package", "x", "com..bad", "1com.example", "a".repeat(300) + ".b")
+        repeat(ScreenTrackpadTerminalApps.MAX_PACKAGES * 2) { restored += "com.example.app$it" }
+        context.getSharedPreferences("plektra_prefs", android.content.Context.MODE_PRIVATE)
+            .edit().putStringSet("screen_trackpad_terminal_apps", restored).commit()
+
+        val kept = SettingsManager.getScreenTrackpadTerminalApps(context)
+
+        assertEquals(ScreenTrackpadTerminalApps.MAX_PACKAGES, kept.size)
+        assertTrue(kept.all { it.startsWith("com.") })
+        assertFalse("not a package" in kept)
+        assertFalse("x" in kept)
+    }
 }
