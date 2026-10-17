@@ -1875,7 +1875,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             service = this,
             handler = uiHandler,
             inputConnectionProvider = { currentInputConnection },
-            isShiftActive = { isShiftModifierActive(null) },
+            isShiftActive = { modifierStateController.shiftHeldByUser || shiftLayerLatched },
             isEditableFieldFocused = {
                 currentInputConnection != null &&
                     (currentInputEditorInfo?.inputType ?: EditorInfo.TYPE_NULL) != EditorInfo.TYPE_NULL
