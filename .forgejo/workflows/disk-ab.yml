@@ -1,0 +1,31 @@
+name: Disk A-B bounded repeat
+on:
+  push:
+    branches: [disk-ab-2026-10-16]
+jobs:
+  loop:
+    name: Disk loop
+    runs-on: ubuntu
+    timeout-minutes: 25
+    container:
+      image: ghcr.io/djbclark/ci-image-plektra@sha256:90a5de59e4a7efaa70b4de6af3221023151a2087cfb2689cecfe18a6a1cf602e
+    steps:
+      - uses: https://github.com/actions/checkout@v4
+      - name: Same compile and four targeted tests
+        env:
+          STORAGE: loop
+        run: bash .forgejo/scripts/disk-ab.sh
+  tmpfs:
+    name: Disk tmpfs
+    needs: loop
+    if: always()
+    runs-on: ubuntu
+    timeout-minutes: 25
+    container:
+      image: ghcr.io/djbclark/ci-image-plektra@sha256:90a5de59e4a7efaa70b4de6af3221023151a2087cfb2689cecfe18a6a1cf602e
+    steps:
+      - uses: https://github.com/actions/checkout@v4
+      - name: Same compile and four targeted tests
+        env:
+          STORAGE: tmpfs
+        run: bash .forgejo/scripts/disk-ab.sh
