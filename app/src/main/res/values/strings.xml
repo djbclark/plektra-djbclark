@@ -2132,6 +2132,8 @@ Each key can be configured as Keycode, Action, Native Ctrl, or None. Use overrid
     <string name="screen_trackpad_hint_enabled_title">Show on-screen hint</string>
     <string name="screen_trackpad_hint_enabled_description">Small pill at the top of the screen while the trackpad is active</string>
     <string name="screen_trackpad_hint_cursor">✥ Cursor</string>
+    <string name="screen_trackpad_conflict_gestures_warning">Trackpad Gestures is also on. Both turn touches into cursor movement, so they can fight each other. Turn one of them off.</string>
+    <string name="trackpad_gestures_conflict_screen_trackpad_warning">Screen trackpad is also on. Both turn touches into cursor movement, so they can fight each other. Turn one of them off.</string>
     <string name="screen_trackpad_hint_select">⇧ Select</string>
     <string name="screen_trackpad_hint_sticky">✥ Cursor · tap to exit</string>
     <string name="screen_trackpad_terminal_apps_title">Terminal apps</string>
