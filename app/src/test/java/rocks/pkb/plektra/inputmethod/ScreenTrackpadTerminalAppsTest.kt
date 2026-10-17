@@ -59,4 +59,30 @@ class ScreenTrackpadTerminalAppsTest {
         assertTrue(ScreenTrackpadTerminalApps.mayOpenOverlay(editableFieldFocused = true, hasInputConnection = true, appListed = false))
         assertTrue(ScreenTrackpadTerminalApps.mayOpenOverlay(editableFieldFocused = true, hasInputConnection = true, appListed = true))
     }
+
+    @Test
+    fun onlyAStartedOwnConnectionCountsAsAnInputConnection() {
+        val own = Any()
+        val binding = Any()
+
+        assertTrue(ScreenTrackpadTerminalApps.hasStartedInputConnection(true, own, binding))
+        // The binding's fallback connection is what getCurrentInputConnection() returns when the
+        // focused view gave none.
+        assertFalse(ScreenTrackpadTerminalApps.hasStartedInputConnection(true, binding, binding))
+        assertFalse(ScreenTrackpadTerminalApps.hasStartedInputConnection(true, null, binding))
+        // After onFinishInput or onUnbindInput the leftover connection is stale.
+        assertFalse(ScreenTrackpadTerminalApps.hasStartedInputConnection(false, own, binding))
+        assertTrue(ScreenTrackpadTerminalApps.hasStartedInputConnection(true, own, null))
+    }
+
+    @Test
+    fun sanitizeDropsInvalidNamesAndCapsTheCount() {
+        val valid = setOf("com.termux", "org.connectbot", "a.b", "tech.ula", "com.example.app_2")
+        val invalid = setOf("", " ", "termux", "com.", ".com", "com..x", "1com.x", "com.x y", "com.x\n", "a".repeat(256))
+
+        assertEquals(valid, ScreenTrackpadTerminalApps.sanitize(valid + invalid))
+
+        val many = (0 until ScreenTrackpadTerminalApps.MAX_PACKAGES * 3).map { "com.example.app$it" }.toSet()
+        assertEquals(ScreenTrackpadTerminalApps.MAX_PACKAGES, ScreenTrackpadTerminalApps.sanitize(many).size)
+    }
 }

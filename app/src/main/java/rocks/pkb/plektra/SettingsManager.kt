@@ -5553,10 +5553,12 @@ object SettingsManager {
     /**
      * Apps where the screen trackpad also works with no editable text field in focus (terminals,
      * SSH clients). Pre-filled; once the user edits the list, the stored set (even an empty one)
-     * replaces the defaults.
+     * replaces the defaults. A restored backup can hold anything, so invalid names are dropped and
+     * the count is capped.
      */
     fun getScreenTrackpadTerminalApps(context: Context): Set<String> =
-        getPreferences(context).getStringSet(KEY_SCREEN_TRACKPAD_TERMINAL_APPS, null)?.toSet()
+        getPreferences(context).getStringSet(KEY_SCREEN_TRACKPAD_TERMINAL_APPS, null)
+            ?.let(ScreenTrackpadTerminalApps::sanitize)
             ?: ScreenTrackpadTerminalApps.DEFAULT_PACKAGES
 
     fun isScreenTrackpadTerminalApp(context: Context, packageName: String?): Boolean =

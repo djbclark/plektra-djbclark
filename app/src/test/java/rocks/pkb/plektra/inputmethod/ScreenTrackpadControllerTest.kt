@@ -3,6 +3,7 @@ package rocks.pkb.plektra.inputmethod
 import android.os.Handler
 import android.os.Looper
 import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.inputmethod.InputConnection
 import rocks.pkb.plektra.SettingsManager
 import org.junit.Assert.assertEquals
@@ -154,6 +155,8 @@ class ScreenTrackpadControllerTest {
         editable: Boolean,
         listed: Boolean,
         connection: InputConnection?,
+        editableNow: () -> Boolean = { editable },
+        started: (() -> Boolean)? = null,
     ): ScreenTrackpadController {
         val context = RuntimeEnvironment.getApplication()
         SettingsManager.setScreenTrackpadEnabled(context, true)
@@ -163,9 +166,10 @@ class ScreenTrackpadControllerTest {
             handler = Handler(Looper.getMainLooper()),
             inputConnectionProvider = { connection },
             isShiftActive = { false },
-            isEditableFieldFocused = { editable },
+            isEditableFieldFocused = editableNow,
             replayKey = { keyCode, down, up -> replays += Replay(keyCode, down, up) },
             isTerminalApp = { listed },
+            hasStartedInputConnection = started ?: { connection != null },
         )
     }
 
@@ -225,6 +229,59 @@ class ScreenTrackpadControllerTest {
         // onFinishInput and onWindowHidden both call this.
         c.deactivate()
         assertFalse(c.isActive)
+    }
+
+    @Test
+    fun holdInAListedAppWithOnlyTheBindingFallbackConnectionStillTypesTheKey() {
+        // The provider is non-null (getCurrentInputConnection() falls back to the binding's), but
+        // no started connection exists: the overlay must not open.
+        val c = holdController(
+            editable = false, listed = true, connection = mock(InputConnection::class.java),
+            started = { false },
+        )
+
+        holdTrigger(c)
+        assertFalse(c.isActive)
+        assertEquals(1, replays.size)
+    }
+
+    @Test
+    fun aTouchClosesTheOverlayOnceTheStartedConnectionIsGone() {
+        var started = true
+        val c = holdController(
+            editable = false, listed = true, connection = mock(InputConnection::class.java),
+            started = { started },
+        )
+        holdTrigger(c)
+        assertTrue(c.isActive)
+
+        started = false
+        c.handleTouch(MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_DOWN, 0f, 0f, 0))
+        assertFalse(c.isActive)
+    }
+
+    @Test
+    fun theHintAppearsWhenAnEditableFieldTurnsIntoAFieldlessViewUnderAnOpenOverlay() {
+        SettingsManager.setScreenTrackpadHintEnabled(RuntimeEnvironment.getApplication(), false)
+        var editable = true
+        val c = holdController(
+            editable = true, listed = true, connection = mock(InputConnection::class.java),
+            editableNow = { editable },
+        )
+        holdTrigger(c)
+        assertTrue(c.isActive)
+        assertFalse(c.hintVisible)
+
+        // A touch while the field is still there changes nothing.
+        c.handleTouch(MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_DOWN, 0f, 0f, 0))
+        assertFalse(c.hintVisible)
+
+        // restartInput swapped in a TYPE_NULL view (no onFinishInput): the next touch adds the pill.
+        editable = false
+        c.handleTouch(MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_UP, 0f, 0f, 0))
+        c.handleTouch(MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_DOWN, 0f, 0f, 0))
+        assertTrue(c.isActive)
+        assertTrue(c.hintVisible)
     }
 
     @Test
