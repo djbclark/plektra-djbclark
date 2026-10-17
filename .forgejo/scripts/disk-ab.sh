@@ -38,7 +38,8 @@ echo /usr/local/lib/portshim.so >> /etc/ld.so.preload
 chmod +x ./gradlew
 java -version
 nproc
-cat /proc/swaps
+# libkrunfw can omit swap support and /proc/swaps entirely.
+if [ -r /proc/swaps ]; then cat /proc/swaps; else echo "BENCH /proc/swaps absent"; fi
 (
   while :; do
     awk '/^(MemTotal|MemAvailable|Shmem|SwapTotal|SwapFree):/ {printf "%s=%s ", $1, $2} END {print ""}' /proc/meminfo
