@@ -891,4 +891,5 @@ Mỗi phím có thể cấu hình là Keycode, Action, Native Ctrl hoặc None. 
     <string name="screen_trackpad_hint_select">⇧ Chọn</string>
     <string name="screen_trackpad_hint_sticky">✥ Con trỏ · chạm để thoát</string>
     <string name="kw_screen_trackpad">bàn di chuột, con trỏ, vuốt, màn hình cảm ứng, phím cách, giữ, phím mũi tên, chọn, trackpad, cursor, swipe</string>
+    <string name="kw_screen_trackpad_terminal_apps">terminal, SSH, Termux, dòng lệnh, phím mũi tên, ứng dụng, không có ô nhập văn bản, shell</string>
 </resources>

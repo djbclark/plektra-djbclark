@@ -891,4 +891,5 @@ Nav Mode использует физическое положение клави
     <string name="screen_trackpad_hint_select">⇧ Выделение</string>
     <string name="screen_trackpad_hint_sticky">✥ Курсор · нажмите для выхода</string>
     <string name="kw_screen_trackpad">трекпад, курсор, свайп, сенсорный экран, пробел, удерживать, стрелки, выделение, trackpad, cursor, swipe</string>
+    <string name="kw_screen_trackpad_terminal_apps">терминал, SSH, Termux, консоль, стрелки, приложения, без текстового поля, terminal, shell</string>
 </resources>

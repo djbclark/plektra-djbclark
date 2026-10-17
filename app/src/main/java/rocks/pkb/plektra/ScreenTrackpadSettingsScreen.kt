@@ -273,6 +273,10 @@ fun ScreenTrackpadSettingsScreen(
                 }
             )
 
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+            ScreenTrackpadTerminalAppsSection(enabled = enabled)
+
             Spacer(modifier = Modifier.height(24.dp))
         }
     }

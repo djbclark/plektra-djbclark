@@ -30,6 +30,9 @@ import kotlin.math.abs
  *
  * Holding Shift during the drag extends the selection (Shift+DPAD).
  *
+ * The overlay opens only over an editable field, or in an app on the user's terminal-app list
+ * ([ScreenTrackpadTerminalApps]) that has an input connection but no editable field (TYPE_NULL).
+ *
  * Key consumption contract: [onKeyDown]/[onKeyUp] return true when the event must be swallowed
  * by the IME. In hold mode the trigger key's down is swallowed and *replayed* through the normal
  * pipeline if the key is released before the hold threshold, so a plain tap still types the key.
@@ -42,6 +45,8 @@ internal class ScreenTrackpadController(
     /** True only while a real editable text field (input connection and non-null input type) is focused. */
     private val isEditableFieldFocused: () -> Boolean,
     private val replayKey: (downKeyCode: Int, downEvent: KeyEvent, upEvent: KeyEvent?) -> Unit,
+    /** True while the focused app is on the user's "also without a text field" list. */
+    private val isTerminalApp: () -> Boolean = { false },
 ) {
     private enum class State { IDLE, PENDING_HOLD, ABORTED, ACTIVE_HOLD, ACTIVE_STICKY }
 
@@ -208,8 +213,9 @@ internal class ScreenTrackpadController(
     private fun activate(sticky: Boolean): Boolean {
         if (overlayView != null) return true
         // No editable field (e.g. a terminal with TYPE_NULL): there is no cursor to move, so never
-        // put a full-screen touch catcher over the app.
-        if (!isEditableFieldFocused()) return false
+        // put a full-screen touch catcher over the app, unless the app is on the user's list.
+        if (!mayOpenOverlay()) return false
+        val withoutField = !isEditableFieldFocused()
         if (!Settings.canDrawOverlays(service)) {
             Toast.makeText(service, R.string.screen_trackpad_permission_toast, Toast.LENGTH_LONG).show()
             return false
@@ -229,7 +235,7 @@ internal class ScreenTrackpadController(
         view.setBackgroundColor(Color.TRANSPARENT)
         view.isClickable = true
 
-        if (shouldShowHint(sticky, SettingsManager.isScreenTrackpadHintEnabled(service))) {
+        if (shouldShowHint(sticky, SettingsManager.isScreenTrackpadHintEnabled(service), withoutField)) {
             val hint = TextView(service).apply {
                 setTextColor(Color.WHITE)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
@@ -307,7 +313,7 @@ internal class ScreenTrackpadController(
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 // The editor went away without a key-up reaching us: never leave the overlay up.
-                if (inputConnectionProvider() == null || !isEditableFieldFocused()) {
+                if (inputConnectionProvider() == null || !mayOpenOverlay()) {
                     deactivate()
                     return
                 }
@@ -346,6 +352,12 @@ internal class ScreenTrackpadController(
         }
     }
 
+    private fun mayOpenOverlay(): Boolean = ScreenTrackpadTerminalApps.mayOpenOverlay(
+        editableFieldFocused = isEditableFieldFocused(),
+        hasInputConnection = inputConnectionProvider() != null,
+        appListed = isTerminalApp(),
+    )
+
     private fun sendDpad(keyCode: Int, shift: Boolean) {
         val ic = inputConnectionProvider() ?: return
         val t = SystemClock.uptimeMillis()
@@ -361,9 +373,12 @@ internal class ScreenTrackpadController(
         /**
          * The pill is also the visible sign (and exit button) of the sticky modes, so it is shown
          * there even when the hint setting is off: an invisible full-screen touch catcher must
-         * never exist. In hold mode the held key is the sign, so the setting is honoured.
+         * never exist. In hold mode the held key is the sign, so the setting is honoured, except
+         * in a listed app with no editable field: there the overlay is the only sign that the
+         * keyboard is not typing, so the pill is always shown.
          */
-        internal fun shouldShowHint(sticky: Boolean, hintSetting: Boolean): Boolean = sticky || hintSetting
+        internal fun shouldShowHint(sticky: Boolean, hintSetting: Boolean, withoutField: Boolean = false): Boolean =
+            sticky || hintSetting || withoutField
 
         /**
          * Deliberately without FLAG_KEEP_SCREEN_ON: a sticky overlay left open would keep the
