@@ -257,10 +257,7 @@ internal class ScreenTrackpadController(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
+            OVERLAY_WINDOW_FLAGS,
             PixelFormat.TRANSLUCENT
         ).apply { gravity = Gravity.TOP or Gravity.START }
         return try {
@@ -367,6 +364,16 @@ internal class ScreenTrackpadController(
          * never exist. In hold mode the held key is the sign, so the setting is honoured.
          */
         internal fun shouldShowHint(sticky: Boolean, hintSetting: Boolean): Boolean = sticky || hintSetting
+
+        /**
+         * Deliberately without FLAG_KEEP_SCREEN_ON: a sticky overlay left open would keep the
+         * screen on and the device unlocked indefinitely. Touches on the overlay count as user
+         * activity, so the screen still stays on while swiping.
+         */
+        internal const val OVERLAY_WINDOW_FLAGS =
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
 
         private const val TAG = "ScreenTrackpad"
         private const val HOLD_THRESHOLD_MS = 250L
