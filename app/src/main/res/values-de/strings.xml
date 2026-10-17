@@ -1639,4 +1639,5 @@ Jede Taste kann als Keycode, Aktion, Native Ctrl oder Keine konfiguriert werden.
     <string name="screen_trackpad_hint_select">⇧ Auswählen</string>
     <string name="screen_trackpad_hint_sticky">✥ Cursor · tippen zum Beenden</string>
     <string name="kw_screen_trackpad">Trackpad, Cursor, Wischen, Touchscreen, Leertaste, halten, Pfeiltasten, markieren, trackpad, cursor, swipe</string>
+    <string name="kw_screen_trackpad_terminal_apps">Terminal, SSH, Termux, Shell, Konsole, Pfeiltasten, Apps, kein Textfeld, terminal, ssh</string>
 </resources>

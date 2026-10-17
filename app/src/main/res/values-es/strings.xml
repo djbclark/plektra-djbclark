@@ -891,4 +891,5 @@ Cada tecla puede configurarse como Keycode, Acción, Native Ctrl o Ninguno. Usa 
     <string name="screen_trackpad_hint_select">⇧ Seleccionar</string>
     <string name="screen_trackpad_hint_sticky">✥ Cursor · toque para salir</string>
     <string name="kw_screen_trackpad">trackpad, cursor, deslizar, pantalla táctil, barra espaciadora, mantener, flechas, seleccionar, swipe</string>
+    <string name="kw_screen_trackpad_terminal_apps">terminal, SSH, Termux, consola, flechas, aplicaciones, sin campo de texto, shell</string>
 </resources>

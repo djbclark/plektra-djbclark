@@ -15,6 +15,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowSettings
+import org.mockito.Mockito.mock
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33])
@@ -133,6 +135,89 @@ class ScreenTrackpadControllerTest {
         assertTrue(ScreenTrackpadController.shouldShowHint(sticky = true, hintSetting = true))
         assertTrue(ScreenTrackpadController.shouldShowHint(sticky = false, hintSetting = true))
         assertFalse(ScreenTrackpadController.shouldShowHint(sticky = false, hintSetting = false))
+    }
+
+    @Test
+    fun hintIsAlwaysShownInAListedAppWithoutAField() {
+        assertTrue(ScreenTrackpadController.shouldShowHint(sticky = false, hintSetting = false, withoutField = true))
+        assertFalse(ScreenTrackpadController.shouldShowHint(sticky = false, hintSetting = false, withoutField = false))
+    }
+
+    private fun holdController(
+        editable: Boolean,
+        listed: Boolean,
+        connection: InputConnection?,
+    ): ScreenTrackpadController {
+        val context = RuntimeEnvironment.getApplication()
+        SettingsManager.setScreenTrackpadEnabled(context, true)
+        ShadowSettings.setCanDrawOverlays(true)
+        return ScreenTrackpadController(
+            service = context,
+            handler = Handler(Looper.getMainLooper()),
+            inputConnectionProvider = { connection },
+            isShiftActive = { false },
+            isEditableFieldFocused = { editable },
+            replayKey = { keyCode, down, up -> replays += Replay(keyCode, down, up) },
+            isTerminalApp = { listed },
+        )
+    }
+
+    private fun holdTrigger(c: ScreenTrackpadController) {
+        val d = down(KeyEvent.KEYCODE_SPACE)
+        assertTrue(c.onKeyDown(KeyEvent.KEYCODE_SPACE, d, KeyEvent.KEYCODE_SPACE, d))
+        shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(500))
+    }
+
+    @Test
+    fun holdInAListedAppWithoutAFieldOpensTheOverlayAndReleaseClosesIt() {
+        val c = holdController(editable = false, listed = true, connection = mock(InputConnection::class.java))
+
+        holdTrigger(c)
+        assertTrue(c.isActive)
+        assertTrue(replays.isEmpty())
+
+        assertTrue(c.onKeyUp(KeyEvent.KEYCODE_SPACE, up(KeyEvent.KEYCODE_SPACE), KeyEvent.KEYCODE_SPACE, up(KeyEvent.KEYCODE_SPACE)))
+        assertFalse(c.isActive)
+    }
+
+    @Test
+    fun holdInANonListedAppWithoutAFieldStillTypesTheKey() {
+        val c = holdController(editable = false, listed = false, connection = mock(InputConnection::class.java))
+
+        holdTrigger(c)
+        assertFalse(c.isActive)
+        assertEquals(1, replays.size)
+    }
+
+    @Test
+    fun holdInAListedAppWithoutAnInputConnectionStillTypesTheKey() {
+        val c = holdController(editable = false, listed = true, connection = null)
+
+        holdTrigger(c)
+        assertFalse(c.isActive)
+        assertEquals(1, replays.size)
+    }
+
+    @Test
+    fun holdOverAnEditableFieldOpensTheOverlayInAnyApp() {
+        listOf(true, false).forEach { listed ->
+            val c = holdController(editable = true, listed = listed, connection = mock(InputConnection::class.java))
+            holdTrigger(c)
+            assertTrue("listed=$listed", c.isActive)
+            c.deactivate()
+        }
+        assertTrue(replays.isEmpty())
+    }
+
+    @Test
+    fun deactivateClosesAListedAppOverlay() {
+        val c = holdController(editable = false, listed = true, connection = mock(InputConnection::class.java))
+        holdTrigger(c)
+        assertTrue(c.isActive)
+
+        // onFinishInput and onWindowHidden both call this.
+        c.deactivate()
+        assertFalse(c.isActive)
     }
 
     @Test

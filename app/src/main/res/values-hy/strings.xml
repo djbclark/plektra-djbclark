@@ -891,4 +891,5 @@ Nav Mode-ը օգտագործում է ստեղնի ֆիզիկական դիրքը
     <string name="screen_trackpad_hint_select">⇧ Ընտրել</string>
     <string name="screen_trackpad_hint_sticky">✥ Կուրսոր · հպեք՝ դուրս գալու համար</string>
     <string name="kw_screen_trackpad">թրեքփեդ, կուրսոր, սահեցնել, հպէկրան, բացատ, պահել, սլաքներ, ընտրել, trackpad, cursor, swipe</string>
+    <string name="kw_screen_trackpad_terminal_apps">տերմինալ, SSH, Termux, կոնսոլ, սլաքներ, հավելվածներ, terminal, arrow keys</string>
 </resources>

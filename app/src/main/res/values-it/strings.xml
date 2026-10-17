@@ -1067,4 +1067,5 @@ Ogni tasto può essere configurato come Keycode, Azione, Native Ctrl o Nessuno. 
     <string name="screen_trackpad_hint_select">⇧ Seleziona</string>
     <string name="screen_trackpad_hint_sticky">✥ Cursore · tocca per uscire</string>
     <string name="kw_screen_trackpad">trackpad, cursore, scorrere, touchscreen, barra spaziatrice, tenere premuto, frecce, selezionare, swipe</string>
+    <string name="kw_screen_trackpad_terminal_apps">terminale, SSH, Termux, console, frecce, app, senza campo di testo, terminal, shell</string>
 </resources>
