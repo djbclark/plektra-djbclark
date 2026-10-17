@@ -120,6 +120,12 @@ fun ScreenTrackpadSettingsScreen(
                 }
             )
 
+            // Re-read on each poll tick so the notice follows the other screen's switch.
+            val gesturesAlsoOn = remember(statusTick) { SettingsManager.getTrackpadGesturesEnabled(context) }
+            if (enabled && gesturesAlsoOn) {
+                ScreenTrackpadConflictWarning(R.string.screen_trackpad_conflict_gestures_warning)
+            }
+
             // Permission status row
             Surface(
                 modifier = Modifier
@@ -269,6 +275,30 @@ fun ScreenTrackpadSettingsScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
         }
+    }
+}
+
+@Composable
+internal fun ScreenTrackpadConflictWarning(messageRes: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Warning,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.error,
+            modifier = Modifier.size(24.dp)
+        )
+        Text(
+            text = stringResource(messageRes),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.weight(1f)
+        )
     }
 }
 

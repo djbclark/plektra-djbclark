@@ -245,6 +245,10 @@ fun TrackpadGestureSettingsScreen(
                 }
             }
 
+            if (trackpadGesturesEnabled && SettingsManager.isScreenTrackpadEnabled(context)) {
+                ScreenTrackpadConflictWarning(R.string.trackpad_gestures_conflict_screen_trackpad_warning)
+            }
+
             if (DeviceSpecific.isTitan2EliteDevice()) {
                 Text(
                     text = stringResource(R.string.trackpad_titan2_elite_scroll_assistant_note),
