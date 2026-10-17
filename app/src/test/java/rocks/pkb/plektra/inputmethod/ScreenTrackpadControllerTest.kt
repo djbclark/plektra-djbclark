@@ -221,6 +221,13 @@ class ScreenTrackpadControllerTest {
     }
 
     @Test
+    fun overlayWindowNeverKeepsTheScreenOn() {
+        val flags = ScreenTrackpadController.OVERLAY_WINDOW_FLAGS
+        assertEquals(0, flags and android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        assertTrue(flags and android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE != 0)
+    }
+
+    @Test
     fun holdWithoutEditableFieldFallsBackToATypedKeyAndNeverOpensTheOverlay() {
         val context = RuntimeEnvironment.getApplication()
         SettingsManager.setScreenTrackpadEnabled(context, true)
