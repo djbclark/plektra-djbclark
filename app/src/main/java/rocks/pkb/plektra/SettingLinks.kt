@@ -131,6 +131,7 @@ object SettingLinkIds {
     const val SCREEN_TRACKPAD_ACTIVATION = "screen_trackpad.activation"
     const val SCREEN_TRACKPAD_SENSITIVITY = "screen_trackpad.sensitivity"
     const val SCREEN_TRACKPAD_SHOW_HINT = "screen_trackpad.show_hint"
+    const val SCREEN_TRACKPAD_TERMINAL_APPS = "screen_trackpad.terminal_apps"
 
     // Modifiers screen
     const val MODIFIERS_LONG_PRESS_MODIFIER = "modifiers.long_press_modifier"
@@ -806,6 +807,12 @@ object SettingLinkRegistry {
             R.string.screen_trackpad_hint_enabled_description,
             destination = SettingsDestination.Advanced
         ),
+        entry(
+            SettingLinkIds.SCREEN_TRACKPAD_TERMINAL_APPS,
+            R.string.screen_trackpad_terminal_apps_title,
+            R.string.screen_trackpad_terminal_apps_description,
+            destination = SettingsDestination.Advanced
+        ),
 
         entry(
             SettingLinkIds.MODIFIERS_LONG_PRESS_MODIFIER,
@@ -1124,6 +1131,7 @@ object SettingLinkRegistry {
         SettingLinkIds.ADVANCED_SWIPE_INCREMENTAL_THRESHOLD to R.string.kw_advanced_swipe_threshold,
         // djb/screen-trackpad: search synonyms
         SettingLinkIds.TRACKPAD_SCREEN_TRACKPAD to R.string.kw_screen_trackpad,
+        SettingLinkIds.SCREEN_TRACKPAD_TERMINAL_APPS to R.string.kw_screen_trackpad_terminal_apps,
         SettingLinkIds.MODIFIERS_LONG_PRESS_MODIFIER to R.string.kw_modifiers_long_press_modifier,
         SettingLinkIds.MODIFIERS_LONG_PRESS_THRESHOLD to R.string.kw_modifiers_long_press_threshold,
         SettingLinkIds.MODIFIERS_LONG_PRESS_CYCLE_NEXT to R.string.kw_modifiers_long_press_cycle,

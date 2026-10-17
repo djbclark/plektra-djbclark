@@ -1104,4 +1104,6 @@ Chaque touche peut être configurée comme Keycode, Action, Native Ctrl ou Aucun
     <string name="long_press_cycle_end_original">Revenir au caractère tapé</string>
     <string name="long_press_cycle_end_loop">Continuer à alterner tant que la touche est maintenue</string>
     <string name="kw_modifiers_long_press_cycle">appui long, maintenir, alterner, une main, shift, symboles</string>
+    <string name="kw_screen_trackpad">trackpad, curseur, glisser, écran tactile, barre d\'espace, maintenir, flèches, sélectionner, swipe</string>
+    <string name="kw_screen_trackpad_terminal_apps">terminal, SSH, Termux, console, flèches, applications, sans champ de texte, shell</string>
 </resources>

@@ -1107,4 +1107,6 @@ Każdy klawisz można skonfigurować jako Keycode, Akcja, Native Ctrl lub Brak. 
     <string name="long_press_cycle_end_original">Wróć do wpisanego znaku</string>
     <string name="long_press_cycle_end_loop">Przełączaj dalej, dopóki trzymasz</string>
     <string name="kw_modifiers_long_press_cycle">długie naciśnięcie, przytrzymaj, przełączaj, jedna ręka, shift, symbole</string>
+    <string name="kw_screen_trackpad">trackpad, kursor, przesuwanie, ekran dotykowy, spacja, przytrzymaj, strzałki, zaznacz, swipe</string>
+    <string name="kw_screen_trackpad_terminal_apps">terminal, SSH, Termux, konsola, strzałki, aplikacje, bez pola tekstowego, shell</string>
 </resources>

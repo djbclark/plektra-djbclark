@@ -1098,4 +1098,6 @@ Mỗi phím có thể cấu hình là Keycode, Action, Native Ctrl hoặc None. 
     <string name="long_press_cycle_end_original">Quay lại ký tự đã gõ</string>
     <string name="long_press_cycle_end_loop">Tiếp tục xoay vòng khi còn giữ</string>
     <string name="kw_modifiers_long_press_cycle">nhấn giữ, giữ, xoay vòng, một tay, shift, ký hiệu</string>
+    <string name="kw_screen_trackpad">bàn di chuột, con trỏ, vuốt, màn hình cảm ứng, phím cách, giữ, phím mũi tên, chọn, trackpad, cursor, swipe</string>
+    <string name="kw_screen_trackpad_terminal_apps">terminal, SSH, Termux, dòng lệnh, phím mũi tên, ứng dụng, không có ô nhập văn bản, shell</string>
 </resources>

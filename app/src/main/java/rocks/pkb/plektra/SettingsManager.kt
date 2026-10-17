@@ -17,6 +17,7 @@ import rocks.pkb.plektra.commands.PlektraCommandSource
 import rocks.pkb.plektra.core.Punctuation
 import rocks.pkb.plektra.data.layout.BundledLayoutAssets
 import rocks.pkb.plektra.inputmethod.DeviceSpecific
+import rocks.pkb.plektra.inputmethod.ScreenTrackpadTerminalApps
 import rocks.pkb.plektra.inputmethod.subtype.AdditionalSubtypeUtils
 import rocks.pkb.plektra.inputmethod.subtype.AdditionalSubtypeUtils.localeString
 import rocks.pkb.plektra.inputmethod.ui.KeyboardThemeColors
@@ -5589,6 +5590,7 @@ object SettingsManager {
     private const val KEY_SCREEN_TRACKPAD_ACTIVATION = "screen_trackpad_activation"
     private const val KEY_SCREEN_TRACKPAD_STEP_PX = "screen_trackpad_step_px"
     private const val KEY_SCREEN_TRACKPAD_SHOW_HINT = "screen_trackpad_show_hint"
+    private const val KEY_SCREEN_TRACKPAD_TERMINAL_APPS = "screen_trackpad_terminal_apps"
     const val SCREEN_TRACKPAD_TRIGGER_SPACE = "space"
     const val SCREEN_TRACKPAD_TRIGGER_SHIFT_LEFT = "shift_left"
     const val SCREEN_TRACKPAD_TRIGGER_SHIFT_RIGHT = "shift_right"
@@ -5658,6 +5660,29 @@ object SettingsManager {
         getPreferences(context).edit().putBoolean(KEY_SCREEN_TRACKPAD_SHOW_HINT, enabled).apply()
     }
     // djb/screen-trackpad: end
+
+    /**
+     * Apps where the screen trackpad also works with no editable text field in focus (terminals,
+     * SSH clients). Pre-filled; once the user edits the list, the stored set (even an empty one)
+     * replaces the defaults.
+     */
+    fun getScreenTrackpadTerminalApps(context: Context): Set<String> =
+        getPreferences(context).getStringSet(KEY_SCREEN_TRACKPAD_TERMINAL_APPS, null)?.toSet()
+            ?: ScreenTrackpadTerminalApps.DEFAULT_PACKAGES
+
+    fun isScreenTrackpadTerminalApp(context: Context, packageName: String?): Boolean =
+        ScreenTrackpadTerminalApps.isListed(getScreenTrackpadTerminalApps(context), packageName)
+
+    fun setScreenTrackpadTerminalApp(context: Context, packageName: String, enabled: Boolean) {
+        if (packageName.isBlank()) return
+        val updated = getScreenTrackpadTerminalApps(context).toMutableSet()
+        if (enabled) updated.add(packageName) else updated.remove(packageName)
+        getPreferences(context).edit().putStringSet(KEY_SCREEN_TRACKPAD_TERMINAL_APPS, updated).apply()
+    }
+
+    fun resetScreenTrackpadTerminalApps(context: Context) {
+        getPreferences(context).edit().remove(KEY_SCREEN_TRACKPAD_TERMINAL_APPS).apply()
+    }
 
     fun getTrackpadProvider(context: Context): String {
         val value = getPreferences(context).getString(KEY_TRACKPAD_PROVIDER, DEFAULT_TRACKPAD_PROVIDER).orEmpty()

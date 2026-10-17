@@ -1104,4 +1104,6 @@ Cada tecla puede configurarse como Keycode, Acción, Native Ctrl o Ninguno. Usa 
     <string name="long_press_cycle_end_original">Volver al carácter escrito</string>
     <string name="long_press_cycle_end_loop">Seguir alternando mientras se mantiene</string>
     <string name="kw_modifiers_long_press_cycle">pulsación larga, mantener, alternar, una mano, shift, símbolos</string>
+    <string name="kw_screen_trackpad">trackpad, cursor, deslizar, pantalla táctil, barra espaciadora, mantener, flechas, seleccionar, swipe</string>
+    <string name="kw_screen_trackpad_terminal_apps">terminal, SSH, Termux, consola, flechas, aplicaciones, sin campo de texto, shell</string>
 </resources>

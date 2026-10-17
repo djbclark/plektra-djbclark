@@ -2134,6 +2134,10 @@ Each key can be configured as Keycode, Action, Native Ctrl, or None. Use overrid
     <string name="screen_trackpad_hint_cursor">✥ Cursor</string>
     <string name="screen_trackpad_hint_select">⇧ Select</string>
     <string name="screen_trackpad_hint_sticky">✥ Cursor · tap to exit</string>
+    <string name="screen_trackpad_terminal_apps_title">Terminal apps</string>
+    <string name="screen_trackpad_terminal_apps_description">In these apps the trackpad also works when no text field is focused, as in terminals and SSH clients, and sends arrow keys. In every other app it stays limited to text fields.</string>
+    <string name="screen_trackpad_terminal_apps_empty">No apps. The trackpad only works in text fields.</string>
+    <string name="screen_trackpad_terminal_apps_reset">Restore default list</string>
     <string name="kw_screen_trackpad">trackpad, cursor, swipe, touchscreen, spacebar, hold, arrow keys, select</string>
 
     <!-- djb/backlight: smart keyboard backlight and its Quick Settings tile -->
@@ -2262,4 +2266,5 @@ Each key can be configured as Keycode, Action, Native Ctrl, or None. Use overrid
     <string name="kw_titan2_elite_tools_fn_ctrl">fn, ctrl, control, modifier, remap, programmable key</string>
     <string name="kw_titan2_elite_tools_show_status_bar">status bar, hide, strip, collapse, bar, full screen</string>
     <string name="kw_titan2_elite_tools_reset_to_stock">reset, stock, undo, revert, uninstall, factory, default</string>
+    <string name="kw_screen_trackpad_terminal_apps">terminal, SSH, Termux, shell, console, arrow keys, apps, no text field</string>
 </resources>

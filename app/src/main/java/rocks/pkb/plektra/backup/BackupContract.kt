@@ -378,6 +378,7 @@ internal object BackupPreferenceContract {
             "screen_trackpad_activation" to PreferenceValueType.STRING,
             "screen_trackpad_step_px" to PreferenceValueType.INT,
             "screen_trackpad_show_hint" to PreferenceValueType.BOOLEAN,
+            "screen_trackpad_terminal_apps" to PreferenceValueType.STRING_SET,
             "slim_mode_override" to PreferenceValueType.STRING,
             "software_keyboard_mode" to PreferenceValueType.STRING,
             "physical_keyboard_profile_override" to PreferenceValueType.STRING,

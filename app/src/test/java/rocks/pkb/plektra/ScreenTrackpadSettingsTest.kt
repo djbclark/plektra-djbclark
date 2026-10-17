@@ -3,7 +3,9 @@ package rocks.pkb.plektra
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
+import rocks.pkb.plektra.inputmethod.ScreenTrackpadTerminalApps
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -76,7 +78,8 @@ class ScreenTrackpadSettingsTest {
             SettingLinkIds.SCREEN_TRACKPAD_TRIGGER_KEY,
             SettingLinkIds.SCREEN_TRACKPAD_ACTIVATION,
             SettingLinkIds.SCREEN_TRACKPAD_SENSITIVITY,
-            SettingLinkIds.SCREEN_TRACKPAD_SHOW_HINT
+            SettingLinkIds.SCREEN_TRACKPAD_SHOW_HINT,
+            SettingLinkIds.SCREEN_TRACKPAD_TERMINAL_APPS
         )
 
         ids.forEach { id ->
@@ -84,5 +87,43 @@ class ScreenTrackpadSettingsTest {
             assertEquals(SettingsDestination.Advanced, entry.route.destination)
         }
         assertNotNull(SettingLinkRegistry.keywordsById[SettingLinkIds.TRACKPAD_SCREEN_TRACKPAD])
+        assertNotNull(SettingLinkRegistry.keywordsById[SettingLinkIds.SCREEN_TRACKPAD_TERMINAL_APPS])
+    }
+
+    @Test
+    fun terminalAppListIsPreFilledUntilTheUserEditsIt() {
+        val context = RuntimeEnvironment.getApplication()
+
+        assertEquals(ScreenTrackpadTerminalApps.DEFAULT_PACKAGES, SettingsManager.getScreenTrackpadTerminalApps(context))
+        assertTrue(SettingsManager.isScreenTrackpadTerminalApp(context, "com.termux"))
+        assertFalse(SettingsManager.isScreenTrackpadTerminalApp(context, "com.example.notes"))
+        assertFalse(SettingsManager.isScreenTrackpadTerminalApp(context, null))
+    }
+
+    @Test
+    fun terminalAppListEditsPersistIncludingAnEmptyList() {
+        val context = RuntimeEnvironment.getApplication()
+
+        SettingsManager.setScreenTrackpadTerminalApp(context, "com.example.term", true)
+        assertTrue(SettingsManager.isScreenTrackpadTerminalApp(context, "com.example.term"))
+        assertTrue(SettingsManager.isScreenTrackpadTerminalApp(context, "com.termux"))
+
+        ScreenTrackpadTerminalApps.DEFAULT_PACKAGES.forEach {
+            SettingsManager.setScreenTrackpadTerminalApp(context, it, false)
+        }
+        SettingsManager.setScreenTrackpadTerminalApp(context, "com.example.term", false)
+        assertEquals(emptySet<String>(), SettingsManager.getScreenTrackpadTerminalApps(context))
+        assertFalse(SettingsManager.isScreenTrackpadTerminalApp(context, "com.termux"))
+
+        SettingsManager.resetScreenTrackpadTerminalApps(context)
+        assertEquals(ScreenTrackpadTerminalApps.DEFAULT_PACKAGES, SettingsManager.getScreenTrackpadTerminalApps(context))
+    }
+
+    @Test
+    fun blankPackageNamesAreNotStored() {
+        val context = RuntimeEnvironment.getApplication()
+
+        SettingsManager.setScreenTrackpadTerminalApp(context, " ", true)
+        assertEquals(ScreenTrackpadTerminalApps.DEFAULT_PACKAGES, SettingsManager.getScreenTrackpadTerminalApps(context))
     }
 }

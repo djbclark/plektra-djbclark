@@ -1107,4 +1107,6 @@ Nav Mode использует физическое положение клави
     <string name="long_press_cycle_end_original">Вернуться к набранному символу</string>
     <string name="long_press_cycle_end_loop">Продолжать переключать, пока удерживается</string>
     <string name="kw_modifiers_long_press_cycle">долгое нажатие, удержание, переключение, одной рукой, shift, символы</string>
+    <string name="kw_screen_trackpad">трекпад, курсор, свайп, сенсорный экран, пробел, удерживать, стрелки, выделение, trackpad, cursor, swipe</string>
+    <string name="kw_screen_trackpad_terminal_apps">терминал, SSH, Termux, консоль, стрелки, приложения, без текстового поля, terminal, shell</string>
 </resources>

@@ -1101,4 +1101,6 @@ Nav Mode-ը օգտագործում է ստեղնի ֆիզիկական դիրքը
     <string name="long_press_cycle_end_original">Վերադառնալ մուտքագրված նիշին</string>
     <string name="long_press_cycle_end_loop">Շարունակել փոխել, քանի դեռ պահվում է</string>
     <string name="kw_modifiers_long_press_cycle">երկար սեղմում, պահել, փոխել, մեկ ձեռք, shift, նշաններ</string>
+    <string name="kw_screen_trackpad">թրեքփեդ, կուրսոր, սահեցնել, հպէկրան, բացատ, պահել, սլաքներ, ընտրել, trackpad, cursor, swipe</string>
+    <string name="kw_screen_trackpad_terminal_apps">տերմինալ, SSH, Termux, կոնսոլ, սլաքներ, հավելվածներ, terminal, arrow keys</string>
 </resources>

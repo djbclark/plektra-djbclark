@@ -1107,4 +1107,6 @@ Ctrl-ярлики застосунків із урахуванням розкл�
     <string name="long_press_cycle_end_original">Повернутися до набраного символу</string>
     <string name="long_press_cycle_end_loop">Перемикати далі, доки утримується</string>
     <string name="kw_modifiers_long_press_cycle">довге натискання, утримання, перемикання, однією рукою, shift, символи</string>
+    <string name="kw_screen_trackpad">трекпад, курсор, свайп, сенсорний екран, пробіл, утримувати, стрілки, виділення, trackpad, cursor, swipe</string>
+    <string name="kw_screen_trackpad_terminal_apps">термінал, SSH, Termux, консоль, стрілки, застосунки, без текстового поля, terminal, shell</string>
 </resources>

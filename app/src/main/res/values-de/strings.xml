@@ -1799,4 +1799,6 @@ Jede Taste kann als Keycode, Aktion, Native Ctrl oder Keine konfiguriert werden.
     <string name="long_press_cycle_end_original">Zurück zum getippten Zeichen</string>
     <string name="long_press_cycle_end_loop">Weiter wechseln, solange gehalten</string>
     <string name="kw_modifiers_long_press_cycle">langer Druck, halten, wechseln, einhändig, Shift, Symbole</string>
+    <string name="kw_screen_trackpad">Trackpad, Cursor, Wischen, Touchscreen, Leertaste, halten, Pfeiltasten, markieren, trackpad, cursor, swipe</string>
+    <string name="kw_screen_trackpad_terminal_apps">Terminal, SSH, Termux, Shell, Konsole, Pfeiltasten, Apps, kein Textfeld, terminal, ssh</string>
 </resources>
