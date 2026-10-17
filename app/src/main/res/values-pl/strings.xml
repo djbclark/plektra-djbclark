@@ -891,4 +891,5 @@ Każdy klawisz można skonfigurować jako Keycode, Akcja, Native Ctrl lub Brak. 
     <string name="screen_trackpad_hint_select">⇧ Zaznaczanie</string>
     <string name="screen_trackpad_hint_sticky">✥ Kursor · dotknij, aby wyjść</string>
     <string name="kw_screen_trackpad">trackpad, kursor, przesuwanie, ekran dotykowy, spacja, przytrzymaj, strzałki, zaznacz, swipe</string>
+    <string name="kw_screen_trackpad_terminal_apps">terminal, SSH, Termux, konsola, strzałki, aplikacje, bez pola tekstowego, shell</string>
 </resources>

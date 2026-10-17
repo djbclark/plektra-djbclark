@@ -1738,4 +1738,5 @@ QWERTZ σε φυσικό QWERTY
     <string name="screen_trackpad_hint_select">⇧ Επιλογή</string>
     <string name="screen_trackpad_hint_sticky">✥ Δρομέας · πατήστε για έξοδο</string>
     <string name="kw_screen_trackpad">trackpad, δρομέας, σύρσιμο, οθόνη αφής, πλήκτρο διαστήματος, παρατεταμένο πάτημα, βέλη, επιλογή, cursor, swipe</string>
+    <string name="kw_screen_trackpad_terminal_apps">τερματικό, SSH, Termux, κέλυφος, βέλη, εφαρμογές, χωρίς πεδίο κειμένου, terminal, arrow keys</string>
 </resources>

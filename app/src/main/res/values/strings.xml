@@ -1960,5 +1960,10 @@ Each key can be configured as Keycode, Action, Native Ctrl, or None. Use overrid
     <string name="trackpad_exclusive_continue">Continue</string>
     <string name="screen_trackpad_hint_select">⇧ Select</string>
     <string name="screen_trackpad_hint_sticky">✥ Cursor · tap to exit</string>
+    <string name="screen_trackpad_terminal_apps_title">Terminal apps</string>
+    <string name="screen_trackpad_terminal_apps_description">In these apps the trackpad also works when no text field is focused, as in terminals and SSH clients, and sends arrow keys. In every other app it stays limited to text fields.</string>
+    <string name="screen_trackpad_terminal_apps_empty">No apps. The trackpad only works in text fields.</string>
+    <string name="screen_trackpad_terminal_apps_reset">Restore default list</string>
     <string name="kw_screen_trackpad">trackpad, cursor, swipe, touchscreen, spacebar, hold, arrow keys, select</string>
+    <string name="kw_screen_trackpad_terminal_apps">terminal, SSH, Termux, shell, console, arrow keys, apps, no text field</string>
 </resources>

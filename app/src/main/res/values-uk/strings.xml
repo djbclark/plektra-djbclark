@@ -891,4 +891,5 @@ Ctrl-ярлики застосунків із урахуванням розкл�
     <string name="screen_trackpad_hint_select">⇧ Виділення</string>
     <string name="screen_trackpad_hint_sticky">✥ Курсор · торкніться, щоб вийти</string>
     <string name="kw_screen_trackpad">трекпад, курсор, свайп, сенсорний екран, пробіл, утримувати, стрілки, виділення, trackpad, cursor, swipe</string>
+    <string name="kw_screen_trackpad_terminal_apps">термінал, SSH, Termux, консоль, стрілки, застосунки, без текстового поля, terminal, shell</string>
 </resources>

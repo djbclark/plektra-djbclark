@@ -1869,7 +1869,10 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
                 currentInputConnection != null &&
                     (currentInputEditorInfo?.inputType ?: EditorInfo.TYPE_NULL) != EditorInfo.TYPE_NULL
             },
-            replayKey = { keyCode, downEvent, upEvent -> replayScreenTrackpadTriggerKey(keyCode, downEvent, upEvent) }
+            replayKey = { keyCode, downEvent, upEvent -> replayScreenTrackpadTriggerKey(keyCode, downEvent, upEvent) },
+            isTerminalApp = {
+                SettingsManager.isScreenTrackpadTerminalApp(this, currentInputEditorInfo?.packageName)
+            }
         )
         typingSoundPlayer = TypingSoundPlayer(this).apply { reload() }
         textInputController = TextInputController(
