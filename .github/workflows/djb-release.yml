@@ -39,49 +39,57 @@ jobs:
           java-version: "17"
           cache: gradle
 
-      - name: Install debug signing key
+      - name: Set up Android SDK (build-tools for apksigner)
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools build-tools;35.0.0'
+
+      - name: Install and verify debug signing key
         env:
           DJB_DEBUG_KEYSTORE_B64: ${{ secrets.DJB_DEBUG_KEYSTORE_B64 }}
         run: |
           set -euo pipefail
           keydir="${ANDROID_USER_HOME:-$HOME/.android}"
           mkdir -p "$keydir"
+          # Remove any runner-preinstalled debug key so AGP cannot pick a stranger.
+          rm -f "$keydir/debug.keystore" "$keydir/debug.keystore.lock"
           printf '%s' "$DJB_DEBUG_KEYSTORE_B64" | base64 -d > "$keydir/debug.keystore"
           test -s "$keydir/debug.keystore"
+          fp=$(keytool -list -v -keystore "$keydir/debug.keystore" -storepass android \
+            | gawk '/SHA256:/{gsub(/:/,"",$2); print tolower($2); exit}')
+          echo "installed_keystore_fp=$fp"
+          test "$fp" = "$DJB_SIGNER_SHA256"
           chmod +x ./gradlew
 
       - name: Test and assemble stable debug
         run: |
           set -euo pipefail
+          # Force AGP to use our keystore even if it would otherwise mint a new debug key.
           ./gradlew --no-daemon \
             --init-script .github/ci/known-failures.gradle \
             --init-script .github/ci/central-mirror.gradle \
+            -Pandroid.injected.signing.store.file="${ANDROID_USER_HOME:-$HOME/.android}/debug.keystore" \
+            -Pandroid.injected.signing.store.password=android \
+            -Pandroid.injected.signing.key.alias=androiddebugkey \
+            -Pandroid.injected.signing.key.password=android \
             :app:testStableDebugUnitTest :app:assembleStableDebug
 
-      - name: Check the APK signer
+      - name: Re-sign APK with the Mac debug key and verify
         run: |
           set -euo pipefail
-          # Prefer apksigner when the Android Gradle Plugin left build-tools on disk;
-          # otherwise keytool -printcert -jarfile (same SHA-256 digest string form differs).
-          if command -v apksigner >/dev/null 2>&1; then
-            apksigner verify --print-certs "$APK" > /tmp/signer.txt
-          else
-            bt=$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}" "${ANDROID_SDK_ROOT:-}" \
-              "$HOME/Android/Sdk" -type f -name apksigner 2>/dev/null | head -n 1 || true)
-            if [ -n "${bt:-}" ]; then
-              "$bt" verify --print-certs "$APK" > /tmp/signer.txt
-            else
-              keytool -printcert -jarfile "$APK" > /tmp/signer.txt
-            fi
-          fi
-          cat /tmp/signer.txt
-          # apksigner: "certificate SHA-256 digest: aabb..."
-          # keytool:   "SHA256: AA:BB:..."
-          if grep -qi "certificate SHA-256 digest: $DJB_SIGNER_SHA256" /tmp/signer.txt; then
-            exit 0
-          fi
-          compact=$(tr -d ':\n ' < /tmp/signer.txt | tr 'A-F' 'a-f')
-          echo "$compact" | grep -qi "$DJB_SIGNER_SHA256"
+          keydir="${ANDROID_USER_HOME:-$HOME/.android}"
+          build_tools=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)
+          # Re-sign: AGP on ubuntu-latest has been observed to mint its own debug cert
+          # (SHA-256 57957bb5…) even when ~/.android/debug.keystore is present.
+          "$build_tools/apksigner" sign \
+            --ks "$keydir/debug.keystore" \
+            --ks-pass pass:android \
+            --ks-key-alias androiddebugkey \
+            --key-pass pass:android \
+            --in "$APK" \
+            --out "$APK"
+          "$build_tools/apksigner" verify --print-certs "$APK" | tee /tmp/signer.txt
+          grep -q "certificate SHA-256 digest: $DJB_SIGNER_SHA256" /tmp/signer.txt
 
       - name: Publish the GitHub release
         env:
