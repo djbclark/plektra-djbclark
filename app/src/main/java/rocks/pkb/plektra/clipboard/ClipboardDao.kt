@@ -377,12 +377,14 @@ class ClipboardDao @VisibleForTesting internal constructor(
     fun clearNonPinned() {
         var firstRemoved = -1
         var removedCount = 0
+        val kept: List<ClipboardHistoryEntry>
         synchronized(cache) {
+            kept = cache.filter { it.isPinned }
             if (!loaded) {
                 if (clearedBeforeLoad == ClearedBeforeLoad.NONE) {
                     clearedBeforeLoad = ClearedBeforeLoad.NON_PINNED
                 }
-                pinnedAtClear.addAll(cache.filter { it.isPinned }.map { it.id })
+                pinnedAtClear.addAll(kept.map { it.id })
             }
             firstRemoved = cache.indexOfFirst { !it.isPinned }
             if (firstRemoved >= 0) {
@@ -393,7 +395,32 @@ class ClipboardDao @VisibleForTesting internal constructor(
         if (firstRemoved >= 0) listener?.onClipsRemoved(firstRemoved, removedCount)
         // Unconditional: rows of the stored history may not be in the cache yet.
         dbExecutor.execute {
-            db.writableDatabase.delete(TABLE, "$COLUMN_PINNED = 0", null)
+            // A failed load may still owe a kept clip its stored twin's sensitivity.
+            val keptTexts = synchronized(cache) {
+                kept.filter { entry -> cache.any { it === entry } }.map { it.text }.toSet()
+            }
+            val database = db.writableDatabase
+            if (keptTexts.isEmpty()) {
+                database.delete(TABLE, "$COLUMN_PINNED = 0", null)
+            } else {
+                database.beginTransaction()
+                try {
+                    val removedIds = database.query(
+                        TABLE, arrayOf(COLUMN_ID, BOUNDED_TEXT), "$COLUMN_PINNED = 0",
+                        null, null, null, null
+                    ).use { cursor ->
+                        buildList {
+                            while (cursor.moveToNext()) {
+                                if (cursor.isNull(1) || cursor.getString(1) !in keptTexts) add(cursor.getLong(0))
+                            }
+                        }
+                    }
+                    removedIds.forEach { database.delete(TABLE, "$COLUMN_ID = ?", arrayOf(it.toString())) }
+                    database.setTransactionSuccessful()
+                } finally {
+                    database.endTransaction()
+                }
+            }
         }
     }
 
