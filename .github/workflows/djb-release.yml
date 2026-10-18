@@ -56,7 +56,7 @@ jobs:
           printf '%s' "$DJB_DEBUG_KEYSTORE_B64" | base64 -d > "$keydir/debug.keystore"
           test -s "$keydir/debug.keystore"
           fp=$(keytool -list -v -keystore "$keydir/debug.keystore" -storepass android \
-            | gawk '/SHA256:/{gsub(/:/,"",$2); print tolower($2); exit}')
+            | awk '/SHA256:/{gsub(/:/,"",$2); print tolower($2); exit}')
           echo "installed_keystore_fp=$fp"
           test "$fp" = "$DJB_SIGNER_SHA256"
           chmod +x ./gradlew
