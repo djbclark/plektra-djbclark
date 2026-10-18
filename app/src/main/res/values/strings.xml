@@ -2088,7 +2088,7 @@ Each key can be configured as Keycode, Action, Native Ctrl, or None. Use overrid
     <string name="privileged_access_using_broker">Commands run through the built-in broker (wireless debugging).</string>
     <string name="device_setup_ready_shizuku_title">Connected through Shizuku</string>
     <string name="device_setup_ready_shizuku_body">The tools below reach the system through Shizuku, so Plektra doesn\'t need its own pairing. Choose \"Built-in broker only\" to use the pairing instead.</string>
-    <string name="kw_main_titan2_elite_tools">titan, elite, t2e, device setup, broker, adb, wireless debugging, pairing, privileged</string>
+    <string name="kw_main_titan2_elite_tools">titan, elite, t2e, toolbox, tools, device setup, broker, adb, wireless debugging, pairing, privileged</string>
     <string name="kw_titan2_elite_tools_privileged_access">shizuku, shizukutendcf, broker, privileged, root, shell, adb, automatic, backend</string>
     <string name="kw_titan2_elite_tools_device_setup">adb, wireless debugging, pair, pairing, broker, shizuku, grant, secure settings</string>
     <!-- Exact Typing: per-app raw mode (no autocorrect, suggestions or auto-capitalisation) -->
