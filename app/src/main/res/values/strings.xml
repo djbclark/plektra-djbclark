@@ -1954,6 +1954,10 @@ Each key can be configured as Keycode, Action, Native Ctrl, or None. Use overrid
     <string name="screen_trackpad_hint_enabled_title">Show on-screen hint</string>
     <string name="screen_trackpad_hint_enabled_description">Small pill at the top of the screen while the trackpad is active</string>
     <string name="screen_trackpad_hint_cursor">✥ Cursor</string>
+    <string name="trackpad_exclusive_dialog_title">Only one trackpad feature at a time</string>
+    <string name="trackpad_exclusive_screen_trackpad_message">Turning on Screen trackpad turns off Trackpad Gestures. Both turn touches into cursor movement, so they cannot be on together. Continue?</string>
+    <string name="trackpad_exclusive_trackpad_gestures_message">Turning on Trackpad Gestures turns off Screen trackpad. Both turn touches into cursor movement, so they cannot be on together. Continue?</string>
+    <string name="trackpad_exclusive_continue">Continue</string>
     <string name="screen_trackpad_hint_select">⇧ Select</string>
     <string name="screen_trackpad_hint_sticky">✥ Cursor · tap to exit</string>
     <string name="kw_screen_trackpad">trackpad, cursor, swipe, touchscreen, spacebar, hold, arrow keys, select</string>

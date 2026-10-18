@@ -1839,6 +1839,11 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         lastSystemLocalesSignature = resources.configuration.locales.toLanguageTags()
         lastImeConfiguration = Configuration(resources.configuration)
         prefs = getSharedPreferences("plektra_prefs", Context.MODE_PRIVATE)
+        // Screen trackpad and Trackpad Gestures are never both on; repair prefs written by
+        // an older build or a restored backup before either controller reads them.
+        rocks.pkb.plektra.TrackpadFeatureExclusivity.reconcile(this)?.let { turnedOff ->
+            Log.i(TAG, "Trackpad features were both on; turned off $turnedOff")
+        }
         clearAltOnSpaceEnabled = SettingsManager.getClearAltOnSpace(this)
         physicalKeyboardProfileOverride = SettingsManager.getPhysicalKeyboardProfileOverride(this)
 
