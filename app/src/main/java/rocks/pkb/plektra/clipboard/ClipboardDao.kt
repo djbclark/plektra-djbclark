@@ -495,7 +495,7 @@ class ClipboardDao @VisibleForTesting internal constructor(
 
         /**
          * Get the singleton instance, or create it if needed.
-         * Returns null if instance can't be created (e.g. device locked).
+         * Returns null if the instance can't be created. Database loading is asynchronous.
          */
         fun getInstance(context: Context): ClipboardDao? {
             return instance ?: synchronized(this) {
