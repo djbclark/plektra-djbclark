@@ -4513,6 +4513,9 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             disableEmojiSearchInputCapture()
         }
         
+        if (cursorPositionChanged && collapsedSelection && forwardByOne) {
+            DeferredPunctuationSpaceTracker.onCursorAdvanced(newSelStart)
+        }
         if (cursorPositionChanged && collapsedSelection && !shouldSkipForCommit) {
             if (!forwardByOne) {
                 DeferredPunctuationSpaceTracker.onCursorMoved(currentInputConnection, newSelStart)
