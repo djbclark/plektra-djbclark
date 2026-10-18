@@ -2,8 +2,8 @@ package rocks.pkb.plektra
 
 import android.content.Context
 import android.content.res.Configuration
-import java.util.Locale
 import java.io.File
+import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -153,6 +153,14 @@ class SettingLinkCoverageTest {
                 assertEquals("status_bar_buttons", entry.route.customizationDestination)
             }
         }
+    }
+
+    @Test
+    @Config(qualifiers = "en")
+    fun searchingForSettingsDoesNotMatchEveryEntry() {
+        val available = SettingLinkRegistry.entries.count { it.isAvailable(context) }
+        val matches = SettingLinkRegistry.search(context, "settings")
+        assertTrue("'settings' matched all $available entries", matches.size < available)
     }
 
     @Test

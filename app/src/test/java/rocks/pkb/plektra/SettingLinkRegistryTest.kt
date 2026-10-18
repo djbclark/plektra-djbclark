@@ -89,6 +89,24 @@ class SettingLinkRegistryTest {
     }
 
     @Test
+    fun everyCustomizationPageIsEitherReachableFromMainOrUnderMoreCustomizations() {
+        val moreCustomizationPages = setOf("variations", "sounds", "app_icon", "main_background")
+        SettingLinkRegistry.entries
+            .filter { it.route.destination == SettingsDestination.Customization }
+            .forEach { entry ->
+                val page = entry.route.customizationDestination ?: return@forEach
+                val underMoreCustomizations = R.string.settings_category_customization in
+                    SettingLinkRegistry.breadcrumbTitles(entry.route)
+                assertEquals(
+                    "Customization page '$page' of '${entry.id}' needs a breadcrumb parent or " +
+                        "an entry in the More Customizations set",
+                    page in moreCustomizationPages,
+                    underMoreCustomizations
+                )
+            }
+    }
+
+    @Test
     fun otherSettingsBreadcrumbsKeepTheirScreenAndSubscreen() {
         val entry = requireNotNull(SettingLinkRegistry.byId("on_screen.number_row"))
         assertEquals(listOf(R.string.settings_title, R.string.keyboards_devices_title,
