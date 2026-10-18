@@ -24,7 +24,7 @@ class ClipboardHistoryManager internal constructor(
     private lateinit var clipboardManager: ClipboardManager
     private var clipboardDao: ClipboardDao? = null
 
-    // A DAO that failed to open at startup is retried on the next use instead of staying null.
+    // Retry creation on the next use; the DAO loads stored history on its worker.
     private val dao: ClipboardDao?
         get() = clipboardDao ?: ClipboardDao.getInstance(context).also { clipboardDao = it }
     private var isEnabled: Boolean = true // TODO: Add setting
