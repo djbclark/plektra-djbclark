@@ -1986,6 +1986,11 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         // A keypad opened on a hardware keyboard is field-scoped and must not survive a restart.
         SettingsManager.endFieldScopedVirtualKeyboard(this)
         if (lockedAtCreate) directBootSurfaceMode = SettingsManager.resolveEffectiveSoftwareKeyboardMode(this)
+        // Screen trackpad and Trackpad Gestures are never both on; repair prefs written by
+        // an older build or a restored backup before either controller reads them.
+        rocks.pkb.plektra.TrackpadFeatureExclusivity.reconcile(this)?.let { turnedOff ->
+            Log.i(TAG, "Trackpad features were both on; turned off $turnedOff")
+        }
         clearAltOnSpaceEnabled = SettingsManager.getClearAltOnSpace(this)
         physicalKeyboardProfileOverride = SettingsManager.getPhysicalKeyboardProfileOverride(this)
 
@@ -3250,6 +3255,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
     private fun completeDirectBootHandoff() {
         // onCreate wrote these to memory only.
         SettingsManager.endFieldScopedVirtualKeyboard(this)
+        rocks.pkb.plektra.TrackpadFeatureExclusivity.reconcile(this)
         // Switching the storage notifies no listener; the surface follows the credential settings here.
         val surfaceMode = SettingsManager.resolveEffectiveSoftwareKeyboardMode(this)
         if (directBootSurfaceMode != null && surfaceMode != directBootSurfaceMode) scheduleKeyboardSurfaceTransition(surfaceMode)

@@ -120,6 +120,9 @@ object RestoreManager {
                             )
                         }
                     )
+                    // A backup from a build that allowed both may carry Screen trackpad and
+                    // Trackpad Gestures on together; keep exactly one (Screen trackpad wins).
+                    rocks.pkb.plektra.TrackpadFeatureExclusivity.reconcile(context)
                     // Restored layout files bypass LayoutFileStore; the keyboard used before unlock must match.
                     if (!publish()) throw IOException("The keyboard copy for use before unlock could not be updated")
                     fileSummary to prefsSummary
