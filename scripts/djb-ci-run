@@ -58,9 +58,22 @@ echo "$url"
 [ "$wait" = 1 ] || exit 0
 
 deadline=$(( $(date +%s) + ${DJB_CI_WAIT:-5400} ))
+# A failed poll (e.g. a proxy's 408) is not the run failing: keep polling until
+# the deadline, and give up only after 10 failures in a row.
+fails=0
 while :; do
-  "$api" GET "/repos/$repo/actions/runs/$run_id" > "$work/status.json"
-  status=$(jq -r .status "$work/status.json")
+  if "$api" GET "/repos/$repo/actions/runs/$run_id" > "$work/status.json" &&
+     status=$(jq -re .status "$work/status.json"); then
+    fails=0
+  else
+    fails=$((fails + 1))
+    echo "djb-ci-run: poll $fails failed for run $run_number; retrying" >&2
+    if [ "$fails" -ge 10 ]; then
+      echo "djb-ci-run: 10 polls in a row failed; the run may still be going: $url" >&2
+      exit 1
+    fi
+    status=unknown
+  fi
   case "$status" in
     waiting|running|blocked|unknown) ;;
     *) break ;;
@@ -75,9 +88,16 @@ done
 logdir="$HOME/.local/state/plektra-ci"
 mkdir -p "$logdir"
 log="$logdir/run-$run_number.log"
-"$api" GET "/repos/$repo/actions/runs/$run_id/jobs" > "$work/jobs.json"
-job_id=$(jq -r '.[0].id' "$work/jobs.json")
-"$api" GET "/repos/$repo/actions/jobs/$job_id/logs" > "$log"
-grep -E 'FAILED|tests completed|BUILD (SUCCESSFUL|FAILED)' "$log" | tail -n 40 || true
+for try in 1 2 3; do
+  if "$api" GET "/repos/$repo/actions/runs/$run_id/jobs" > "$work/jobs.json" &&
+     job_id=$(jq -re 'if type=="array" then .[0].id else .jobs[0].id end' "$work/jobs.json") &&
+     "$api" GET "/repos/$repo/actions/jobs/$job_id/logs" > "$log"; then
+    break
+  fi
+  echo "djb-ci-run: fetching the log for run $run_number failed (try $try)" >&2
+  [ "$try" = 3 ] && log="(not fetched)"
+  sleep 10
+done
+[ -f "$log" ] && { grep -E 'FAILED|tests completed|BUILD (SUCCESSFUL|FAILED)' "$log" | tail -n 40 || true; }
 echo "run $run_number: $status ($url, log $log)"
 [ "$status" = success ]
