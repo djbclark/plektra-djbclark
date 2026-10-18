@@ -356,6 +356,47 @@ class ClipboardDaoLoadTest {
     }
 
     @Test
+    fun oversizedStoredTextDoesNotBlockHistoryOrRetainDeletedCopies() {
+        val now = System.currentTimeMillis()
+        store("valid", now)
+        store("deleted", now)
+        store("x".repeat(3 * 1024 * 1024), now, sensitive = true)
+        store("\u0000" + "x".repeat(3 * 1024 * 1024), now, pinned = true)
+        store("\u20ac".repeat(ClipboardDao.MAX_TEXT_BYTES / 3 + 1), now)
+        createDaoBeforeLoad()
+        dao.addClip(now, false, "deleted")
+        dao.deleteClip(requireNotNull(dao.getAt(0)).id)
+
+        release()
+
+        assertEquals(listOf("valid"), texts())
+        assertEquals(listOf(Row("valid", pinned = false, sensitive = false)), rows())
+        assertTrue(ReflectionHelpers.getField<Set<String>>(dao, "deletedBeforeLoad").isEmpty())
+        assertTrue(ReflectionHelpers.getField<Boolean>(dao, "loaded"))
+    }
+
+    @Test
+    fun oversizedCopiesAreRejectedWithoutTruncatingOrLoggingThem() {
+        createDaoBeforeLoad()
+        val now = System.currentTimeMillis()
+        ShadowLog.clear()
+        dao.addClip(now, false, "x".repeat(ClipboardDao.MAX_TEXT_BYTES + 1), sensitive = true)
+        dao.addClip(now, true, "\u20ac".repeat(ClipboardDao.MAX_TEXT_BYTES / 3 + 1))
+        val boundary = "\u20ac".repeat(ClipboardDao.MAX_TEXT_BYTES / 3) + "x"
+        dao.addClip(now, false, boundary, sensitive = true)
+
+        release()
+
+        assertEquals(listOf(boundary), texts())
+        assertEquals(listOf(Row(boundary, pinned = false, sensitive = true)), rows())
+        assertTrue(ShadowLog.getLogs().none { it.tag == "ClipboardDao" })
+        createdDao = ClipboardDao(database)
+        ClipboardDao.awaitDatabaseIdle()
+        assertEquals(listOf(boundary), texts())
+        assertTrue(requireNotNull(dao.getAt(0)).isSensitive)
+    }
+
+    @Test
     fun nullStoredTextDoesNotPreventLoadingValidRows() {
         store("valid", System.currentTimeMillis())
         database.writableDatabase.execSQL(

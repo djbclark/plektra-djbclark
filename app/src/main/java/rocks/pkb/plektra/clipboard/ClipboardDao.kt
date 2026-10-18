@@ -74,7 +74,7 @@ class ClipboardDao @VisibleForTesting internal constructor(
         val superseded = mutableSetOf<Long>()
         db.readableDatabase.query(
             TABLE,
-            arrayOf(COLUMN_ID, COLUMN_TIMESTAMP, COLUMN_PINNED, COLUMN_TEXT, COLUMN_SENSITIVE),
+            arrayOf(COLUMN_ID, COLUMN_TIMESTAMP, COLUMN_PINNED, BOUNDED_TEXT, COLUMN_SENSITIVE),
             null,
             null,
             null,
@@ -193,6 +193,7 @@ class ClipboardDao @VisibleForTesting internal constructor(
             retentionMinutes = retentionMinutes,
             sensitiveRetentionMinutes = sensitiveRetentionMinutes
         )
+        if (text.length > MAX_TEXT_BYTES || text.toByteArray(Charsets.UTF_8).size > MAX_TEXT_BYTES) return
         if (sensitive && timestamp <= System.currentTimeMillis() - sensitiveRetentionMinutes.coerceIn(1, 120) * 60_000L) {
             return
         }
@@ -445,6 +446,11 @@ class ClipboardDao @VisibleForTesting internal constructor(
         private const val COLUMN_PINNED = "PINNED"
         private const val COLUMN_TEXT = "TEXT"
         private const val COLUMN_SENSITIVE = "SENSITIVE"
+
+        internal const val MAX_TEXT_BYTES = 256 * 1024
+        // Keep oversized legacy rows out of CursorWindow, including text containing NUL.
+        private const val BOUNDED_TEXT =
+            "CASE WHEN length(CAST($COLUMN_TEXT AS BLOB)) <= $MAX_TEXT_BYTES THEN $COLUMN_TEXT ELSE NULL END"
 
         const val CREATE_TABLE = """
             CREATE TABLE $TABLE (
