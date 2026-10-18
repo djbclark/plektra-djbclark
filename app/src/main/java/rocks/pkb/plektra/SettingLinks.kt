@@ -1093,7 +1093,6 @@ object SettingLinkRegistry {
         SettingLinkIds.MAIN_TEXT_INPUT to R.string.kw_main_text_input,
         SettingLinkIds.MAIN_AUTO_CORRECTION to R.string.kw_main_auto_correction,
         SettingLinkIds.MAIN_KEYBOARD_THEME to R.string.kw_main_keyboard_theme,
-        "status_bar.presentation" to R.string.kw_status_bar_presentation,
         SettingLinkIds.MAIN_APP_LANGUAGE to R.string.kw_main_app_language,
         SettingLinkIds.MAIN_CUSTOMIZATION to R.string.kw_main_customization,
         SettingLinkIds.MAIN_ADVANCED to R.string.kw_main_advanced,
@@ -1153,7 +1152,8 @@ object SettingLinkRegistry {
         SettingLinkIds.MODIFIERS_INDICATOR_BOTTOM_STRIP to R.string.kw_indicator_bottom_strip,
         SettingLinkIds.MODIFIERS_INDICATOR_MENU_BAR to R.string.kw_indicator_menu_bar,
         SettingLinkIds.MODIFIERS_INDICATOR_STATUS_BAR to R.string.kw_indicator_status_bar,
-        SettingLinkIds.MODIFIERS_CARET_BADGE to R.string.kw_caret_modifier_badge
+        SettingLinkIds.MODIFIERS_CARET_BADGE to R.string.kw_caret_modifier_badge,
+        "status_bar.presentation" to R.string.kw_status_bar_presentation
     )
 
     fun byId(id: String): SettingEntry? = entriesById[
@@ -1295,7 +1295,8 @@ object SettingLinkRegistry {
             val summary = entry.summaryRes?.let { normalizeForSearch(context.getString(it)) }
             val keywords = normalizeForSearch(listOfNotNull(
                 keywordsById[entry.id]?.let(context::getString),
-                breadcrumbTitles(entry.route).joinToString(" ", transform = context::getString),
+                breadcrumbTitles(entry.route).drop(1)
+                    .joinToString(" ", transform = context::getString),
                 entry.id.replace('.', ' ').replace('_', ' ')
             ).joinToString(" "))
             var score = 0
