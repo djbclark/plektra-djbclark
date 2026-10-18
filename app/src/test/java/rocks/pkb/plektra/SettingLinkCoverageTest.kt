@@ -158,9 +158,29 @@ class SettingLinkCoverageTest {
     @Test
     @Config(qualifiers = "en")
     fun searchingForSettingsDoesNotMatchEveryEntry() {
-        val available = SettingLinkRegistry.entries.count { it.isAvailable(context) }
+        val available = SettingLinkRegistry.entries.filter { it.isAvailable(context) }
         val matches = SettingLinkRegistry.search(context, "settings")
-        assertTrue("'settings' matched all $available entries", matches.size < available)
+        assertTrue("'settings' matched all ${available.size} entries", matches.size < available.size)
+
+        // The breadcrumb root is not a keyword, so a hit needs "settings" in the row's own words.
+        fun mentionsSettings(entry: SettingEntry): Boolean = listOfNotNull(
+            context.getString(entry.titleRes),
+            entry.summaryRes?.let(context::getString),
+            SettingLinkRegistry.keywordsById[entry.id]?.let(context::getString),
+            SettingLinkRegistry.breadcrumbTitles(entry.route).drop(1).joinToString(" ", transform = context::getString),
+            entry.id.replace('.', ' ').replace('_', ' ')
+        ).any { it.contains("settings", ignoreCase = true) }
+        matches.forEach { entry ->
+            assertTrue("'${entry.id}' matched 'settings' without mentioning it",
+                entry.route.destination == SettingsDestination.Main || mentionsSettings(entry))
+        }
+        val expected = available.filter {
+            listOfNotNull(context.getString(it.titleRes), it.summaryRes?.let(context::getString))
+                .any { text -> text.contains("settings", ignoreCase = true) }
+        }
+        assertTrue("no row mentions 'settings' in its title or summary", expected.isNotEmpty())
+        assertTrue("rows mentioning 'settings' went missing: ${expected.map { it.id } - matches.map { it.id }.toSet()}",
+            matches.map { it.id }.containsAll(expected.map { it.id }))
     }
 
     @Test

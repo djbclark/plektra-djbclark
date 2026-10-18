@@ -107,6 +107,14 @@ class SettingLinkRegistryTest {
     }
 
     @Test
+    fun breadcrumbParentsAreCustomizationPages() {
+        SettingLinkRegistry.customizationBreadcrumbParents.values.filterNotNull().forEach { parent ->
+            assertTrue("breadcrumb parent '$parent' is not a customization page",
+                SettingLinkRegistry.customizationSubtitles.containsKey(parent))
+        }
+    }
+
+    @Test
     fun otherSettingsBreadcrumbsKeepTheirScreenAndSubscreen() {
         val entry = requireNotNull(SettingLinkRegistry.byId("on_screen.number_row"))
         assertEquals(listOf(R.string.settings_title, R.string.keyboards_devices_title,

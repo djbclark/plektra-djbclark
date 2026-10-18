@@ -1248,7 +1248,7 @@ object SettingLinkRegistry {
     ) + customizationSettingSubtitles()
 
     // These pages use the customization host but are reached from the main screen.
-    private val customizationBreadcrumbParents: Map<String, String?> = mapOf(
+    internal val customizationBreadcrumbParents: Map<String, String?> = mapOf(
         "status_bar_buttons" to null,
         "keyboard_theme" to null,
         "display_geometry" to null,
