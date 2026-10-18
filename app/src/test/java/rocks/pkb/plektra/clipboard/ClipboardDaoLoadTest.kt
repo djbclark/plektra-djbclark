@@ -106,10 +106,24 @@ class ClipboardDaoLoadTest {
     private fun rows(): List<Row> {
         ClipboardDao.awaitDatabaseIdle()
         return database.readableDatabase.query(
-            ClipboardDao.TABLE, arrayOf("TEXT", "PINNED", "SENSITIVE"), null, null, null, null, "TEXT"
+            ClipboardDao.TABLE, arrayOf("TEXT", "PINNED", "SENSITIVE"),
+            "length(CAST(TEXT AS BLOB)) <= ${ClipboardDao.MAX_LOAD_BYTES}", null, null, null, "TEXT"
         ).use {
             buildList {
                 while (it.moveToNext()) add(Row(it.getString(0), it.getInt(1) != 0, it.getInt(2) != 0))
+            }
+        }
+    }
+
+    /** Pinned and sensitive flags of the stored rows [rows] leaves out for being too large to read. */
+    private fun oversizedRows(): List<Pair<Boolean, Boolean>> {
+        ClipboardDao.awaitDatabaseIdle()
+        return database.readableDatabase.query(
+            ClipboardDao.TABLE, arrayOf("PINNED", "SENSITIVE"),
+            "length(CAST(TEXT AS BLOB)) > ${ClipboardDao.MAX_LOAD_BYTES}", null, null, null, "ID"
+        ).use {
+            buildList {
+                while (it.moveToNext()) add(it.getInt(0) != 0 to (it.getInt(1) != 0))
             }
         }
     }
@@ -319,6 +333,65 @@ class ClipboardDaoLoadTest {
     }
 
     @Test
+    fun deleteAfterClearDuringFailedLoadAlsoRemovesTheStoredTwin() {
+        val now = System.currentTimeMillis()
+        store("stored-secret", now - 1_000L, sensitive = true)
+        createDaoBeforeLoad { error("load failed") }
+        dao.addClip(now, false, "stored-secret")
+        val entry = requireNotNull(dao.getAt(0))
+        release()
+
+        dao.togglePinned(entry.id)
+        dao.clearNonPinned()
+        assertEquals(
+            listOf(Row("stored-secret", true, false), Row("stored-secret", false, true)).toSet(),
+            rows().toSet()
+        )
+        dao.deleteClip(entry.id)
+
+        assertEquals(emptyList<Row>(), rows())
+        createdDao = ClipboardDao(database)
+        ClipboardDao.awaitDatabaseIdle()
+        assertEquals(0, dao.count())
+    }
+
+    @Test
+    fun clearNonPinnedAfterTheLoadRemovesEveryUnpinnedRowAndKeepsThePinnedClip() {
+        val now = System.currentTimeMillis()
+        store("pinned", now, pinned = true)
+        store("a", now - 1_000L)
+        createDaoBeforeLoad()
+        release()
+        // A row that appeared after the load, with the text of a kept clip.
+        store("pinned", now - 2_000L)
+
+        dao.clearNonPinned()
+        ClipboardDao.awaitDatabaseIdle()
+
+        assertEquals(listOf("pinned"), texts())
+        assertEquals(listOf(Row("pinned", pinned = true, sensitive = false)), rows())
+    }
+
+    @Test
+    fun clearNonPinnedDuringFailedLoadDropsOversizedRowsButKeepsTheKeptClipsTwin() {
+        val now = System.currentTimeMillis()
+        store("kept", now - 1_000L)
+        store("x".repeat(ClipboardDao.MAX_LOAD_BYTES + 1), now)
+        store("other", now)
+        createDaoBeforeLoad { error("load failed") }
+        dao.addClip(now, true, "kept")
+        release()
+
+        dao.clearNonPinned()
+
+        assertEquals(
+            setOf(Row("kept", true, false), Row("kept", false, false)),
+            rows().toSet()
+        )
+        assertEquals(emptyList<Pair<Boolean, Boolean>>(), oversizedRows())
+    }
+
+    @Test
     fun unpinAfterClearDuringFailedLoadKeepsTheClipInHistoryAndOnDisk() {
         val now = System.currentTimeMillis()
         var failLoad = true
@@ -497,11 +570,14 @@ class ClipboardDaoLoadTest {
     @Test
     fun oversizedStoredTextDoesNotBlockHistoryOrRetainDeletedCopies() {
         val now = System.currentTimeMillis()
+        val tooBig = ClipboardDao.MAX_LOAD_BYTES + 1
         store("valid", now)
         store("deleted", now)
         store("x".repeat(3 * 1024 * 1024), now, sensitive = true)
+        store("y".repeat(3 * 1024 * 1024), now, pinned = true, sensitive = true)
+        store("\u20ac".repeat(tooBig / 3 + 1), now)
+        // Unpinned rows past the bound are dropped; a pinned clip is left unread on disk.
         store("\u0000" + "x".repeat(3 * 1024 * 1024), now, pinned = true)
-        store("\u20ac".repeat(ClipboardDao.MAX_TEXT_BYTES / 3 + 1), now)
         createDaoBeforeLoad()
         dao.addClip(now, false, "deleted")
         dao.deleteClip(requireNotNull(dao.getAt(0)).id)
@@ -510,8 +586,24 @@ class ClipboardDaoLoadTest {
 
         assertEquals(listOf("valid"), texts())
         assertEquals(listOf(Row("valid", pinned = false, sensitive = false)), rows())
+        assertEquals(listOf(true to false), oversizedRows())
         assertTrue(ReflectionHelpers.getField<Set<String>>(dao, "deletedBeforeLoad").isEmpty())
         assertTrue(ReflectionHelpers.getField<Boolean>(dao, "loaded"))
+    }
+
+    @Test
+    fun storedTextBetweenTheCopyCapAndTheLoadBoundIsLoadedAndKept() {
+        val now = System.currentTimeMillis()
+        val pinned = "p".repeat(ClipboardDao.MAX_TEXT_BYTES + 1)
+        val unpinned = "\u20ac".repeat(200_000)
+        store(pinned, now, pinned = true)
+        store(unpinned, now - 1_000L)
+        createDaoBeforeLoad()
+
+        release()
+
+        assertEquals(listOf(pinned, unpinned), texts())
+        assertEquals(setOf(Row(pinned, true, false), Row(unpinned, false, false)), rows().toSet())
     }
 
     @Test
