@@ -39,11 +39,6 @@ jobs:
           java-version: "17"
           cache: gradle
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: 'tools platform-tools platforms;android-36 build-tools;36.0.0'
-
       - name: Install debug signing key
         env:
           DJB_DEBUG_KEYSTORE_B64: ${{ secrets.DJB_DEBUG_KEYSTORE_B64 }}
@@ -66,10 +61,27 @@ jobs:
       - name: Check the APK signer
         run: |
           set -euo pipefail
-          build_tools=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)
-          "$build_tools/apksigner" verify --print-certs "$APK" > /tmp/signer.txt
+          # Prefer apksigner when the Android Gradle Plugin left build-tools on disk;
+          # otherwise keytool -printcert -jarfile (same SHA-256 digest string form differs).
+          if command -v apksigner >/dev/null 2>&1; then
+            apksigner verify --print-certs "$APK" > /tmp/signer.txt
+          else
+            bt=$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}" "${ANDROID_SDK_ROOT:-}" \
+              "$HOME/Android/Sdk" -type f -name apksigner 2>/dev/null | head -n 1 || true)
+            if [ -n "${bt:-}" ]; then
+              "$bt" verify --print-certs "$APK" > /tmp/signer.txt
+            else
+              keytool -printcert -jarfile "$APK" > /tmp/signer.txt
+            fi
+          fi
           cat /tmp/signer.txt
-          grep -q "certificate SHA-256 digest: $DJB_SIGNER_SHA256" /tmp/signer.txt
+          # apksigner: "certificate SHA-256 digest: aabb..."
+          # keytool:   "SHA256: AA:BB:..."
+          if grep -qi "certificate SHA-256 digest: $DJB_SIGNER_SHA256" /tmp/signer.txt; then
+            exit 0
+          fi
+          compact=$(tr -d ':\n ' < /tmp/signer.txt | tr 'A-F' 'a-f')
+          echo "$compact" | grep -qi "$DJB_SIGNER_SHA256"
 
       - name: Publish the GitHub release
         env:
@@ -78,10 +90,10 @@ jobs:
           TARGET_REF: ${{ steps.meta.outputs.target_ref }}
         run: |
           set -euo pipefail
-          export COMMIT_SUBJECT="$(git log -1 --format=%s -- "$TARGET_SHA" 2>/dev/null || true)"
-          # Prefer subject of the real target commit if present in this repo.
           if git cat-file -e "${TARGET_SHA}^{commit}" 2>/dev/null; then
             COMMIT_SUBJECT=$(git log -1 --format=%s "$TARGET_SHA")
+          else
+            COMMIT_SUBJECT=$(git log -1 --format=%s)
           fi
           export COMMIT_SUBJECT SIGNER_SHA256="$DJB_SIGNER_SHA256"
           python3 .github/ci/djb_release.py "$APK"

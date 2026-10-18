@@ -36,11 +36,6 @@ jobs:
           java-version: "17"
           cache: gradle
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: 'tools platform-tools platforms;android-36 build-tools;36.0.0'
-
       - name: Gradle
         env:
           TASKS: ${{ steps.meta.outputs.tasks }}
