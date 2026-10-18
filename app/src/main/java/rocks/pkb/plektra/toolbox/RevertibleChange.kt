@@ -51,6 +51,7 @@ object RevertibleChange {
 
     private const val TAG = "RevertibleChange"
     private const val KEY_PENDING = "toolbox_pending_revert"
+    private const val KEY_PREVIOUS_DPI = "previous_dpi"
 
     /** Long enough to read the screen and react, short enough not to strand anyone. */
     const val CONFIRM_WINDOW_MS = 15_000L
@@ -58,7 +59,10 @@ object RevertibleChange {
     /** Covers the broker's mDNS discovery between arming and the command landing. */
     private const val ARM_SLACK_MS = 20_000L
 
-    /** What can be applied with a revert armed, and the fixed command that undoes each. */
+    /**
+     * What can be applied with a revert armed, and the fixed command that undoes each when nothing
+     * was set beforehand ([Pending.revert] swaps in the earlier value when there was one).
+     */
     internal enum class Kind(val revert: PrivilegedCommand) {
         DENSITY(PrivilegedCommand.ResetDensity)
     }
@@ -69,9 +73,20 @@ object RevertibleChange {
         data class Failed(val reason: String) : Outcome
     }
 
-    /** A change waiting to be confirmed; [deadlineMs] is wall-clock time (System.currentTimeMillis). */
-    internal data class Pending(val kind: Kind, val deadlineMs: Long) {
+    /**
+     * A change waiting to be confirmed; [deadlineMs] is wall-clock time (System.currentTimeMillis).
+     * [previousDpi] is the density that was in force before a [Kind.DENSITY] change when the user
+     * already had an override, or null when there was none, so the revert goes back to exactly that.
+     */
+    internal data class Pending(val kind: Kind, val deadlineMs: Long, val previousDpi: Int? = null) {
         fun remainingMs(now: Long = System.currentTimeMillis()): Long = (deadlineMs - now).coerceAtLeast(0L)
+
+        /** The command that undoes this change: the earlier override, else the kind's reset. */
+        val revert: PrivilegedCommand
+            get() = when {
+                kind == Kind.DENSITY && previousDpi != null -> PrivilegedCommand.SetDensity(previousDpi)
+                else -> kind.revert
+            }
     }
 
     private val timer: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor { r ->
@@ -85,12 +100,18 @@ object RevertibleChange {
     @Volatile
     private var armedTrigger: BrokerTrigger? = null
 
-    internal fun apply(context: Context, kind: Kind, command: PrivilegedCommand, trigger: BrokerTrigger?): Outcome {
+    internal fun apply(
+        context: Context,
+        kind: Kind,
+        command: PrivilegedCommand,
+        trigger: BrokerTrigger?,
+        previousDpi: Int? = null
+    ): Outcome {
         if (!PrivilegedBackends.hasAccess(context)) return Outcome.NotPaired
         val appContext = context.applicationContext
 
         // Recorded first: a change we cannot reverse is worse than one that never lands.
-        arm(appContext, Pending(kind, System.currentTimeMillis() + CONFIRM_WINDOW_MS + ARM_SLACK_MS))
+        arm(appContext, Pending(kind, System.currentTimeMillis() + CONFIRM_WINDOW_MS + ARM_SLACK_MS, previousDpi))
 
         val result = PrivilegedShell.run(appContext, command, trigger)
         if (!result.ok) {
@@ -99,7 +120,7 @@ object RevertibleChange {
         }
 
         // The window starts when the change is on screen, not when we asked for it.
-        val pending = Pending(kind, System.currentTimeMillis() + CONFIRM_WINDOW_MS)
+        val pending = Pending(kind, System.currentTimeMillis() + CONFIRM_WINDOW_MS, previousDpi)
         arm(appContext, pending)
         schedule(appContext, pending, trigger)
         return Outcome.Applied
@@ -129,7 +150,7 @@ object RevertibleChange {
     fun revertNow(context: Context, trigger: BrokerTrigger?): Boolean {
         val appContext = context.applicationContext
         val pending = pending(appContext) ?: return true
-        val ok = PrivilegedShell.run(appContext, pending.kind.revert, trigger).ok
+        val ok = PrivilegedShell.run(appContext, pending.revert, trigger).ok
         if (ok) disarm(appContext)
         return ok
     }
@@ -148,10 +169,19 @@ object RevertibleChange {
             val json = JSONObject(raw)
             Pending(
                 kind = Kind.valueOf(json.getString("kind")),
-                deadlineMs = json.getLong("deadline")
+                deadlineMs = json.getLong("deadline"),
+                previousDpi = readPreviousDpi(json)
             )
         }.onFailure { Log.w(TAG, "Pending revert unreadable", it) }.getOrNull()
     }
+
+    /**
+     * The stored earlier density, only if it is an Int inside [PrivilegedCommand.SetDensity]'s
+     * bounds; anything else reads as "no override", which reverts to the stock value.
+     */
+    private fun readPreviousDpi(json: JSONObject): Int? =
+        json.optInt(KEY_PREVIOUS_DPI, 0)
+            .takeIf { it in PrivilegedCommand.SetDensity.MIN_DPI..PrivilegedCommand.SetDensity.MAX_DPI }
 
     private fun prefs(context: Context) = EmbeddedAdbInit.prefs(context.applicationContext)
 
@@ -159,6 +189,7 @@ object RevertibleChange {
         val json = JSONObject()
             .put("kind", pending.kind.name)
             .put("deadline", pending.deadlineMs)
+            .apply { pending.previousDpi?.let { put(KEY_PREVIOUS_DPI, it) } }
         prefs(context).edit().putString(KEY_PENDING, json.toString()).apply()
     }
 

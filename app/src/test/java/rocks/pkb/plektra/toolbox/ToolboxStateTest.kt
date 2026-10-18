@@ -80,6 +80,44 @@ class ToolboxStateTest {
     }
 
     @Test
+    fun `a density revert goes back to the earlier override, and to stock only without one`() {
+        // The user had 295 on a 300 panel: Apply must remember it, and the revert restores it.
+        val override = DisplayDensity.Info(physical = 300, current = 295)
+        assertEquals(295, DisplayDensity.previousOverride(override))
+        val withOverride = RevertibleChange.Pending(
+            RevertibleChange.Kind.DENSITY, 1L, DisplayDensity.previousOverride(override)
+        )
+        assertEquals(listOf(listOf("wm", "density", "295")), withOverride.revert.argvs("p.q"))
+
+        // No override in force: the revert is the plain reset.
+        val stock = DisplayDensity.Info(physical = 300, current = 300)
+        assertNull(DisplayDensity.previousOverride(stock))
+        val noOverride = RevertibleChange.Pending(
+            RevertibleChange.Kind.DENSITY, 1L, DisplayDensity.previousOverride(stock)
+        )
+        assertEquals(PrivilegedCommand.ResetDensity, noOverride.revert)
+    }
+
+    @Test
+    fun `the earlier density survives the preferences round trip and is range checked`() {
+        val prefs = EmbeddedAdbInit.prefs(context)
+        prefs.edit().putString("toolbox_pending_revert", """{"kind":"DENSITY","deadline":5,"previous_dpi":295}""").commit()
+        val pending = RevertibleChange.pending(context)!!
+        assertEquals(295, pending.previousDpi)
+        assertEquals(listOf(listOf("wm", "density", "295")), pending.revert.argvs("p.q"))
+
+        // A stored value outside the command's bounds, or no value at all, reverts to stock.
+        for (stored in listOf("""{"kind":"DENSITY","deadline":5,"previous_dpi":99999}""",
+            """{"kind":"DENSITY","deadline":5,"previous_dpi":-3}""", """{"kind":"DENSITY","deadline":5}""")) {
+            prefs.edit().putString("toolbox_pending_revert", stored).commit()
+            val read = RevertibleChange.pending(context)!!
+            assertNull(read.previousDpi)
+            assertEquals(PrivilegedCommand.ResetDensity, read.revert)
+        }
+        prefs.edit().remove("toolbox_pending_revert").commit()
+    }
+
+    @Test
     fun `status bar toggle defaults to shown and only hides on a Titan 2 Elite`() {
         SettingsManager.getPreferences(context).edit().remove(SettingsManager.KEY_SHOW_STATUS_BAR).commit()
         assertTrue(SettingsManager.getShowStatusBar(context))

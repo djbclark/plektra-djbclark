@@ -69,9 +69,8 @@ object DisplayDensity {
     /**
      * Applies a density with the revert already armed.
      *
-     * The revert is always `wm density reset` rather than "back to the previous number":
-     * chaining changes would otherwise leave the undo pointing at another override rather
-     * than at the value the panel actually shipped with.
+     * The revert restores the density in force before this call: the earlier override when
+     * the user had one, and `wm density reset` only when the panel was on its stock value.
      */
     fun apply(context: Context, info: Info, density: Int, trigger: BrokerTrigger?): RevertibleChange.Outcome {
         val allowed = range(info.physical)
@@ -80,9 +79,13 @@ object DisplayDensity {
             return RevertibleChange.Outcome.Failed("Outside the safe range")
         }
         return RevertibleChange.apply(
-            context, RevertibleChange.Kind.DENSITY, PrivilegedCommand.SetDensity(density), trigger
+            context, RevertibleChange.Kind.DENSITY, PrivilegedCommand.SetDensity(density), trigger,
+            previousDpi = previousOverride(info)
         )
     }
+
+    /** The override to restore on revert, or null when the panel is on its stock density. */
+    internal fun previousOverride(info: Info): Int? = info.current.takeIf { info.isOverridden }
 
     /** Back to the panel's own density, with no confirmation window — this is always safe. */
     fun reset(context: Context, trigger: BrokerTrigger?): Boolean {
