@@ -314,9 +314,9 @@ class ClipboardDao @VisibleForTesting internal constructor(
         dbExecutor.execute {
             val rowId = entry.rowId
             if (rowId != PENDING_ID) db.writableDatabase.delete(TABLE, "$COLUMN_ID = $rowId", null)
-            // Until the load succeeds, an unmerged stored copy of the text would come back
-            // on the next start, since deletedBeforeLoad only lives in memory.
-            if (owesTwins) deleteUnpinnedRows { it == entry.text }
+            // Until the load succeeds, an unmerged stored copy of the text, pinned or not, would
+            // come back on the next start, since deletedBeforeLoad only lives in memory.
+            if (owesTwins) deleteRows(includePinned = true) { it == entry.text }
         }
     }
 
@@ -412,21 +412,22 @@ class ClipboardDao @VisibleForTesting internal constructor(
             if (keptTexts.isEmpty()) {
                 db.writableDatabase.delete(TABLE, "$COLUMN_PINNED = 0", null)
             } else {
-                deleteUnpinnedRows { it == null || it !in keptTexts }
+                deleteRows { it == null || it !in keptTexts }
             }
         }
     }
 
     /**
-     * Deletes the unpinned rows whose bounded text [shouldDelete] accepts (null for an oversized
-     * or empty one). Compares in Kotlin so no clip text is ever put into SQL.
+     * Deletes the unpinned rows, and the pinned ones if [includePinned], whose bounded text
+     * [shouldDelete] accepts (null for an oversized or empty one). Compares in Kotlin so no clip
+     * text is ever put into SQL.
      */
-    private fun deleteUnpinnedRows(shouldDelete: (String?) -> Boolean) {
+    private fun deleteRows(includePinned: Boolean = false, shouldDelete: (String?) -> Boolean) {
         val database = db.writableDatabase
         database.beginTransaction()
         try {
             val removedIds = database.query(
-                TABLE, arrayOf(COLUMN_ID, BOUNDED_TEXT), "$COLUMN_PINNED = 0",
+                TABLE, arrayOf(COLUMN_ID, BOUNDED_TEXT), if (includePinned) null else "$COLUMN_PINNED = 0",
                 null, null, null, null
             ).use { cursor ->
                 buildList {
