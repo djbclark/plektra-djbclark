@@ -53,6 +53,10 @@ fun TrackpadGestureSettingsScreen(
         mutableStateOf(SettingsManager.getTrackpadDeleteSwipeThreshold(context))
     }
     var showTutorialDialog by remember { mutableStateOf(false) }
+    // Turning on while Screen trackpad is on asks first (TrackpadFeatureExclusivity).
+    var confirmEnable by remember { mutableStateOf(false) }
+    // Follow the Screen trackpad page, a restore or the IME's reconcile while this page is up.
+    ObserveTrackpadFeaturePrefs { trackpadGesturesEnabled = SettingsManager.getTrackpadGesturesEnabled(context) }
     // The page is decided once from the hosting activity's intent (see TrackpadSettingsNavigation.kt).
     val initialPage = remember {
         trackpadGesturePageFor(settingsChild(context, TRACKPAD_CHILD_SECTION), settingsLinkId(context))
@@ -240,16 +244,28 @@ fun TrackpadGestureSettingsScreen(
                     FeatureStatusIcon(FeatureStatus.Experimental)
                     Switch(
                         checked = trackpadGesturesEnabled,
-                        onCheckedChange = { enabled ->
-                            trackpadGesturesEnabled = enabled
-                            SettingsManager.setTrackpadGesturesEnabled(context, enabled)
+                        onCheckedChange = { wanted ->
+                            val screenTrackpadOn = SettingsManager.isScreenTrackpadEnabled(context)
+                            if (wanted && TrackpadFeatureExclusivity.enablingNeedsConfirmation(TrackpadFeature.TRACKPAD_GESTURES, screenTrackpadOn)) {
+                                confirmEnable = true
+                            } else {
+                                TrackpadFeatureExclusivity.setEnabled(context, TrackpadFeature.TRACKPAD_GESTURES, wanted)
+                                trackpadGesturesEnabled = wanted
+                            }
                         }
                     )
                 }
             }
-
-            if (trackpadGesturesEnabled && SettingsManager.isScreenTrackpadEnabled(context)) {
-                ScreenTrackpadConflictWarning(R.string.trackpad_gestures_conflict_screen_trackpad_warning)
+            if (confirmEnable) {
+                TrackpadExclusiveDialog(
+                    feature = TrackpadFeature.TRACKPAD_GESTURES,
+                    onContinue = {
+                        confirmEnable = false
+                        TrackpadFeatureExclusivity.setEnabled(context, TrackpadFeature.TRACKPAD_GESTURES, true)
+                        trackpadGesturesEnabled = true
+                    },
+                    onDismiss = { confirmEnable = false }
+                )
             }
 
             if (DeviceSpecific.isTitan2EliteDevice()) {

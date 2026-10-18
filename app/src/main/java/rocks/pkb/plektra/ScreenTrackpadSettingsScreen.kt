@@ -1,6 +1,8 @@
 package rocks.pkb.plektra
 
+import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.net.Uri
 import android.provider.Settings
 import androidx.compose.foundation.clickable
@@ -39,6 +41,10 @@ fun ScreenTrackpadSettingsScreen(
     var showHint by remember { mutableStateOf(SettingsManager.isScreenTrackpadHintEnabled(context)) }
     var triggerMenuExpanded by remember { mutableStateOf(false) }
     var activationMenuExpanded by remember { mutableStateOf(false) }
+    // Turning on while Trackpad Gestures is on asks first (TrackpadFeatureExclusivity).
+    var confirmEnable by remember { mutableStateOf(false) }
+    // Follow the other screen, a restore or the IME's reconcile while this page is up.
+    ObserveTrackpadFeaturePrefs { enabled = SettingsManager.isScreenTrackpadEnabled(context) }
 
     // Poll the overlay permission so the status updates when the user comes back from system settings.
     var statusTick by remember { mutableStateOf(0) }
@@ -107,23 +113,35 @@ fun ScreenTrackpadSettingsScreen(
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
         ) {
+            fun applyEnabled(wanted: Boolean) {
+                TrackpadFeatureExclusivity.setEnabled(context, TrackpadFeature.SCREEN_TRACKPAD, wanted)
+                enabled = wanted
+                if (wanted && !Settings.canDrawOverlays(context)) openOverlayPermission()
+            }
             ScreenTrackpadSwitchRow(
                 icon = Icons.Filled.TouchApp,
                 title = stringResource(R.string.screen_trackpad_enabled_title),
                 description = stringResource(R.string.screen_trackpad_enabled_description),
                 checked = enabled,
                 linkId = SettingLinkIds.SCREEN_TRACKPAD_ENABLED,
-                onCheckedChange = {
-                    enabled = it
-                    SettingsManager.setScreenTrackpadEnabled(context, it)
-                    if (it && !Settings.canDrawOverlays(context)) openOverlayPermission()
+                onCheckedChange = { wanted ->
+                    val gesturesOn = SettingsManager.getTrackpadGesturesEnabled(context)
+                    if (wanted && TrackpadFeatureExclusivity.enablingNeedsConfirmation(TrackpadFeature.SCREEN_TRACKPAD, gesturesOn)) {
+                        confirmEnable = true
+                    } else {
+                        applyEnabled(wanted)
+                    }
                 }
             )
-
-            // Re-read on each poll tick so the notice follows the other screen's switch.
-            val gesturesAlsoOn = remember(statusTick) { SettingsManager.getTrackpadGesturesEnabled(context) }
-            if (enabled && gesturesAlsoOn) {
-                ScreenTrackpadConflictWarning(R.string.screen_trackpad_conflict_gestures_warning)
+            if (confirmEnable) {
+                TrackpadExclusiveDialog(
+                    feature = TrackpadFeature.SCREEN_TRACKPAD,
+                    onContinue = {
+                        confirmEnable = false
+                        applyEnabled(true)
+                    },
+                    onDismiss = { confirmEnable = false }
+                )
             }
 
             // Permission status row
@@ -282,27 +300,53 @@ fun ScreenTrackpadSettingsScreen(
     }
 }
 
+/**
+ * Asks before turning [feature] on while the other trackpad feature is on. Continue turns
+ * [feature] on and the other off; Cancel changes nothing (the switch stays off).
+ */
 @Composable
-internal fun ScreenTrackpadConflictWarning(messageRes: Int) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Icon(
-            imageVector = Icons.Filled.Warning,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.error,
-            modifier = Modifier.size(24.dp)
-        )
-        Text(
-            text = stringResource(messageRes),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.error,
-            modifier = Modifier.weight(1f)
-        )
+internal fun TrackpadExclusiveDialog(
+    feature: TrackpadFeature,
+    onContinue: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = stringResource(R.string.trackpad_exclusive_dialog_title)) },
+        text = {
+            Text(
+                text = stringResource(
+                    when (feature) {
+                        TrackpadFeature.SCREEN_TRACKPAD -> R.string.trackpad_exclusive_screen_trackpad_message
+                        TrackpadFeature.TRACKPAD_GESTURES -> R.string.trackpad_exclusive_trackpad_gestures_message
+                    }
+                )
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onContinue) { Text(text = stringResource(R.string.trackpad_exclusive_continue)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(text = stringResource(R.string.cancel)) }
+        }
+    )
+}
+
+/**
+ * Calls [onChanged] whenever either trackpad feature's preference changes, so a screen's
+ * switch follows the other screen's confirm dialog, a backup restore or the IME's reconcile.
+ */
+@Composable
+internal fun ObserveTrackpadFeaturePrefs(onChanged: () -> Unit) {
+    val context = LocalContext.current
+    val currentOnChanged by rememberUpdatedState(onChanged)
+    DisposableEffect(context) {
+        val prefs = context.getSharedPreferences("plektra_prefs", Context.MODE_PRIVATE)
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == "screen_trackpad_enabled" || key == "trackpad_gestures_enabled") currentOnChanged()
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
 }
 
