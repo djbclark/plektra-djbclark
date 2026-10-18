@@ -58,6 +58,31 @@ class ToolboxParsingTest {
     }
 
     @Test
+    fun `fn writes go to the privileged backend whenever the settings route is missing or fails`() {
+        fun write(canWrite: Boolean, settingsWorks: Boolean, hasBackend: Boolean, backendWorks: Boolean): Pair<FnCtrlRemap.Result, List<String>> {
+            val ran = mutableListOf<String>()
+            val result = FnCtrlRemap.writeWithFallback(
+                canWriteSettings = canWrite,
+                viaSettings = { ran += "settings"; settingsWorks },
+                hasBackend = hasBackend,
+                viaBackend = { ran += "backend"; backendWorks }
+            )
+            return result to ran
+        }
+
+        // No "Modify system settings": the backend is tried (this was the reset that never was).
+        assertEquals(FnCtrlRemap.Result.SUCCESS to listOf("backend"), write(false, false, true, true))
+        assertEquals(FnCtrlRemap.Result.FAILED to listOf("backend"), write(false, false, true, false))
+        // Granted and working: the backend is not touched.
+        assertEquals(FnCtrlRemap.Result.SUCCESS to listOf("settings"), write(true, true, true, false))
+        // Granted but the write did not take: fall through to the backend.
+        assertEquals(FnCtrlRemap.Result.SUCCESS to listOf("settings", "backend"), write(true, false, true, true))
+        // Neither route: ask for the permission; a failed settings write alone is a failure.
+        assertEquals(FnCtrlRemap.Result.NEEDS_PERMISSION to emptyList<String>(), write(false, false, false, false))
+        assertEquals(FnCtrlRemap.Result.FAILED to listOf("settings"), write(true, false, false, false))
+    }
+
+    @Test
     fun `short names keep only the tail of an activity`() {
         assertEquals("ShortcutActivity", KeyInventory.shortName("com.agui.shortcutsettings.ShortcutActivity"))
         assertEquals("plain", KeyInventory.shortName("plain"))

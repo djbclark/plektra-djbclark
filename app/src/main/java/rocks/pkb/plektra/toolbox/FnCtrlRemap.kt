@@ -17,7 +17,8 @@ import moe.shizuku.manager.adb.EmbeddedAdbInit
  * firmware, and a reboot may be needed for it to take effect.
  *
  * The write goes through `Settings.System` when "Modify system settings" is granted, and
- * otherwise through the broker's typed [PrivilegedCommand.SetFnProgrammableKey]. Either way the
+ * otherwise (or when that write does not take) through the privileged backend's typed
+ * [PrivilegedCommand.SetFnProgrammableKey], for the apply and the reset alike. Either way the
  * result is confirmed by reading the two rows back through the Settings API, never from shell
  * output. The device's ORIGINAL values are captured once, before the first overwrite, so a reset
  * restores the exact prior state. The capture lives in the broker's preferences file
@@ -78,24 +79,48 @@ object FnCtrlRemap {
     }
 
     private fun write(context: Context, enable: Int, function: Int, trigger: BrokerTrigger?): Result {
-        if (Settings.System.canWrite(context)) {
-            val ok = runCatching {
-                Settings.System.putInt(context.contentResolver, FN_KEY_ENABLE, enable)
-                Settings.System.putInt(context.contentResolver, FN_KEY_FUNCTION, function)
-            }.getOrDefault(false)
-            return if (ok && readPair(context) == (enable to function)) Result.SUCCESS else Result.FAILED
-        }
-        if (PrivilegedBackends.hasAccess(context)) {
-            if (enable !in 0..PrivilegedCommand.SetFnProgrammableKey.MAX_VALUE ||
-                function !in 0..PrivilegedCommand.SetFnProgrammableKey.MAX_VALUE
-            ) return Result.FAILED
-            val ran = PrivilegedShell.run(context, PrivilegedCommand.SetFnProgrammableKey(enable, function), trigger).ok
-            // The shell is not the witness: read the rows back through the Settings API.
-            val seen = readPair(context)
-            if (ran && seen != (enable to function)) Log.w(TAG, "Fn rows read $seen after writing $enable/$function")
-            return if (ran && seen == (enable to function)) Result.SUCCESS else Result.FAILED
-        }
-        return Result.NEEDS_PERMISSION
+        val canWrite = Settings.System.canWrite(context)
+        return writeWithFallback(
+            canWriteSettings = canWrite,
+            viaSettings = {
+                val ok = runCatching {
+                    Settings.System.putInt(context.contentResolver, FN_KEY_ENABLE, enable)
+                    Settings.System.putInt(context.contentResolver, FN_KEY_FUNCTION, function)
+                }.getOrDefault(false)
+                ok && readPair(context) == (enable to function)
+            },
+            hasBackend = PrivilegedBackends.hasAccess(context),
+            viaBackend = {
+                if (enable !in 0..PrivilegedCommand.SetFnProgrammableKey.MAX_VALUE ||
+                    function !in 0..PrivilegedCommand.SetFnProgrammableKey.MAX_VALUE
+                ) {
+                    false
+                } else {
+                    val ran = PrivilegedShell.run(context, PrivilegedCommand.SetFnProgrammableKey(enable, function), trigger).ok
+                    // The shell is not the witness: read the rows back through the Settings API.
+                    val seen = readPair(context)
+                    if (ran && seen != (enable to function)) Log.w(TAG, "Fn rows read $seen after writing $enable/$function")
+                    ran && seen == (enable to function)
+                }
+            }
+        )
+    }
+
+    /**
+     * The order of the two routes, shared by apply and reset: the Settings API when "Modify system
+     * settings" is granted, and the privileged backend (broker or Shizuku, as the user chose)
+     * whenever that route is missing OR did not take, so a grant that does not stick still reaches
+     * the backend. [Result.NEEDS_PERMISSION] only when neither route exists.
+     */
+    internal fun writeWithFallback(
+        canWriteSettings: Boolean,
+        viaSettings: () -> Boolean,
+        hasBackend: Boolean,
+        viaBackend: () -> Boolean
+    ): Result {
+        if (canWriteSettings && viaSettings()) return Result.SUCCESS
+        if (hasBackend) return if (viaBackend()) Result.SUCCESS else Result.FAILED
+        return if (canWriteSettings) Result.FAILED else Result.NEEDS_PERMISSION
     }
 
     private fun readPair(context: Context): Pair<Int, Int> = runCatching {
