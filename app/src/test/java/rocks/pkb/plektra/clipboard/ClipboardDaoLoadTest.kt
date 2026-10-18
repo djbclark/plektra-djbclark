@@ -356,6 +356,23 @@ class ClipboardDaoLoadTest {
     }
 
     @Test
+    fun deleteDuringFailedLoadAlsoRemovesAStoredPinnedTwin() {
+        val now = System.currentTimeMillis()
+        store("T", now - 1_000L, pinned = true)
+        createDaoBeforeLoad { error("load failed") }
+        dao.addClip(now, false, "T")
+        val entry = requireNotNull(dao.getAt(0))
+        release()
+
+        dao.deleteClip(entry.id)
+
+        assertEquals(emptyList<Row>(), rows())
+        createdDao = ClipboardDao(database)
+        ClipboardDao.awaitDatabaseIdle()
+        assertEquals(0, dao.count())
+    }
+
+    @Test
     fun clearNonPinnedAfterTheLoadRemovesEveryUnpinnedRowAndKeepsThePinnedClip() {
         val now = System.currentTimeMillis()
         store("pinned", now, pinned = true)
