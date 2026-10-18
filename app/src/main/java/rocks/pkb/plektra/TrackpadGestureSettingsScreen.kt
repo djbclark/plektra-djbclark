@@ -2,6 +2,7 @@ package rocks.pkb.plektra
 
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -52,9 +53,18 @@ fun TrackpadGestureSettingsScreen(
         mutableStateOf(SettingsManager.getTrackpadDeleteSwipeThreshold(context))
     }
     var showTutorialDialog by remember { mutableStateOf(false) }
-    var showSensitivitySettings by remember { mutableStateOf(settingsChild(context, "trackpad") == "sensitivity") }
-    // child page (hold a key, swipe anywhere on the screen to move the cursor)
-    var showScreenTrackpadSettings by remember { mutableStateOf(settingsChild(context, "trackpad") == "screen") }
+    // The page is decided once from the hosting activity's intent (see TrackpadSettingsNavigation.kt).
+    val initialPage = remember {
+        trackpadGesturePageFor(settingsChild(context, TRACKPAD_CHILD_SECTION), settingsLinkId(context))
+    }
+    var showSensitivitySettings by remember { mutableStateOf(initialPage == TrackpadGesturePage.Sensitivity) }
+    // child page (hold a key, swipe anywhere on the screen to move the cursor).
+    // Opened from its row it is its own activity (Back finishes it); opened by a setting link it
+    // replaces this screen in place (Back returns to the gesture settings).
+    val screenTrackpadIsOwnActivity = remember {
+        settingsChild(context, TRACKPAD_CHILD_SECTION) == TRACKPAD_CHILD_PAGE_SCREEN
+    }
+    var showScreenTrackpadSettings by remember { mutableStateOf(initialPage == TrackpadGesturePage.ScreenTrackpad) }
     var shizukuStatus by remember { mutableStateOf(ShizukuStatus.NotConnected) }
     var trackpadProvider by remember { mutableStateOf(SettingsManager.getTrackpadProvider(context)) }
     var providerMenuExpanded by remember { mutableStateOf(false) }
@@ -92,16 +102,6 @@ fun TrackpadGestureSettingsScreen(
             SettingLinkIds.TRACKPAD_DEBUG -> showSensitivitySettings = false
         }
     }
-    // deep links to the child page's rows open it in place
-    LaunchedEffect(highlightedSettingId) {
-        when (highlightedSettingId) {
-            SettingLinkIds.SCREEN_TRACKPAD_ENABLED,
-            SettingLinkIds.SCREEN_TRACKPAD_TRIGGER_KEY,
-            SettingLinkIds.SCREEN_TRACKPAD_ACTIVATION,
-            SettingLinkIds.SCREEN_TRACKPAD_SENSITIVITY,
-            SettingLinkIds.SCREEN_TRACKPAD_SHOW_HINT -> showScreenTrackpadSettings = true
-        }
-    }
     LaunchedEffect(Unit) {
         while (true) {
             shizukuStatus = resolveShizukuStatus()
@@ -127,9 +127,12 @@ fun TrackpadGestureSettingsScreen(
 
     // the child page brings its own top bar
     if (showScreenTrackpadSettings) {
+        BackHandler(enabled = !screenTrackpadIsOwnActivity) { showScreenTrackpadSettings = false }
         ScreenTrackpadSettingsScreen(
             modifier = modifier,
-            onBack = { context.settingsActivity().finish() }
+            onBack = {
+                if (screenTrackpadIsOwnActivity) context.settingsActivity().finish() else showScreenTrackpadSettings = false
+            }
         )
         return
     }
@@ -611,7 +614,7 @@ fun TrackpadGestureSettingsScreen(
                     .fillMaxWidth()
                     .height(72.dp)
                     .settingRow(SettingLinkIds.TRACKPAD_SENSITIVITY) {
-                        openSettingsChild(context, "trackpad", "sensitivity")
+                        openSettingsChild(context, TRACKPAD_CHILD_SECTION, TRACKPAD_CHILD_PAGE_SENSITIVITY)
                     }
             ) {
                 Row(
@@ -660,7 +663,7 @@ fun TrackpadGestureSettingsScreen(
                     .fillMaxWidth()
                     .height(72.dp)
                     .settingRow(SettingLinkIds.TRACKPAD_SCREEN_TRACKPAD) {
-                        openSettingsChild(context, "trackpad", "screen")
+                        openSettingsChild(context, TRACKPAD_CHILD_SECTION, TRACKPAD_CHILD_PAGE_SCREEN)
                     }
             ) {
                 Row(
