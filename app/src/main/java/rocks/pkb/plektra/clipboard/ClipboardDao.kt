@@ -84,7 +84,9 @@ class ClipboardDao @VisibleForTesting internal constructor(
         ).use {
             while (it.moveToNext()) {
                 if (it.isNull(3)) {
-                    superseded.add(it.getLong(0))
+                    // Too big to read, or no text. Only a pinned clip the user may still want
+                    // stays on disk (unread); a sensitive or unpinned one is dropped.
+                    if (it.getInt(2) == 0 || it.getInt(4) != 0) superseded.add(it.getLong(0))
                     continue
                 }
                 stored.add(
@@ -299,18 +301,22 @@ class ClipboardDao @VisibleForTesting internal constructor(
     /** Deletes by entry id, which stays valid when a background merge shifts positions. */
     fun deleteClip(id: Long) {
         val removedIndex: Int
+        val owesTwins: Boolean
         val entry = synchronized(cache) {
             removedIndex = cache.indexOfFirst { it.id == id }
             if (removedIndex < 0) return
+            owesTwins = !loaded
             cache.removeAt(removedIndex).also {
-                if (!loaded) deletedBeforeLoad.add(it.text)
+                if (owesTwins) deletedBeforeLoad.add(it.text)
             }
         }
         listener?.onClipsRemoved(removedIndex, 1)
         dbExecutor.execute {
             val rowId = entry.rowId
-            if (rowId == PENDING_ID) return@execute
-            db.writableDatabase.delete(TABLE, "$COLUMN_ID = $rowId", null)
+            if (rowId != PENDING_ID) db.writableDatabase.delete(TABLE, "$COLUMN_ID = $rowId", null)
+            // Until the load succeeds, an unmerged stored copy of the text would come back
+            // on the next start, since deletedBeforeLoad only lives in memory.
+            if (owesTwins) deleteUnpinnedRows { it == entry.text }
         }
     }
 
@@ -379,9 +385,11 @@ class ClipboardDao @VisibleForTesting internal constructor(
         var firstRemoved = -1
         var removedCount = 0
         val kept: List<ClipboardHistoryEntry>
+        val owesTwins: Boolean
         synchronized(cache) {
             kept = cache.filter { it.isPinned }
-            if (!loaded) {
+            owesTwins = !loaded
+            if (owesTwins) {
                 if (clearedBeforeLoad == ClearedBeforeLoad.NONE) {
                     clearedBeforeLoad = ClearedBeforeLoad.NON_PINNED
                 }
@@ -396,32 +404,41 @@ class ClipboardDao @VisibleForTesting internal constructor(
         if (firstRemoved >= 0) listener?.onClipsRemoved(firstRemoved, removedCount)
         // Unconditional: rows of the stored history may not be in the cache yet.
         dbExecutor.execute {
-            // A failed load may still owe a kept clip its stored twin's sensitivity.
-            val keptTexts = synchronized(cache) {
+            // Only a load that has not succeeded may still owe a kept clip its stored twin's
+            // sensitivity; afterwards no twin exists and a plain delete is enough.
+            val keptTexts = if (!owesTwins) emptySet() else synchronized(cache) {
                 kept.filter { entry -> cache.any { it === entry } }.map { it.text }.toSet()
             }
-            val database = db.writableDatabase
             if (keptTexts.isEmpty()) {
-                database.delete(TABLE, "$COLUMN_PINNED = 0", null)
+                db.writableDatabase.delete(TABLE, "$COLUMN_PINNED = 0", null)
             } else {
-                database.beginTransaction()
-                try {
-                    val removedIds = database.query(
-                        TABLE, arrayOf(COLUMN_ID, BOUNDED_TEXT), "$COLUMN_PINNED = 0",
-                        null, null, null, null
-                    ).use { cursor ->
-                        buildList {
-                            while (cursor.moveToNext()) {
-                                if (cursor.isNull(1) || cursor.getString(1) !in keptTexts) add(cursor.getLong(0))
-                            }
-                        }
+                deleteUnpinnedRows { it == null || it !in keptTexts }
+            }
+        }
+    }
+
+    /**
+     * Deletes the unpinned rows whose bounded text [shouldDelete] accepts (null for an oversized
+     * or empty one). Compares in Kotlin so no clip text is ever put into SQL.
+     */
+    private fun deleteUnpinnedRows(shouldDelete: (String?) -> Boolean) {
+        val database = db.writableDatabase
+        database.beginTransaction()
+        try {
+            val removedIds = database.query(
+                TABLE, arrayOf(COLUMN_ID, BOUNDED_TEXT), "$COLUMN_PINNED = 0",
+                null, null, null, null
+            ).use { cursor ->
+                buildList {
+                    while (cursor.moveToNext()) {
+                        if (shouldDelete(if (cursor.isNull(1)) null else cursor.getString(1))) add(cursor.getLong(0))
                     }
-                    removedIds.forEach { database.delete(TABLE, "$COLUMN_ID = ?", arrayOf(it.toString())) }
-                    database.setTransactionSuccessful()
-                } finally {
-                    database.endTransaction()
                 }
             }
+            removedIds.forEach { database.delete(TABLE, "$COLUMN_ID = ?", arrayOf(it.toString())) }
+            database.setTransactionSuccessful()
+        } finally {
+            database.endTransaction()
         }
     }
 
@@ -475,10 +492,17 @@ class ClipboardDao @VisibleForTesting internal constructor(
         private const val COLUMN_TEXT = "TEXT"
         private const val COLUMN_SENSITIVE = "SENSITIVE"
 
+        /** Largest new copy addClip accepts. */
         internal const val MAX_TEXT_BYTES = 256 * 1024
+
+        // Largest stored row a load reads. Well below the CursorWindow limit, and above
+        // MAX_TEXT_BYTES so rows saved by earlier versions, or a copy whose UTF-8 size SQLite
+        // counts differently from the JVM (lone surrogates), are not discarded.
+        internal const val MAX_LOAD_BYTES = 1024 * 1024
+
         // Keep oversized legacy rows out of CursorWindow, including text containing NUL.
         private const val BOUNDED_TEXT =
-            "CASE WHEN length(CAST($COLUMN_TEXT AS BLOB)) <= $MAX_TEXT_BYTES THEN $COLUMN_TEXT ELSE NULL END"
+            "CASE WHEN length(CAST($COLUMN_TEXT AS BLOB)) <= $MAX_LOAD_BYTES THEN $COLUMN_TEXT ELSE NULL END"
 
         const val CREATE_TABLE = """
             CREATE TABLE $TABLE (
