@@ -6,7 +6,9 @@ import android.content.Context
 import android.os.Looper
 import android.os.SystemClock
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 import rocks.pkb.plektra.SettingsManager
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -73,9 +75,12 @@ class ClipboardDaoLoadTest {
     }
 
     /** Creates the DAO with its load queued behind the gate. */
-    private fun createDaoBeforeLoad(beforeLoadMerge: (() -> Unit)? = null) {
+    private fun createDaoBeforeLoad(
+        afterClipLookup: (() -> Unit)? = null,
+        beforeLoadMerge: (() -> Unit)? = null
+    ) {
         ClipboardDao.dbWorker.execute { gate.await() }
-        createdDao = ClipboardDao(database, beforeLoadMerge)
+        createdDao = ClipboardDao(database, beforeLoadMerge, afterClipLookup)
     }
 
     private fun createManager(): ClipboardHistoryManager {
@@ -311,6 +316,108 @@ class ClipboardDaoLoadTest {
         createdDao = ClipboardDao(database)
         ClipboardDao.awaitDatabaseIdle()
         assertEquals(0, dao.count())
+    }
+
+    @Test
+    fun unpinAfterClearDuringFailedLoadKeepsTheClipInHistoryAndOnDisk() {
+        val now = System.currentTimeMillis()
+        var failLoad = true
+        createDaoBeforeLoad { check(!failLoad) }
+        dao.addClip(now, true, "kept")
+        val entry = requireNotNull(dao.getAt(0))
+        release()
+
+        val clearGate = CountDownLatch(1).also { extraGates += it }
+        ClipboardDao.dbWorker.execute { check(clearGate.await(10, TimeUnit.SECONDS)) }
+        dao.clearNonPinned()
+        dao.togglePinned(entry.id)
+        clearGate.countDown()
+        ClipboardDao.awaitDatabaseIdle()
+        failLoad = false
+        dao.clearOldClips(now = true)
+        release()
+
+        assertEquals(listOf("kept"), texts())
+        assertFalse(entry.isPinned)
+        assertEquals(listOf(Row("kept", pinned = false, sensitive = false)), rows())
+        createdDao = ClipboardDao(database)
+        ClipboardDao.awaitDatabaseIdle()
+        assertEquals(listOf("kept"), texts())
+    }
+
+    @Test
+    fun copyDuringLoadCannotInsertASecondStoredTwin() {
+        copyWhileLoadWaits(existingBeforeClear = false)
+    }
+
+    @Test
+    fun copyAfterClearCannotUpdateAnEntryDetachedByTheLoad() {
+        copyWhileLoadWaits(existingBeforeClear = true)
+    }
+
+    private fun copyWhileLoadWaits(existingBeforeClear: Boolean) {
+        val now = System.currentTimeMillis()
+        store("stored-secret", now - 1_000L, sensitive = true)
+        val queried = CountDownLatch(1)
+        val lookedUp = CountDownLatch(1)
+        val loadFinished = CountDownLatch(1)
+        val mergeGate = CountDownLatch(1).also { extraGates += it }
+        val copyGate = CountDownLatch(1).also { extraGates += it }
+        val loadThread = AtomicReference<Thread>()
+        var stallCopy = false
+        createDaoBeforeLoad(afterClipLookup = {
+            if (stallCopy) {
+                lookedUp.countDown()
+                check(copyGate.await(10, TimeUnit.SECONDS))
+            }
+        }) {
+            loadThread.set(Thread.currentThread())
+            queried.countDown()
+            check(mergeGate.await(10, TimeUnit.SECONDS))
+        }
+        ClipboardDao.dbWorker.execute { loadFinished.countDown() }
+        if (existingBeforeClear) {
+            dao.addClip(now, true, "stored-secret")
+            dao.clearNonPinned()
+        }
+        val moved = mutableListOf<Pair<Int, Int>>()
+        dao.listener = object : ClipboardDao.Listener {
+            override fun onClipInserted(position: Int) {}
+            override fun onClipsRemoved(position: Int, count: Int) {}
+            override fun onClipMoved(oldPosition: Int, newPosition: Int) {
+                moved += oldPosition to newPosition
+            }
+        }
+        stallCopy = true
+        val copy = FutureTask { dao.addClip(now + 1, false, "stored-secret") }
+        val copyThread = Thread(copy)
+        copyThread.start()
+        try {
+            assertTrue(lookedUp.await(10, TimeUnit.SECONDS))
+            gate.countDown()
+            assertTrue(queried.await(10, TimeUnit.SECONDS))
+            mergeGate.countDown()
+            // Let the load reach the cache lock (or finish if lookup released it).
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+            while (loadThread.get().state != Thread.State.BLOCKED && loadFinished.count != 0L &&
+                System.nanoTime() < deadline
+            ) {
+                Thread.yield()
+            }
+            assertTrue(loadThread.get().state == Thread.State.BLOCKED || loadFinished.count == 0L)
+        } finally {
+            copyGate.countDown()
+            mergeGate.countDown()
+            gate.countDown()
+            copy.get(10, TimeUnit.SECONDS)
+        }
+        release()
+
+        assertEquals(listOf("stored-secret"), texts())
+        assertTrue(requireNotNull(dao.getAt(0)).isSensitive)
+        assertFalse(requireNotNull(dao.getAt(0)).isPinned)
+        if (existingBeforeClear) assertEquals(listOf(0 to 0), moved)
+        assertEquals(listOf(Row("stored-secret", pinned = false, sensitive = true)), rows())
     }
 
     @Test
