@@ -123,7 +123,7 @@ class ClipboardDaoLoadTest {
             "length(CAST(TEXT AS BLOB)) > ${ClipboardDao.MAX_LOAD_BYTES}", null, null, null, "ID"
         ).use {
             buildList {
-                while (it.moveToNext()) add(it.getInt(0) != 0 to (it.getInt(1) != 0))
+                while (it.moveToNext()) add((it.getInt(0) != 0) to (it.getInt(1) != 0))
             }
         }
     }
