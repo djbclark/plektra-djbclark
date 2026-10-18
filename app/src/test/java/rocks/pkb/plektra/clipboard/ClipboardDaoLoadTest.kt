@@ -282,6 +282,38 @@ class ClipboardDaoLoadTest {
     }
 
     @Test
+    fun clearAfterFailedLoadPreservesPinnedCopiesSensitiveTwinsUntilRetry() {
+        val now = System.currentTimeMillis()
+        store("stored-secret", now - 1_000L, sensitive = true)
+        store("discard", now)
+        var failLoad = true
+        createDaoBeforeLoad { check(!failLoad) }
+        dao.addClip(now, false, "stored-secret")
+        val entry = requireNotNull(dao.getAt(0))
+        release()
+        assertFalse(entry.isSensitive)
+
+        dao.togglePinned(entry.id)
+        dao.clearNonPinned()
+        assertEquals(
+            listOf(Row("stored-secret", true, false), Row("stored-secret", false, true)).toSet(),
+            rows().toSet()
+        )
+
+        failLoad = false
+        dao.clearOldClips(now = true)
+        release()
+
+        assertTrue(entry.isSensitive)
+        assertFalse(entry.isPinned)
+        assertNull(dao.get(entry.id))
+        assertEquals(emptyList<Row>(), rows())
+        createdDao = ClipboardDao(database)
+        ClipboardDao.awaitDatabaseIdle()
+        assertEquals(0, dao.count())
+    }
+
+    @Test
     fun clearNonPinnedKeepsACopyMadeAfterTheClearButMergesItsSensitivity() {
         val now = System.currentTimeMillis()
         store("stored-secret", now - 1_000L, sensitive = true)
