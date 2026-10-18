@@ -20,7 +20,8 @@ import java.util.concurrent.atomic.AtomicLong
  */
 class ClipboardDao @VisibleForTesting internal constructor(
     private val db: ClipboardDatabase,
-    private val beforeLoadMerge: (() -> Unit)? = null
+    private val beforeLoadMerge: (() -> Unit)? = null,
+    private val afterClipLookup: (() -> Unit)? = null
 ) {
 
     interface Listener {
@@ -136,7 +137,7 @@ class ClipboardDao @VisibleForTesting internal constructor(
             }
             // Clear all kept these entries only because their stored sensitivity was unknown.
             cache.removeAll { entry ->
-                (entry.id in pinnedAtClear && !entry.isPinned).also { remove ->
+                (entry.id in pinnedAtClear && entry.isSensitive).also { remove ->
                     if (remove && entry.rowId !in addedNow) changed = true
                     if (remove && entry.rowId != PENDING_ID) superseded.add(entry.rowId)
                 }
@@ -198,37 +199,37 @@ class ClipboardDao @VisibleForTesting internal constructor(
             return
         }
 
-        val existing = synchronized(cache) {
+        val entry: ClipboardHistoryEntry
+        val oldPos: Int
+        val newPos: Int
+        synchronized(cache) {
             nextExpiry = 0L
-            cache.firstOrNull { it.text == text }
-        }
-        if (existing != null) {
-            val (oldPos, newPos) = synchronized(cache) {
-                val oldPos = cache.indexOfFirst { it === existing }
-                existing.timeStamp = timestamp
-                existing.isSensitive = existing.isSensitive || sensitive
-                if (existing.isSensitive) existing.isPinned = false
-                cache.sort()
-                oldPos to cache.indexOfFirst { it === existing }
+            oldPos = cache.indexOfFirst { it.text == text }
+            afterClipLookup?.invoke()
+            if (oldPos >= 0) {
+                entry = cache[oldPos]
+                entry.timeStamp = timestamp
+                entry.isSensitive = entry.isSensitive || sensitive
+                if (entry.isSensitive) entry.isPinned = false
+                // A new copy after Clear all is no longer covered by that clear.
+                pinnedAtClear.remove(entry.id)
+            } else {
+                entry = ClipboardHistoryEntry(nextPendingId.getAndDecrement(), timestamp, pinned && !sensitive, text, sensitive)
+                cache.add(entry)
             }
-            listener?.onClipMoved(oldPos, newPos)
-            persistState(existing)
-            return
+            cache.sort()
+            newPos = cache.indexOfFirst { it === entry }
         }
-
-        insertNewEntry(timestamp, pinned, text, sensitive)
+        if (oldPos >= 0) {
+            listener?.onClipMoved(oldPos, newPos)
+            persistState(entry)
+        } else {
+            listener?.onClipInserted(newPos)
+            persistNewEntry(entry)
+        }
     }
 
-    private fun insertNewEntry(timestamp: Long, pinned: Boolean, text: String, sensitive: Boolean) {
-        val effectivePinned = pinned && !sensitive
-        val entry = ClipboardHistoryEntry(nextPendingId.getAndDecrement(), timestamp, effectivePinned, text, sensitive)
-        val position = synchronized(cache) {
-            cache.add(entry)
-            cache.sort()
-            cache.indexOfFirst { it === entry }
-        }
-        listener?.onClipInserted(position)
-
+    private fun persistNewEntry(entry: ClipboardHistoryEntry) {
         dbExecutor.execute {
             // The load may have merged stronger flags from a stored duplicate into the entry
             // since it was queued, so write its current state.
