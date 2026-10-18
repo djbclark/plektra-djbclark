@@ -1,0 +1,54 @@
+name: Gradle on any ref (ci/run)
+
+# Fork-only (ci/base overlay): pushed by scripts/github-test-ref. The overlay commit
+# is target-ref tree + this workflow set; every other .github/workflows/* is removed.
+
+on:
+  push:
+    branches: ['ci/run/**']
+
+jobs:
+  gradle:
+    if: ${{ !contains(github.event.head_commit.message, '[djb-release]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout overlay commit
+        uses: actions/checkout@v4
+
+      - name: Read run metadata
+        id: meta
+        run: |
+          set -euo pipefail
+          . .github/ci/run-meta.env
+          TASKS=$(cat .github/ci/tasks.txt)
+          echo "target_ref=$TARGET_REF" >> "$GITHUB_OUTPUT"
+          echo "target_sha=$TARGET_SHA" >> "$GITHUB_OUTPUT"
+          echo "tasks<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$TASKS" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          echo "target $TARGET_REF @ $TARGET_SHA tasks=$TASKS"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'tools platform-tools platforms;android-36 build-tools;36.0.0'
+
+      - name: Gradle
+        env:
+          TASKS: ${{ steps.meta.outputs.tasks }}
+        run: |
+          set -euo pipefail
+          chmod +x ./gradlew
+          # TASKS is split on spaces on purpose.
+          ./gradlew --no-daemon \
+            --init-script .github/ci/known-failures.gradle \
+            --init-script .github/ci/central-mirror.gradle \
+            $TASKS
