@@ -1,6 +1,8 @@
 package rocks.pkb.plektra
 
 import android.content.Context
+import android.content.res.Configuration
+import java.util.Locale
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -136,6 +138,34 @@ class SettingLinkCoverageTest {
         ).firstOrNull { it.isDirectory }
         requireNotNull(sourceDirectory) { "Main sources not found relative to $workingDirectory" }
         return sourceDirectory.walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
+    }
+
+    @Test
+    @Config(qualifiers = "en")
+    fun keyboardBarProfilesAreSearchableAndTargetTheProfileTabs() {
+        for (mode in SettingsManager.StatusBarPresentationMode.values()) {
+            SettingsManager.setStatusBarPresentationMode(context, mode)
+            for (query in listOf("Slim", "normal", "profile", "minimal", "compact", "Slim profile")) {
+                val entry = SettingLinkRegistry.search(context, query)
+                    .single { it.id == "status_bar.presentation" }
+                assertEquals(entry, SettingLinkRegistry.visibleTarget(context, entry))
+                assertEquals(SettingsDestination.Customization, entry.route.destination)
+                assertEquals("status_bar_buttons", entry.route.customizationDestination)
+            }
+        }
+    }
+
+    @Test
+    fun keyboardBarProfileKeywordsAreLocalized() {
+        val queries = mapOf("de" to "kompakt", "it" to "compatto", "el" to "συμπαγές")
+        queries.forEach { (language, query) ->
+            val configuration = Configuration(context.resources.configuration).apply {
+                setLocale(Locale(language))
+            }
+            val localizedContext = context.createConfigurationContext(configuration)
+            assertTrue("Profile keyword missing for $language",
+                SettingLinkRegistry.search(localizedContext, query).any { it.id == "status_bar.presentation" })
+        }
     }
 
     @Test

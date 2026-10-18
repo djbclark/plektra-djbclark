@@ -973,6 +973,7 @@ object SettingLinkRegistry {
         SettingLinkIds.MAIN_TEXT_INPUT to R.string.kw_main_text_input,
         SettingLinkIds.MAIN_AUTO_CORRECTION to R.string.kw_main_auto_correction,
         SettingLinkIds.MAIN_KEYBOARD_THEME to R.string.kw_main_keyboard_theme,
+        "status_bar.presentation" to R.string.kw_status_bar_presentation,
         SettingLinkIds.MAIN_APP_LANGUAGE to R.string.kw_main_app_language,
         SettingLinkIds.MAIN_CUSTOMIZATION to R.string.kw_main_customization,
         SettingLinkIds.MAIN_ADVANCED to R.string.kw_main_advanced,
