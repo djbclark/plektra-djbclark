@@ -24,7 +24,8 @@ internal val SCREEN_TRACKPAD_PAGE_LINK_IDS: Set<String> = setOf(
     SettingLinkIds.SCREEN_TRACKPAD_TRIGGER_KEY,
     SettingLinkIds.SCREEN_TRACKPAD_ACTIVATION,
     SettingLinkIds.SCREEN_TRACKPAD_SENSITIVITY,
-    SettingLinkIds.SCREEN_TRACKPAD_SHOW_HINT
+    SettingLinkIds.SCREEN_TRACKPAD_SHOW_HINT,
+    SettingLinkIds.SCREEN_TRACKPAD_TERMINAL_APPS
 )
 
 /** Rows on the sensitivity page of the gesture settings screen. */
