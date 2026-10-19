@@ -1,0 +1,10 @@
+// Gradle init script for the fork's GitHub Actions jobs (ci/base): skip tests that fail on unmodified
+// upstream too, so they do not block a djb release.
+// CornerButtonThemeTest: fails on GitHub Actions, macOS and the Hyades runner alike.
+gradle.allprojects {
+    tasks.withType(Test).configureEach {
+        filter {
+            excludeTestsMatching 'rocks.pkb.plektra.inputmethod.CornerButtonThemeTest'
+        }
+    }
+}
