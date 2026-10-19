@@ -3,6 +3,9 @@ package rocks.pkb.plektra
 import android.content.Context
 import android.os.Looper
 import android.provider.Settings
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -44,5 +47,61 @@ class ImeSettingsObserverTest {
         stop()
         notifyChange(Settings.Secure.DEFAULT_INPUT_METHOD)
         assertEquals(0, calls)
+    }
+
+    private class TestOwner : LifecycleOwner {
+        val registry = LifecycleRegistry.createUnsafe(this)
+        override val lifecycle: Lifecycle get() = registry
+    }
+
+    @Test
+    fun whileStartedObserverIgnoresChangesBelowStartedAndHearsThemAfterStart() {
+        val owner = TestOwner()
+        owner.registry.currentState = Lifecycle.State.CREATED
+        var calls = 0
+        val stop = observeImeSettingsWhileStarted(context, owner.lifecycle) { calls++ }
+
+        notifyChange(Settings.Secure.DEFAULT_INPUT_METHOD)
+        assertEquals(0, calls)
+
+        owner.registry.handleLifecycleEvent(Lifecycle.Event.ON_START)
+        notifyChange(Settings.Secure.DEFAULT_INPUT_METHOD)
+        assertEquals(1, calls)
+
+        // RESUMED and back to STARTED (unfocused multi-window pane): still observing.
+        owner.registry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
+        owner.registry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
+        notifyChange(Settings.Secure.ENABLED_INPUT_METHODS)
+        assertEquals(2, calls)
+
+        owner.registry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
+        notifyChange(Settings.Secure.DEFAULT_INPUT_METHOD)
+        assertEquals(2, calls)
+
+        owner.registry.handleLifecycleEvent(Lifecycle.Event.ON_START)
+        notifyChange(Settings.Secure.DEFAULT_INPUT_METHOD)
+        assertEquals(3, calls)
+
+        stop()
+        notifyChange(Settings.Secure.DEFAULT_INPUT_METHOD)
+        assertEquals(3, calls)
+    }
+
+    @Test
+    fun whileStartedObserverRegistersAtOnceWhenAlreadyStartedAndStopsOnDispose() {
+        val owner = TestOwner()
+        owner.registry.currentState = Lifecycle.State.STARTED
+        var calls = 0
+        val stop = observeImeSettingsWhileStarted(context, owner.lifecycle) { calls++ }
+
+        notifyChange(Settings.Secure.ENABLED_INPUT_METHODS)
+        assertEquals(1, calls)
+
+        stop()
+        notifyChange(Settings.Secure.ENABLED_INPUT_METHODS)
+        owner.registry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
+        owner.registry.handleLifecycleEvent(Lifecycle.Event.ON_START)
+        notifyChange(Settings.Secure.ENABLED_INPUT_METHODS)
+        assertEquals(1, calls)
     }
 }
