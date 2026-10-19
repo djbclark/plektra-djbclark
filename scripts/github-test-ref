@@ -106,22 +106,20 @@ overlay_sha=$($GIT -C "$work/src" rev-parse HEAD)
 echo "pushing $branch (overlay $overlay_sha of $ref@$short)"
 timeout 600 $GIT -C "$work/src" push -u "$remote" "HEAD:refs/heads/$branch" --force
 
-# Find the new run for this branch head.
-sleep 3
+# Find the new run for this overlay commit. Both workflows run on every push and
+# one of them skips, so select by workflow file, never just the newest run.
+workflow=djb-test-ref.yml
+[ "$release" = 1 ] && workflow=djb-release.yml
 run_json=$work/run.json
-timeout 120 gh run list -R "$repo" --branch "$branch" --limit 1 --json databaseId,url,status,conclusion,createdAt,headSha,event,name > "$run_json"
-run_id=$(jq -r '.[0].databaseId // empty' "$run_json")
-url=$(jq -r '.[0].url // empty' "$run_json")
-if [ -z "$run_id" ]; then
-  # Retry briefly: Actions indexing lag.
-  for _ in 1 2 3 4 5; do
-    sleep 5
-    timeout 120 gh run list -R "$repo" --branch "$branch" --limit 1 --json databaseId,url,status,conclusion,createdAt,headSha > "$run_json"
-    run_id=$(jq -r '.[0].databaseId // empty' "$run_json")
-    url=$(jq -r '.[0].url // empty' "$run_json")
-    [ -n "$run_id" ] && break
-  done
-fi
+run_id=
+for _ in 1 2 3 4 5 6 7; do
+  sleep 5
+  timeout 120 gh run list -R "$repo" --workflow "$workflow" --commit "$overlay_sha" --limit 1 \
+    --json databaseId,url,status,conclusion,createdAt,headSha > "$run_json" || continue
+  run_id=$(jq -r '.[0].databaseId // empty' "$run_json")
+  url=$(jq -r '.[0].url // empty' "$run_json")
+  [ -n "$run_id" ] && break
+done
 if [ -z "$run_id" ]; then
   echo "github-test-ref: pushed $branch but no Actions run found yet" >&2
   echo "https://github.com/$repo/actions"
@@ -141,7 +139,11 @@ while :; do
     chunk_deadline=$deadline
   fi
   while [ "$(date +%s)" -lt "$chunk_deadline" ]; do
-    timeout 60 gh run view "$run_id" -R "$repo" --json status,conclusion,url > "$work/status.json"
+    # A transient API error must not end the wait (set -e).
+    if ! timeout 60 gh run view "$run_id" -R "$repo" --json status,conclusion,url > "$work/status.json"; then
+      sleep 30
+      continue
+    fi
     status=$(jq -r .status "$work/status.json")
     conclusion=$(jq -r .conclusion "$work/status.json")
     case "$status" in
