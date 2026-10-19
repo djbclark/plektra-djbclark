@@ -374,13 +374,19 @@ fun KeyboardSetupScreen(
     // Not on a timer: enabledInputMethodList makes system_server run AppsFilter against every
     // other installed keyboard, which logged a BLOCKED interaction per package every 2 s.
     val windowFocused = LocalWindowInfo.current.isWindowFocused
-    LaunchedEffect(windowFocused) {
-        if (!windowFocused) return@LaunchedEffect
+    val recheckImeStatus = {
         checkImeStatus(context) { enabled, selected ->
             isPlektraEnabled = enabled
             isPlektraSelected = selected
         }
     }
+    LaunchedEffect(windowFocused) {
+        if (!windowFocused) return@LaunchedEffect
+        recheckImeStatus()
+    }
+    // A change made while this window keeps focus (hardware switch shortcut, Settings in another
+    // pane) gives no focus event.
+    RecheckImeStatusOnSettingsChange(recheckImeStatus)
 
     // Request notification permission (Android 13+)
     val requestPermissionLauncher = rememberLauncherForActivityResult(
