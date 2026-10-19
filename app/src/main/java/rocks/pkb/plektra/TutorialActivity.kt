@@ -210,13 +210,22 @@ fun TutorialScreen(
 
     // On window focus, not a timer: see the note on MainActivity's IME status check.
     val windowFocused = LocalWindowInfo.current.isWindowFocused
-    LaunchedEffect(windowFocused) {
-        if (!windowFocused) return@LaunchedEffect
+    var checkedImeStatus by remember { mutableStateOf(false) }
+    val recheckImeStatus = {
         checkImeStatus(context) { enabled, selected ->
             isPlektraEnabled = enabled
             isPlektraSelected = selected
         }
     }
+    LaunchedEffect(windowFocused) {
+        // Always once on first composition, even if the window is not focused yet (or stays so).
+        if (!windowFocused && checkedImeStatus) return@LaunchedEffect
+        checkedImeStatus = true
+        recheckImeStatus()
+    }
+    // A change made while this window keeps focus (hardware switch shortcut, Settings in another
+    // pane) gives no focus event.
+    RecheckImeStatusOnSettingsChange(recheckImeStatus)
 
     val pages = buildList {
         if (updateTutorial) {
