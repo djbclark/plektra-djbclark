@@ -379,6 +379,8 @@ android {
     testOptions {
         unitTests.isIncludeAndroidResources = true
         unitTests.all {
+            // Gradle's 512 MB default runs out on the full Robolectric suite (OutOfMemoryError mid-run).
+            it.maxHeapSize = "2g"
             it.systemProperty(
                 "pastiera.eval.realDictionary",
                 providers.gradleProperty("pastiera.eval.realDictionary").getOrElse("false")
