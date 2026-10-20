@@ -55,53 +55,64 @@ class ImeSettingsObserverTest {
     }
 
     @Test
-    fun whileStartedObserverIgnoresChangesBelowStartedAndHearsThemAfterStart() {
+    fun whileStartedObserverChecksOncePerStartAndOncePerChangeWhileStarted() {
         val owner = TestOwner()
         owner.registry.currentState = Lifecycle.State.CREATED
         var calls = 0
         val stop = observeImeSettingsWhileStarted(context, owner.lifecycle) { calls++ }
 
+        // Below STARTED: no check and no observer.
         notifyChange(Settings.Secure.DEFAULT_INPUT_METHOD)
         assertEquals(0, calls)
 
         owner.registry.handleLifecycleEvent(Lifecycle.Event.ON_START)
-        notifyChange(Settings.Secure.DEFAULT_INPUT_METHOD)
         assertEquals(1, calls)
 
-        // RESUMED and back to STARTED (unfocused multi-window pane): still observing.
+        notifyChange(Settings.Secure.DEFAULT_INPUT_METHOD)
+        assertEquals(2, calls)
+
+        // RESUMED and back to STARTED (unfocused multi-window pane): still observing, no new check.
         owner.registry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
         owner.registry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
-        notifyChange(Settings.Secure.ENABLED_INPUT_METHODS)
         assertEquals(2, calls)
+        notifyChange(Settings.Secure.ENABLED_INPUT_METHODS)
+        assertEquals(3, calls)
 
+        // Stopped: no check, no observer.
         owner.registry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
         notifyChange(Settings.Secure.DEFAULT_INPUT_METHOD)
-        assertEquals(2, calls)
-
-        owner.registry.handleLifecycleEvent(Lifecycle.Event.ON_START)
-        notifyChange(Settings.Secure.DEFAULT_INPUT_METHOD)
+        notifyChange(Settings.Secure.ENABLED_INPUT_METHODS)
         assertEquals(3, calls)
+
+        // Started again (return from Settings, rotation): one more check, then observing again.
+        owner.registry.handleLifecycleEvent(Lifecycle.Event.ON_START)
+        assertEquals(4, calls)
+        notifyChange(Settings.Secure.DEFAULT_INPUT_METHOD)
+        assertEquals(5, calls)
 
         stop()
         notifyChange(Settings.Secure.DEFAULT_INPUT_METHOD)
-        assertEquals(3, calls)
+        assertEquals(5, calls)
     }
 
     @Test
-    fun whileStartedObserverRegistersAtOnceWhenAlreadyStartedAndStopsOnDispose() {
+    fun whileStartedObserverChecksOnceAtOnceWhenAlreadyStartedAndStopsOnDispose() {
         val owner = TestOwner()
         owner.registry.currentState = Lifecycle.State.STARTED
         var calls = 0
         val stop = observeImeSettingsWhileStarted(context, owner.lifecycle) { calls++ }
 
-        notifyChange(Settings.Secure.ENABLED_INPUT_METHODS)
+        // addObserver on a started lifecycle replays ON_START: a composition created late is checked.
         assertEquals(1, calls)
+
+        notifyChange(Settings.Secure.ENABLED_INPUT_METHODS)
+        assertEquals(2, calls)
 
         stop()
         notifyChange(Settings.Secure.ENABLED_INPUT_METHODS)
         owner.registry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
         owner.registry.handleLifecycleEvent(Lifecycle.Event.ON_START)
         notifyChange(Settings.Secure.ENABLED_INPUT_METHODS)
-        assertEquals(1, calls)
+        assertEquals(2, calls)
     }
 }

@@ -47,7 +47,6 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -208,21 +207,14 @@ fun TutorialScreen(
     var isPlektraEnabled by remember { mutableStateOf(false) }
     var isPlektraSelected by remember { mutableStateOf(false) }
 
-    // On window focus, not a timer: see the note on MainActivity's IME status check.
-    val windowFocused = LocalWindowInfo.current.isWindowFocused
-    val recheckImeStatus = {
+    // On every start and settings change, not a timer: see the note on MainActivity's IME status
+    // check.
+    CheckImeStatusWhileStarted {
         checkImeStatus(context) { enabled, selected ->
             isPlektraEnabled = enabled
             isPlektraSelected = selected
         }
     }
-    LaunchedEffect(windowFocused) {
-        if (!windowFocused) return@LaunchedEffect
-        recheckImeStatus()
-    }
-    // A change made while this window keeps focus (hardware switch shortcut, Settings in another
-    // pane) gives no focus event.
-    RecheckImeStatusOnSettingsChange(recheckImeStatus)
 
     val pages = buildList {
         if (updateTutorial) {
