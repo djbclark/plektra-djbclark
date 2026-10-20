@@ -55,7 +55,10 @@ ci_base_sha=$($GIT -C "$top" rev-parse "$ci_base_ref^{commit}")
 
 slug=$(printf '%s' "$ref" | tr '/:' '--' | tr -c 'A-Za-z0-9._-' '-' | cut -c1-40)
 short=${target_sha:0:8}
-branch="ci/run/${slug}-${short}"
+# The task list is part of the name, so two runs of one commit with different
+# Gradle args (debug and F-Droid paths) can be pushed at once without colliding.
+tasks_tag=$(printf '%s' "$tasks" | shasum | cut -c1-6)
+branch="ci/run/${slug}-${short}-${tasks_tag}"
 if [ "$release" = 1 ]; then
   branch="ci/run/release-${short}"
 fi
