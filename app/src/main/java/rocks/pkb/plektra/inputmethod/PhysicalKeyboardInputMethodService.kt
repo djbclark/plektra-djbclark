@@ -5731,7 +5731,10 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
                     modifierStateController.ctrlPhysicallyPressed = false
                     updateStatusBarText()
                 } else {
-                    val result = modifierStateController.handleCtrlKeyUp(keyCode)
+                    val result = modifierStateController.handleCtrlKeyUp(
+                        keyCode,
+                        now = ModifierKeyHandler.eventTimeOrUptime(event)
+                    )
                     if (result.shouldUpdateStatusBar) {
                         updateStatusBarText()
                     }
@@ -5768,7 +5771,10 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
                     modifierStateController.altPhysicallyPressed = false
                     updateStatusBarText()
                 } else {
-                    val result = modifierStateController.handleAltKeyUp(keyCode)
+                    val result = modifierStateController.handleAltKeyUp(
+                        keyCode,
+                        now = ModifierKeyHandler.eventTimeOrUptime(event)
+                    )
                     if (result.shouldUpdateStatusBar) {
                         updateStatusBarText()
                     }
