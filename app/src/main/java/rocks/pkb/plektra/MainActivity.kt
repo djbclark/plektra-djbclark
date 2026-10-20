@@ -32,7 +32,6 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -369,24 +368,17 @@ fun KeyboardSetupScreen(
     var isPlektraEnabled by remember { mutableStateOf(false) }
     var isPlektraSelected by remember { mutableStateOf(false) }
 
-    // Check IME status when the window gains focus: on open, on return from the system's keyboard
-    // settings, and after the input method picker closes (it is a dialog over this activity).
-    // Not on a timer: enabledInputMethodList makes system_server run AppsFilter against every
-    // other installed keyboard, which logged a BLOCKED interaction per package every 2 s.
-    val windowFocused = LocalWindowInfo.current.isWindowFocused
-    val recheckImeStatus = {
+    // Check IME status each time this screen becomes visible (open, multi-window, rotation, return
+    // from the system's keyboard settings), then on every change of the input method settings while
+    // it stays visible (the IME picker and a hardware switch shortcut write them too). Not on a
+    // timer: enabledInputMethodList makes system_server run AppsFilter against every other
+    // installed keyboard, which logged a BLOCKED interaction per package every 2 s.
+    CheckImeStatusWhileStarted {
         checkImeStatus(context) { enabled, selected ->
             isPlektraEnabled = enabled
             isPlektraSelected = selected
         }
     }
-    LaunchedEffect(windowFocused) {
-        if (!windowFocused) return@LaunchedEffect
-        recheckImeStatus()
-    }
-    // A change made while this window keeps focus (hardware switch shortcut, Settings in another
-    // pane) gives no focus event.
-    RecheckImeStatusOnSettingsChange(recheckImeStatus)
 
     // Request notification permission (Android 13+)
     val requestPermissionLauncher = rememberLauncherForActivityResult(

@@ -36,11 +36,20 @@ internal fun observeImeSettings(context: Context, onChanged: () -> Unit): () -> 
 }
 
 /**
- * Like [observeImeSettings], but only while [lifecycle] is at least STARTED: registered on ON_START,
- * unregistered on ON_STOP. STARTED rather than RESUMED, so a change made in another window while
- * this one is visible but unfocused (multi-window) is still seen. A stopped activity needs no
- * observer: every re-check costs system_server an AppsFilter pass per installed keyboard, and the
- * window-focus re-check covers the return. Returns a function that stops observing.
+ * Checks once on every ON_START and observes the input method settings (see [observeImeSettings])
+ * while [lifecycle] is at least STARTED: the observer is registered on ON_START and unregistered on
+ * ON_STOP. [onChanged] runs once right after each registration, so every time the screen becomes
+ * visible (open, multi-window, rotation, return from the keyboard settings) it starts from the
+ * current state, whichever window has focus; after that it runs on each change. The IME picker
+ * writes the default input method, so the observer sees it too.
+ *
+ * STARTED rather than RESUMED, so a change made in another window while this one is visible but
+ * unfocused (multi-window) is still seen. A stopped activity needs neither: there is no timer, since
+ * every check costs system_server an AppsFilter pass per installed keyboard.
+ *
+ * [Lifecycle.addObserver] on a lifecycle that is already STARTED replays ON_START, so a composition
+ * created while its activity is started gets its check at once. A repeated ON_START cannot register
+ * twice. Returns a function that stops observing.
  */
 internal fun observeImeSettingsWhileStarted(
     context: Context,
@@ -52,6 +61,7 @@ internal fun observeImeSettingsWhileStarted(
         when (event) {
             Lifecycle.Event.ON_START -> if (stopObserving == null) {
                 stopObserving = observeImeSettings(context, onChanged)
+                onChanged()
             }
             Lifecycle.Event.ON_STOP -> {
                 stopObserving?.invoke()
@@ -69,17 +79,17 @@ internal fun observeImeSettingsWhileStarted(
 }
 
 /**
- * Runs [recheck] each time the input method settings change, while this composition is alive and
- * its activity is at least STARTED.
+ * Runs [check] once each time this composition's activity becomes STARTED and again on each input
+ * method settings change while it stays started; see [observeImeSettingsWhileStarted].
  */
 @Composable
-internal fun RecheckImeStatusOnSettingsChange(recheck: () -> Unit) {
+internal fun CheckImeStatusWhileStarted(check: () -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val currentRecheck by rememberUpdatedState(recheck)
+    val currentCheck by rememberUpdatedState(check)
     DisposableEffect(context, lifecycleOwner) {
         val stopObserving = observeImeSettingsWhileStarted(context, lifecycleOwner.lifecycle) {
-            currentRecheck()
+            currentCheck()
         }
         onDispose(stopObserving)
     }
