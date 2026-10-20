@@ -59,6 +59,9 @@ object RevertibleChange {
     /** Covers the broker's mDNS discovery between arming and the command landing. */
     private const val ARM_SLACK_MS = 20_000L
 
+    /** What [apply] says when an earlier change still waits for its confirmation. */
+    internal const val CHANGE_WAITING = "A change is waiting to be confirmed"
+
     /**
      * What can be applied with a revert armed, and the fixed command that undoes each when nothing
      * was set beforehand ([Pending.revert] swaps in the earlier value when there was one).
@@ -100,6 +103,9 @@ object RevertibleChange {
     @Volatile
     private var armedTrigger: BrokerTrigger? = null
 
+    /** Held across [apply]'s pending check and its first [arm]. */
+    private val armLock = Any()
+
     internal fun apply(
         context: Context,
         kind: Kind,
@@ -107,11 +113,19 @@ object RevertibleChange {
         trigger: BrokerTrigger?,
         previousDpi: Int? = null
     ): Outcome {
-        if (!PrivilegedBackends.hasAccess(context)) return Outcome.NotPaired
         val appContext = context.applicationContext
 
-        // Recorded first: a change we cannot reverse is worse than one that never lands.
-        arm(appContext, Pending(kind, System.currentTimeMillis() + CONFIRM_WINDOW_MS + ARM_SLACK_MS, previousDpi))
+        // One change at a time: a second apply would re-arm over the first and could take its
+        // still-unconfirmed value as "the earlier override" to revert to. The screens already
+        // disable Apply while a change waits; this keeps that true for any other caller. The check
+        // and the first arm share a lock, so two concurrent callers cannot both pass it.
+        synchronized(armLock) {
+            if (pending(appContext) != null) return Outcome.Failed(CHANGE_WAITING)
+            if (!PrivilegedBackends.hasAccess(context)) return Outcome.NotPaired
+
+            // Recorded first: a change we cannot reverse is worse than one that never lands.
+            arm(appContext, Pending(kind, System.currentTimeMillis() + CONFIRM_WINDOW_MS + ARM_SLACK_MS, previousDpi))
+        }
 
         val result = PrivilegedShell.run(appContext, command, trigger)
         if (!result.ok) {

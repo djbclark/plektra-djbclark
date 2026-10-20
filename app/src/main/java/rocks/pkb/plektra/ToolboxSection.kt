@@ -281,18 +281,26 @@ private fun FnCtrlCard(modifier: Modifier) {
         grantReturned++
     }
 
-    fun startFn(action: FnAction, askPermission: () -> Unit) {
+    fun startFn(action: FnAction, fromGrantScreen: Boolean, askPermission: () -> Unit) {
         if (busy) return
-        // A tap (finding 1.3g). On the way back from the grant screen the write goes through the
-        // Settings API, so a null trigger there costs nothing.
-        val trigger = BrokerTrigger.fromTap(context, if (action == FnAction.APPLY) "fn_ctrl_apply" else "fn_ctrl_revert")
+        // Only a tap mints a trigger. On the way back from the grant screen there was no tap: that
+        // call has no trigger, stays on the Settings API and queues no finish-setup step.
+        val trigger = if (fromGrantScreen) {
+            null
+        } else {
+            BrokerTrigger.fromTap(context, if (action == FnAction.APPLY) "fn_ctrl_apply" else "fn_ctrl_revert")
+        }
         busy = true
         statusRes = null
         scope.launch {
             val result = withContext(Dispatchers.IO) {
-                if (action == FnAction.APPLY) FnCtrlRemap.apply(context, trigger) else FnCtrlRemap.revert(context, trigger)
+                if (action == FnAction.APPLY) {
+                    FnCtrlRemap.apply(context, trigger, allowBackend = !fromGrantScreen)
+                } else {
+                    FnCtrlRemap.revert(context, trigger, allowBackend = !fromGrantScreen)
+                }
             }
-            PrivilegedSetup.queueFinishSetup(context, trigger)
+            if (!fromGrantScreen) PrivilegedSetup.queueFinishSetup(context, trigger)
             when (result) {
                 FnCtrlRemap.Result.SUCCESS -> {
                     alreadySet = action == FnAction.APPLY
@@ -324,7 +332,7 @@ private fun FnCtrlCard(modifier: Modifier) {
         val action = resume
         if (grantReturned > 0 && action != null && Settings.System.canWrite(context)) {
             resume = null
-            startFn(action) {}
+            startFn(action, fromGrantScreen = true) {}
         }
     }
 
@@ -376,7 +384,7 @@ private fun FnCtrlCard(modifier: Modifier) {
                 }
                 if (alreadySet && !busy) {
                     TextButton(
-                        onClick = { startFn(FnAction.REVERT, ::launchGrantScreen) },
+                        onClick = { startFn(FnAction.REVERT, fromGrantScreen = false, ::launchGrantScreen) },
                         contentPadding = PaddingValues(horizontal = 0.dp, vertical = 4.dp)
                     ) {
                         Text(
@@ -390,7 +398,7 @@ private fun FnCtrlCard(modifier: Modifier) {
             if (busy) {
                 CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
             } else {
-                OutlinedButton(onClick = { startFn(FnAction.APPLY, ::launchGrantScreen) }) {
+                OutlinedButton(onClick = { startFn(FnAction.APPLY, fromGrantScreen = false, ::launchGrantScreen) }) {
                     Text(
                         text = stringResource(R.string.fn_ctrl_map_action),
                         fontFamily = FontFamily.Monospace

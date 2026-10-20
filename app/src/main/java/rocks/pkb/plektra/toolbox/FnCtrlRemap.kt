@@ -45,10 +45,14 @@ object FnCtrlRemap {
     /** True when the system already reports Fn mapped to Ctrl (enable=1, function=1). */
     fun isSet(context: Context): Boolean = readPair(context) == (1 to 1)
 
-    /** Apply Fn -> Ctrl. Captures the original values first (once). */
-    fun apply(context: Context, trigger: BrokerTrigger?): Result {
+    /**
+     * Apply Fn -> Ctrl. Captures the original values first (once). [allowBackend] false keeps the
+     * write on the Settings API even when a privileged backend is available: the resume after the
+     * "Modify system settings" screen passes it, because that call is not backed by a tap.
+     */
+    fun apply(context: Context, trigger: BrokerTrigger?, allowBackend: Boolean = true): Result {
         captureOriginalIfNeeded(context)
-        val result = write(context, 1, 1, trigger)
+        val result = write(context, 1, 1, trigger, allowBackend)
         // Nothing was written, so a capture taken now would go stale before the next attempt.
         if (result == Result.NEEDS_PERMISSION) clearCapture(context)
         return result
@@ -56,9 +60,10 @@ object FnCtrlRemap {
 
     /**
      * Undo [apply]: restore the captured original values, or disable the remap (0/0) when the
-     * original was unset or never captured. On success the capture is cleared.
+     * original was unset or never captured. On success the capture is cleared. [allowBackend] as
+     * for [apply].
      */
-    fun revert(context: Context, trigger: BrokerTrigger?): Result {
+    fun revert(context: Context, trigger: BrokerTrigger?, allowBackend: Boolean = true): Result {
         val prefs = prefs(context)
         val captured = prefs.getBoolean(KEY_CAPTURED, false)
         val target = revertTarget(
@@ -66,7 +71,7 @@ object FnCtrlRemap {
             prefs.getInt(KEY_PREV_ENABLE, VALUE_UNSET),
             prefs.getInt(KEY_PREV_FUNCTION, VALUE_UNSET)
         )
-        val result = write(context, target.first, target.second, trigger)
+        val result = write(context, target.first, target.second, trigger, allowBackend)
         if (result == Result.SUCCESS) clearCapture(context)
         return result
     }
@@ -78,7 +83,13 @@ object FnCtrlRemap {
             (if (captured && usable(prevFunction)) prevFunction else 0)
     }
 
-    private fun write(context: Context, enable: Int, function: Int, trigger: BrokerTrigger?): Result {
+    private fun write(
+        context: Context,
+        enable: Int,
+        function: Int,
+        trigger: BrokerTrigger?,
+        allowBackend: Boolean
+    ): Result {
         val canWrite = Settings.System.canWrite(context)
         return writeWithFallback(
             canWriteSettings = canWrite,
@@ -89,7 +100,7 @@ object FnCtrlRemap {
                 }.getOrDefault(false)
                 ok && readPair(context) == (enable to function)
             },
-            hasBackend = PrivilegedBackends.hasAccess(context),
+            hasBackend = allowBackend && PrivilegedBackends.hasAccess(context),
             viaBackend = {
                 if (enable !in 0..PrivilegedCommand.SetFnProgrammableKey.MAX_VALUE ||
                     function !in 0..PrivilegedCommand.SetFnProgrammableKey.MAX_VALUE

@@ -197,7 +197,10 @@ fun DisplayDensityScreen(
                                     }
                                     is RevertibleChange.Outcome.Failed -> {
                                         error = outcome.reason
-                                        PrivilegedSetup.queueFinishSetup(context, trigger)
+                                        // A revert is still armed: Wireless debugging must stay on for it.
+                                        if (outcome.reason != RevertibleChange.CHANGE_WAITING) {
+                                            PrivilegedSetup.queueFinishSetup(context, trigger)
+                                        }
                                     }
                                 }
                             }

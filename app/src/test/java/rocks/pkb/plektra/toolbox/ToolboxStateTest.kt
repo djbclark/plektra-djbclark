@@ -118,6 +118,23 @@ class ToolboxStateTest {
     }
 
     @Test
+    fun `a second apply is refused while an earlier change waits, and leaves it untouched`() {
+        val prefs = EmbeddedAdbInit.prefs(context)
+        val stored = """{"kind":"DENSITY","deadline":4102444800000,"previous_dpi":295}"""
+        prefs.edit().putString("toolbox_pending_revert", stored).commit()
+
+        // The first, unconfirmed value must never become the "earlier override" of a second apply.
+        val outcome = RevertibleChange.apply(
+            context, RevertibleChange.Kind.DENSITY, PrivilegedCommand.SetDensity(320), trigger = null,
+            previousDpi = 310
+        )
+        assertEquals(RevertibleChange.Outcome.Failed(RevertibleChange.CHANGE_WAITING), outcome)
+        assertEquals(stored, prefs.getString("toolbox_pending_revert", null))
+        assertEquals(295, RevertibleChange.pending(context)!!.previousDpi)
+        prefs.edit().remove("toolbox_pending_revert").commit()
+    }
+
+    @Test
     fun `status bar toggle defaults to shown and only hides on a Titan 2 Elite`() {
         SettingsManager.getPreferences(context).edit().remove(SettingsManager.KEY_SHOW_STATUS_BAR).commit()
         assertTrue(SettingsManager.getShowStatusBar(context))
