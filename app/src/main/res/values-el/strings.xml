@@ -1748,4 +1748,7 @@ QWERTZ σε φυσικό QWERTY
     <string name="screen_trackpad_hint_sticky">✥ Δρομέας · πατήστε για έξοδο</string>
     <string name="kw_screen_trackpad">trackpad, δρομέας, σύρσιμο, οθόνη αφής, πλήκτρο διαστήματος, παρατεταμένο πάτημα, βέλη, επιλογή, cursor, swipe</string>
     <string name="kw_screen_trackpad_terminal_apps">τερματικό, SSH, Termux, κέλυφος, βέλη, εφαρμογές, χωρίς πεδίο κειμένου, terminal, arrow keys</string>
+    <!-- djb/sym-shortcuts: Sym+C/V/X/A edit shortcuts toggle -->
+    <string name="sym_edit_shortcuts_title">Sym+C/V/X/A: αντιγραφή, επικόλληση, αποκοπή, επιλογή όλων</string>
+    <string name="sym_edit_shortcuts_description">Σε πεδίο κειμένου, το Sym με C, V, X ή A επεξεργάζεται το κείμενο αντί να πληκτρολογεί σύμβολο ή να ανοίγει εφαρμογή. Όταν είναι ανενεργό, αυτοί οι τέσσερις συνδυασμοί επιστρέφουν στο επίπεδο SYM.</string>
 </resources>
