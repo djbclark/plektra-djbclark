@@ -14,7 +14,8 @@ data class InputContextState(
     val inputClass: Int,
     val inputVariation: Int,
     val inputType: Int,
-    val restrictedReason: RestrictedReason?
+    val restrictedReason: RestrictedReason?,
+    val isAppRawMode: Boolean = false
 ) {
 
     val isPhoneField: Boolean
@@ -31,28 +32,28 @@ data class InputContextState(
      * Disabled for: PASSWORD, URI, EMAIL, FILTER
      */
     val shouldDisableSuggestions: Boolean
-        get() = restrictedReason != null
+        get() = isAppRawMode || restrictedReason != null
     
     /**
      * Disable auto-correction (automatic word replacement).
      * Disabled for: PASSWORD, URI, EMAIL, FILTER
      */
     val shouldDisableAutoCorrect: Boolean
-        get() = restrictedReason != null
+        get() = isAppRawMode || restrictedReason != null
     
     /**
      * Disable auto-capitalization (automatic capitalization after period/enter).
      * Disabled for: PASSWORD, URI, EMAIL, FILTER
      */
     val shouldDisableAutoCapitalize: Boolean
-        get() = restrictedReason != null
+        get() = isAppRawMode || restrictedReason != null
     
     /**
      * Disable double-space-to-period conversion.
      * Disabled for: PASSWORD, URI, EMAIL, FILTER
      */
     val shouldDisableDoubleSpaceToPeriod: Boolean
-        get() = restrictedReason != null
+        get() = isAppRawMode || restrictedReason != null
     
     /**
      * Disable character variations (accented characters, special variants).
@@ -91,10 +92,6 @@ data class InputContextState(
     val isPasswordField: Boolean
         get() = restrictedReason == RestrictedReason.PASSWORD
 
-    /** The whole app is in raw mode (explicit "no smart typing" choice), not a field-type restriction. */
-    val isAppRawMode: Boolean
-        get() = restrictedReason == RestrictedReason.APP_RAW_MODE
-
     val isUriField: Boolean
         get() = restrictedReason == RestrictedReason.URI
 
@@ -108,10 +105,7 @@ data class InputContextState(
         PASSWORD,
         URI,
         EMAIL,
-        FILTER,
-
-        /** The user disabled smart typing features for this app ("raw mode"). */
-        APP_RAW_MODE
+        FILTER
     }
 
     companion object {
@@ -234,9 +228,6 @@ data class InputContextState(
                 inputVariation == InputType.TYPE_TEXT_VARIATION_FILTER ->
                     RestrictedReason.FILTER
 
-                // Field-specific reasons take precedence; raw mode covers the rest of the app.
-                isRawModeApp -> RestrictedReason.APP_RAW_MODE
-
                 else -> null
             }
 
@@ -246,7 +237,8 @@ data class InputContextState(
                 inputClass = inputClass,
                 inputVariation = inputVariation,
                 inputType = inputType,
-                restrictedReason = restrictedReason
+                restrictedReason = restrictedReason,
+                isAppRawMode = isRawModeApp
             )
 
             // Debug logging

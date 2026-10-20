@@ -75,7 +75,7 @@ class InputContextStateTest {
         val state = InputContextState.fromEditorInfo(info, isRawModeApp = true)
 
         assertTrue(state.isAppRawMode)
-        assertEquals(InputContextState.RestrictedReason.APP_RAW_MODE, state.restrictedReason)
+        assertNull(state.restrictedReason)
         assertTrue(state.shouldDisableSuggestions)
         assertTrue(state.shouldDisableAutoCorrect)
         assertTrue(state.shouldDisableAutoCapitalize)
@@ -84,14 +84,26 @@ class InputContextStateTest {
     }
 
     @Test
-    fun testFieldRestrictionWinsOverRawMode() {
+    fun testFieldRestrictionIsPreservedAlongsideRawMode() {
         val info = EditorInfo().apply {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
         }
         val state = InputContextState.fromEditorInfo(info, isRawModeApp = true)
 
         assertTrue(state.isPasswordField)
-        assertFalse(state.isAppRawMode)
+        assertTrue(state.isAppRawMode)
+    }
+
+    @Test
+    fun rawModePreservesEmailRestrictions() {
+        val info = EditorInfo().apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+        }
+        val state = InputContextState.fromEditorInfo(info, isRawModeApp = true)
+        assertTrue(state.isAppRawMode)
+        assertTrue(state.isEmailField)
+        assertTrue(state.shouldDisableVariations)
+        assertTrue(state.shouldDisableAutoCapitalize)
     }
 
     @Test

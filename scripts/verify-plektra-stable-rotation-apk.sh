@@ -23,7 +23,6 @@ apkanalyzer="$sdk_root/cmdline-tools/latest/bin/apkanalyzer"
 zipalign="$sdk_root/build-tools/36.0.0/zipalign"
 apksigner_jar="$sdk_root/build-tools/36.0.0/lib/apksigner.jar"
 java_source="$root_dir/scripts/VerifyApkSigningLineage.java"
-legacy_sha256=d5c018b9c33e0cda7cef0b006ed739d4c6304c4ef4a0c4d9454a5302e7c4c3e7
 stable_a_sha256=b28ac03130088bb27a356e1dd704b35f2701268474a386c348d07ed92f3ef71a
 
 [[ -f "$apk" ]] || fail "APK does not exist: $apk"
@@ -50,9 +49,9 @@ classes_dir=$(mktemp -d "${TMPDIR:-/tmp}/plektra-apk-verifier.XXXXXX")
 trap 'rm -rf -- "$classes_dir"' EXIT
 javac -cp "$apksigner_jar" -d "$classes_dir" "$java_source"
 java -cp "$classes_dir:$apksigner_jar" VerifyApkSigningLineage \
-  "$apk" "$stable_a_sha256" "$legacy_sha256" "$stable_a_sha256"
+  "$apk" "$stable_a_sha256" "$stable_a_sha256"
 
-printf 'Success: Plektra Stable A rotation APK verified.\n'
+printf 'Success: Plektra Stable A APK verified.\n'
 printf 'application_id=%s\n' "$actual_app_id"
 printf 'version_name=%s\n' "$actual_version_name"
 printf 'version_code=%s\n' "$actual_version_code"

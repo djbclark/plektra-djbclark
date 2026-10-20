@@ -185,6 +185,10 @@ object AutoCapitalizeHelper {
         onUpdateStatusBar: () -> Unit,
         inputContextState: InputContextState? = null
     ) {
+        if (inputContextState?.isAppRawMode == true) {
+            clearSmartShift(disableShift, onUpdateStatusBar)
+            return
+        }
         val ic = inputConnection ?: run {
             clearSmartShift(disableShift, onUpdateStatusBar)
             return
@@ -451,7 +455,7 @@ object AutoCapitalizeHelper {
         enableShiftOneShot: () -> Boolean,
         onUpdateStatusBar: () -> Unit
     ) {
-        if (!state.isEditable) return
+        if (!state.isEditable || state.isAppRawMode) return
         
         // Handle textCapCharacters: enable caps lock automatically
         if (state.requiresCapCharacters) {
@@ -522,7 +526,7 @@ object AutoCapitalizeHelper {
         inputConnection: InputConnection?,
         keyCode: Int
     ): Boolean {
-        if (!state.isEditable || inputConnection == null) return false
+        if (!state.isEditable || state.isAppRawMode || inputConnection == null) return false
         
         // CAP_CHARACTERS doesn't need per-character checks (caps lock handles it)
         if (state.requiresCapCharacters) return false

@@ -152,6 +152,27 @@ Play Console's **Save as draft** to retain the draft without submitting it for
 review. Keep the upload certificate and saved draft status as verification
 records before proceeding with publication.
 
+## Stable APK variants
+
+The `stable` and `stableNoAccessibility` flavors share the canonical Stable
+package ID, version and PIV signing configuration. They replace each other while
+preserving app data. The reduced variant omits the Clicks launcher-button
+accessibility service; normal keyboard features and TalkBack remain available.
+
+Build both variants with the same version and version code:
+
+```sh
+scripts/build-stable-release-unsigned.sh 26.10 26100000 --variant full --output-apk /path/to/Plektra-26.10-full-unsigned.apk
+scripts/build-stable-release-unsigned.sh 26.10 26100000 --variant no-accessibility --output-apk /path/to/Plektra-26.10-no-accessibility-unsigned.apk
+```
+
+The helper runs each variant's Debug unit tests and verifies the unsigned Release
+APK's identity, version and service presence. Use `--skip-unit-tests` only after
+the corresponding suite has passed for the same source and version parameters.
+Both APKs contain a variant-specific runtime SBOM. Sign both with
+`scripts/sign-plektra-stable-apk-piv.sh`; final asset names are
+`Plektra-VERSION-full.apk` and `Plektra-VERSION-no-accessibility.apk`.
+
 ## Nightly APK variants
 
 The `nightly` and `nightlyNoAccessibility` flavors share the canonical Nightly

@@ -89,6 +89,20 @@ class TextExpansionControllerTest {
     }
 
     @Test
+    fun rawModeAppsDoNotQueryOrExpandText() {
+        var editorQueries = 0
+        val controller = controller(
+            state = editableState.copy(isAppRawMode = true),
+            configs = listOf(config(SnippetExpansionSource { mapOf("id" to "value") }, enabled = true)),
+            onEditorQuery = { editorQueries++ }
+        )
+
+        controller.refresh()
+
+        assertEquals(0, editorQueries)
+    }
+
+    @Test
     fun activeSelectionDoesNotQueryOrReplaceEditorText() {
         var editorQueries = 0
         val controller = TextExpansionController(
