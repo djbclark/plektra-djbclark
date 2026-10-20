@@ -14,7 +14,8 @@ data class InputContextState(
     val inputClass: Int,
     val inputVariation: Int,
     val inputType: Int,
-    val restrictedReason: RestrictedReason?
+    val restrictedReason: RestrictedReason?,
+    val isAppRawMode: Boolean = false
 ) {
 
     val isPhoneField: Boolean
@@ -31,28 +32,28 @@ data class InputContextState(
      * Disabled for: PASSWORD, URI, EMAIL, FILTER
      */
     val shouldDisableSuggestions: Boolean
-        get() = restrictedReason != null
+        get() = isAppRawMode || restrictedReason != null
     
     /**
      * Disable auto-correction (automatic word replacement).
      * Disabled for: PASSWORD, URI, EMAIL, FILTER
      */
     val shouldDisableAutoCorrect: Boolean
-        get() = restrictedReason != null
+        get() = isAppRawMode || restrictedReason != null
     
     /**
      * Disable auto-capitalization (automatic capitalization after period/enter).
      * Disabled for: PASSWORD, URI, EMAIL, FILTER
      */
     val shouldDisableAutoCapitalize: Boolean
-        get() = restrictedReason != null
+        get() = isAppRawMode || restrictedReason != null
     
     /**
      * Disable double-space-to-period conversion.
      * Disabled for: PASSWORD, URI, EMAIL, FILTER
      */
     val shouldDisableDoubleSpaceToPeriod: Boolean
-        get() = restrictedReason != null
+        get() = isAppRawMode || restrictedReason != null
     
     /**
      * Disable character variations (accented characters, special variants).
@@ -182,7 +183,7 @@ data class InputContextState(
             }
         }
 
-        fun fromEditorInfo(info: EditorInfo?): InputContextState {
+        fun fromEditorInfo(info: EditorInfo?, isRawModeApp: Boolean = false): InputContextState {
             if (info == null) {
                 Log.d(TAG, "Input field: NULL (no EditorInfo)")
                 return EMPTY
@@ -236,7 +237,8 @@ data class InputContextState(
                 inputClass = inputClass,
                 inputVariation = inputVariation,
                 inputType = inputType,
-                restrictedReason = restrictedReason
+                restrictedReason = restrictedReason,
+                isAppRawMode = isRawModeApp
             )
 
             // Debug logging

@@ -18,8 +18,22 @@ import org.robolectric.annotation.Config
 class CornerButtonThemeTest {
     @Test
     @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
-    fun outerButtonFollowsInnerLedThroughTheBottomOfTheSlot() {
-        val geometry = KeyboardBarGeometry(RuntimeEnvironment.getApplication()).apply {
+    @Config(qualifiers = "mdpi")
+    fun outerButtonFollowsInnerLedWithConfiguredClearanceAtMdpi() {
+        assertOuterButtonLedClearance()
+    }
+
+    @Test
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    @Config(qualifiers = "xhdpi")
+    fun outerButtonFollowsInnerLedWithConfiguredClearanceAtXhdpi() {
+        assertOuterButtonLedClearance()
+    }
+
+    private fun assertOuterButtonLedClearance() {
+        val context = RuntimeEnvironment.getApplication()
+        val density = context.resources.displayMetrics.density
+        val geometry = KeyboardBarGeometry(context).apply {
             radii = 100 to 100
             ledsVisible = true
             ledLayout = rocks.pkb.plektra.inputmethod.ui.ModifierLedLayouts.TITAN_2_ELITE
@@ -44,8 +58,10 @@ class CornerButtonThemeTest {
         for (x in 125..140) {
             val buttonBottom = (90 until 204).last { surface.contains(x, it) }
             val railTop = (90 until 204).first { rail.contains(x, it) }
-            org.junit.Assert.assertTrue("Button follows lower LED at x=$x: $buttonBottom / $railTop",
-                railTop - buttonBottom in 1..3)
+            // Pixel indices add one pixel to the empty space between the painted regions.
+            val emptyPixels = railTop - buttonBottom - 1
+            assertEquals("2.2 dp button-to-LED clearance at x=$x, density=$density",
+                2.2f * density, emptyPixels.toFloat(), 1f)
         }
     }
 

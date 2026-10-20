@@ -42,7 +42,7 @@ class TextExpansionController(
         refreshRunnable?.let(handler::removeCallbacks)
         refreshRunnable = null
         val state = inputContextProvider()
-        if (!state.isReallyEditable || state.restrictedReason != null || !isSelectionCollapsedProvider()) {
+        if (!state.isReallyEditable || state.shouldDisableSmartFeatures || !isSelectionCollapsedProvider()) {
             clear()
             return
         }

@@ -1033,6 +1033,38 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
         )
     }
 
+    @Test
+    fun rawMode_plainFieldDoesNotCapitalize() {
+        val context = RuntimeEnvironment.getApplication()
+        SettingsManager.setRawModeApp(context, "rocks.pkb.plektra.test", true)
+        focusNewField(RecordingInputConnection(), inputType = InputType.TYPE_CLASS_TEXT)
+        assertFalse(modifierController().shiftOneShot)
+    }
+
+    @Test
+    fun rawMode_fieldCapitalizationFlagsDoNotArmShiftOrCapsLock() {
+        val context = RuntimeEnvironment.getApplication()
+        SettingsManager.setRawModeApp(context, "rocks.pkb.plektra.test", true)
+        for (flag in listOf(InputType.TYPE_TEXT_FLAG_CAP_SENTENCES, InputType.TYPE_TEXT_FLAG_CAP_WORDS, InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS)) {
+            focusNewField(RecordingInputConnection(), inputType = InputType.TYPE_CLASS_TEXT or flag)
+            assertFalse("Shift for flag $flag", modifierController().shiftOneShot)
+            assertFalse("Caps Lock for flag $flag", modifierController().capsLockEnabled)
+            val state = InputContextState.fromEditorInfo(editorInfo, isRawModeApp = true)
+            assertFalse(AutoCapitalizeHelper.shouldCapitalizeAfterBoundary(context, state, inputConnection, KeyEvent.KEYCODE_SPACE))
+        }
+    }
+
+    @Test
+    fun rawMode_fieldRestrictionsDoNotAllowAutoCapitalizeOptIn() {
+        val context = RuntimeEnvironment.getApplication()
+        SettingsManager.setRawModeApp(context, "rocks.pkb.plektra.test", true)
+        SettingsManager.setAutoCapitalizeRestrictedFields(context, true)
+        for (variation in listOf(InputType.TYPE_TEXT_VARIATION_URI, InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, InputType.TYPE_TEXT_VARIATION_FILTER, InputType.TYPE_TEXT_VARIATION_PASSWORD)) {
+            focusNewField(RecordingInputConnection(), inputType = InputType.TYPE_CLASS_TEXT or variation)
+            assertFalse("Shift for variation $variation", modifierController().shiftOneShot)
+        }
+    }
+
     private fun focusNewField(
         newRecorder: RecordingInputConnection,
         inputType: Int = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES,

@@ -75,7 +75,12 @@ fun shouldValidateStableSigning(taskNames: List<String>): Boolean {
         "bundleStableRelease",
         "packageStableRelease",
         "publishStableRelease",
-        "installStableRelease"
+        "installStableRelease",
+        "assembleStableNoAccessibilityRelease",
+        "bundleStableNoAccessibilityRelease",
+        "packageStableNoAccessibilityRelease",
+        "publishStableNoAccessibilityRelease",
+        "installStableNoAccessibilityRelease"
     )
     return taskNames.any { task ->
         signingTaskHints.any { hint -> task.contains(hint, ignoreCase = true) }
@@ -179,6 +184,11 @@ android {
                 signingConfig = signingConfigs.getByName("release")
             }
         }
+        create("stableNoAccessibility") {
+            initWith(getByName("stable"))
+            buildConfigField("String", "APK_VARIANT", "\"no-accessibility\"")
+            buildConfigField("boolean", "ENABLE_ACCESSIBILITY_SERVICE", "false")
+        }
         create("nightly") {
             dimension = "channel"
             applicationIdSuffix = ".nightly"
@@ -263,7 +273,10 @@ android {
     
     // Validate signing config only when building release
     tasks.whenTaskAdded {
-        if (!isFdroidBuild && name.equals("preStableReleaseBuild", ignoreCase = true)) {
+        if (!isFdroidBuild && (
+                name.equals("preStableReleaseBuild", ignoreCase = true) ||
+                name.equals("preStableNoAccessibilityReleaseBuild", ignoreCase = true)
+            )) {
             doFirst {
                 if (isUnsignedReleaseBuild) {
                     logger.lifecycle("Building an unsigned stable release for separate PIV signing.")
@@ -350,11 +363,15 @@ android {
     }
     testOptions {
         unitTests.isIncludeAndroidResources = true
+        unitTests.all {
+            // Gradle's 512 MB default runs out on the full Robolectric suite (OutOfMemoryError mid-run).
+            it.maxHeapSize = "2g"
+        }
     }
 }
 
 // Release packages carry their runtime dependencies and bundled third-party assets.
-listOf("stable", "nightly", "nightlyNoAccessibility", "playStable", "playNightly").forEach { flavor ->
+listOf("stable", "stableNoAccessibility", "nightly", "nightlyNoAccessibility", "playStable", "playNightly").forEach { flavor ->
     val nightlyFlavor = flavor.startsWith("nightly", ignoreCase = true) || flavor == "playNightly"
     val flavorTitle = flavor.replaceFirstChar { it.uppercase() }
     val sbomAssets = layout.buildDirectory.dir("generated/sbom/${flavor}Release/assets")

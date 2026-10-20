@@ -66,6 +66,46 @@ class InputContextStateTest {
         assertTrue(state.shouldDisableVariations)
     }
 
+    // Exact Typing: app-wide raw mode
+    @Test
+    fun testRawModeAppDisablesSmartFeatures() {
+        val info = EditorInfo().apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_NORMAL
+        }
+        val state = InputContextState.fromEditorInfo(info, isRawModeApp = true)
+
+        assertTrue(state.isAppRawMode)
+        assertNull(state.restrictedReason)
+        assertTrue(state.shouldDisableSuggestions)
+        assertTrue(state.shouldDisableAutoCorrect)
+        assertTrue(state.shouldDisableAutoCapitalize)
+        assertTrue(state.shouldDisableDoubleSpaceToPeriod)
+        assertFalse(state.shouldDisableVariations)
+    }
+
+    @Test
+    fun testFieldRestrictionIsPreservedAlongsideRawMode() {
+        val info = EditorInfo().apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+        }
+        val state = InputContextState.fromEditorInfo(info, isRawModeApp = true)
+
+        assertTrue(state.isPasswordField)
+        assertTrue(state.isAppRawMode)
+    }
+
+    @Test
+    fun rawModePreservesEmailRestrictions() {
+        val info = EditorInfo().apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+        }
+        val state = InputContextState.fromEditorInfo(info, isRawModeApp = true)
+        assertTrue(state.isAppRawMode)
+        assertTrue(state.isEmailField)
+        assertTrue(state.shouldDisableVariations)
+        assertTrue(state.shouldDisableAutoCapitalize)
+    }
+
     @Test
     fun testCapFlags() {
         val info = EditorInfo().apply {
