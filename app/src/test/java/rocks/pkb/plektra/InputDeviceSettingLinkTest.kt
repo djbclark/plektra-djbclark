@@ -80,4 +80,17 @@ class InputDeviceSettingLinkTest {
         assertEquals(KeyboardsDevicesDestination.BuiltIn, requireNotNull(SettingLinkRegistry.byId("hardware.profile")).route.keyboardsDevicesDestination)
         assertEquals(KeyboardsDevicesDestination.PowerKeyboard, requireNotNull(SettingLinkRegistry.byId("clicks.buttons.red_button")).route.keyboardsDevicesDestination)
     }
+
+    @Test
+    fun keyRemapSwitchIsSearchableWhereTheKeyboardSupportsIt() {
+        val id = "hardware.key_remap.swap_shift_right_enter"
+        SettingsManager.setPhysicalKeyboardProfileOverride(context, "titan2")
+        val results = SettingLinkRegistry.search(context, "swap")
+        assertTrue("Search does not expose $id", results.any { it.id == id })
+        assertEquals(KeyboardsDevicesDestination.BuiltIn, results.first { it.id == id }.route.keyboardsDevicesDestination)
+
+        // The Q25 screen hides the option, so search must not offer it either.
+        SettingsManager.setPhysicalKeyboardProfileOverride(context, "q25")
+        assertFalse(SettingLinkRegistry.search(context, "swap").any { it.id == id })
+    }
 }

@@ -99,6 +99,46 @@ class HardwareKeyRemapTest {
         assertEquals(0, up.event?.metaState)
     }
 
+    // The Titan 2's vendor Key setting rewrites physical right Shift (scan code 54) to Alt before
+    // the IME sees it; the swap must still find that key.
+    @Test
+    fun vendorRewrittenShiftRight_becomesEnterWithoutAltMeta() {
+        val remapper = HardwareKeyRemapper()
+        val altRightMeta = KeyEvent.META_ALT_RIGHT_ON or KeyEvent.META_ALT_ON
+
+        val down = remapper.remap(
+            KeyEvent.KEYCODE_ALT_RIGHT,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ALT_RIGHT, altRightMeta, scanCode = 54),
+            enabled
+        )
+        val a = remapper.remap(
+            KeyEvent.KEYCODE_A,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, altRightMeta, scanCode = 30),
+            enabled
+        )
+        val up = remapper.remap(
+            KeyEvent.KEYCODE_ALT_RIGHT,
+            keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ALT_RIGHT, 0, scanCode = 54),
+            enabled
+        )
+
+        assertEquals(KeyEvent.KEYCODE_ENTER, down.keyCode)
+        assertEquals(0, down.event?.metaState)
+        assertEquals(0, a.event?.metaState)
+        assertEquals(KeyEvent.KEYCODE_ENTER, up.keyCode)
+    }
+
+    @Test
+    fun shiftRightKeyCodeOnAnotherPhysicalKey_isNotRemapped() {
+        val remapper = HardwareKeyRemapper()
+        val input = keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SHIFT_RIGHT, shiftRightMeta, scanCode = 56)
+
+        val remapped = remapper.remap(KeyEvent.KEYCODE_SHIFT_RIGHT, input, enabled)
+
+        assertEquals(KeyEvent.KEYCODE_SHIFT_RIGHT, remapped.keyCode)
+        assertSame(input, remapped.event)
+    }
+
     @Test
     fun heldPhysicalEnter_givesOtherKeysShiftMeta() {
         val remapper = HardwareKeyRemapper()

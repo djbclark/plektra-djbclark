@@ -331,6 +331,7 @@ private fun HardwareKeyRemapSwitchRow(option: KeyRemapOption) {
     }
     HardwareKeyboardSwitchRow(
         title = stringResource(option.titleRes),
+        linkId = keyRemapSettingId(option),
         description = stringResource(option.summaryRes),
         checked = enabled,
         onCheckedChange = { checked ->

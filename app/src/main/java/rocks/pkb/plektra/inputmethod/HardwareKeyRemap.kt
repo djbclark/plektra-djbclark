@@ -25,6 +25,12 @@ data class KeyRemapOption(
     val unsupportedModels: Set<DeviceSpecific.KeyboardModel> = emptySet()
 )
 
+/**
+ * [fromKeyCode] names a physical key. The remapper finds it by the event's Linux scan code where
+ * it knows that code ([HardwareKeyRemapper.physicalKeyCode]), because a vendor key setting can
+ * rewrite the key code before the IME sees it (the Titan 2's Shortcut keys > Key setting turns
+ * right Shift into Alt; scan code 54 stays). Events without a known scan code match by key code.
+ */
 data class KeyMapping(val fromKeyCode: Int, val toKeyCode: Int)
 
 /**
@@ -179,7 +185,7 @@ class HardwareKeyRemapper(
             val staleIndex = indexOf(stale, deviceId, keyCode)
             return if (staleIndex >= 0) stale[staleIndex].targetKeyCode else keyCode
         }
-        return mappingFor(keyCode, enabledIds)
+        return mappingFor(keyCode, event?.scanCode ?: 0, enabledIds)
     }
 
     fun remap(
@@ -212,7 +218,7 @@ class HardwareKeyRemapper(
                 // No held entry: the initial DOWN was not remapped (or was never seen).
                 (event?.repeatCount ?: 0) > 0 -> keyCode
                 else -> {
-                    val target = mappingFor(keyCode, enabledIds)
+                    val target = mappingFor(keyCode, event?.scanCode ?: 0, enabledIds)
                     if (target != keyCode) {
                         held.add(HeldKey(deviceId, keyCode, target))
                         ownLocks = ownLocks xor lockMeta(target)
@@ -226,7 +232,7 @@ class HardwareKeyRemapper(
                 if (heldTarget != NO_KEY) heldTarget else keyCode
             }
             // No event, or an action without press/release semantics: remap statelessly.
-            else -> if (heldTarget != NO_KEY) heldTarget else mappingFor(keyCode, enabledIds)
+            else -> if (heldTarget != NO_KEY) heldTarget else mappingFor(keyCode, event?.scanCode ?: 0, enabledIds)
         }
         val keyCodeRemapped = targetKeyCode != keyCode
         if (event == null) {
@@ -269,15 +275,23 @@ class HardwareKeyRemapper(
         return -1
     }
 
-    private fun mappingFor(keyCode: Int, enabledIds: Set<String>): Int {
+    /**
+     * The target of the enabled mapping whose source is this physical key, else [keyCode]. The
+     * key is named by its scan code when [physicalKeyCode] knows it, else by [keyCode] (see
+     * [KeyMapping]). The held entry keeps the key code that arrived, so its release and the meta
+     * bits it carries (Alt for a vendor-rewritten right Shift) are matched and cleared as sent.
+     */
+    private fun mappingFor(keyCode: Int, scanCode: Int, enabledIds: Set<String>): Int {
         if (enabledIds.isEmpty()) return keyCode
+        val known = physicalKeyCode(scanCode)
+        val physical = if (known != KeyEvent.KEYCODE_UNKNOWN) known else keyCode
         for (optionIndex in options.indices) {
             val option = options[optionIndex]
             if (option.id !in enabledIds) continue
             val mappings = option.mappings
             for (mappingIndex in mappings.indices) {
                 val mapping = mappings[mappingIndex]
-                if (mapping.fromKeyCode == keyCode) return mapping.toKeyCode
+                if (mapping.fromKeyCode == physical) return mapping.toKeyCode
             }
         }
         return keyCode
@@ -350,6 +364,32 @@ class HardwareKeyRemapper(
          * -1 is the virtual keyboard, so this never collides with a keyboard.
          */
         private const val NO_DEVICE: Int = Int.MIN_VALUE
+
+        /**
+         * The key a Linux scan code (`input-event-codes.h`) names, for the keys a remap is likely
+         * to name: modifiers, lock keys and editing keys. [KeyEvent.KEYCODE_UNKNOWN] for any other
+         * code, and for 0 (an injected or synthetic event has no scan code).
+         */
+        fun physicalKeyCode(scanCode: Int): Int = when (scanCode) {
+            1 -> KeyEvent.KEYCODE_ESCAPE
+            14 -> KeyEvent.KEYCODE_DEL
+            15 -> KeyEvent.KEYCODE_TAB
+            28 -> KeyEvent.KEYCODE_ENTER
+            29 -> KeyEvent.KEYCODE_CTRL_LEFT
+            42 -> KeyEvent.KEYCODE_SHIFT_LEFT
+            54 -> KeyEvent.KEYCODE_SHIFT_RIGHT
+            56 -> KeyEvent.KEYCODE_ALT_LEFT
+            57 -> KeyEvent.KEYCODE_SPACE
+            58 -> KeyEvent.KEYCODE_CAPS_LOCK
+            69 -> KeyEvent.KEYCODE_NUM_LOCK
+            70 -> KeyEvent.KEYCODE_SCROLL_LOCK
+            96 -> KeyEvent.KEYCODE_NUMPAD_ENTER
+            97 -> KeyEvent.KEYCODE_CTRL_RIGHT
+            100 -> KeyEvent.KEYCODE_ALT_RIGHT
+            125 -> KeyEvent.KEYCODE_META_LEFT
+            126 -> KeyEvent.KEYCODE_META_RIGHT
+            else -> KeyEvent.KEYCODE_UNKNOWN
+        }
 
         private val SHIFT_LEFT = ModifierBits(
             KeyEvent.META_SHIFT_LEFT_ON, KeyEvent.META_SHIFT_ON, KeyEvent.META_SHIFT_RIGHT_ON
