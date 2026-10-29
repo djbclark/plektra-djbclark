@@ -69,6 +69,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.FileProvider
 import rocks.pkb.plektra.inputmethod.DeviceSpecific
+import rocks.pkb.plektra.inputmethod.HardwareKeyRemapper
 import kotlinx.coroutines.delay
 import java.io.File
 import java.security.MessageDigest
@@ -89,11 +90,15 @@ class MainActivity : LocalizedComponentActivity() {
         val isCtrlPressed: Boolean
     )
 
+    private val hardwareKeyRemapper = HardwareKeyRemapper()
+
     private fun remapHardwareEvent(keyCode: Int, event: KeyEvent?): Pair<Int, KeyEvent?> {
         val remapped = DeviceSpecific.remapHardwareKeyEvent(
             keyCode,
             event,
-            SettingsManager.getPhysicalKeyboardProfileOverride(this)
+            SettingsManager.getPhysicalKeyboardProfileOverride(this),
+            SettingsManager.getEnabledKeyRemaps(this),
+            hardwareKeyRemapper
         )
         return remapped.keyCode to remapped.event
     }

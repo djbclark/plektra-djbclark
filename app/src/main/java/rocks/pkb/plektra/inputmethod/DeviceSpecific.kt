@@ -92,22 +92,35 @@ object DeviceSpecific {
 
     private var lastQ25MetaState: Int = 0
 
+    // Shared by the IME service; its held-key state must see every physical DOWN and UP.
+    private val hardwareKeyRemapper = HardwareKeyRemapper()
+
     fun needsRemapping(): Boolean = currentDeviceProfile().needsEventRemapping
 
+    /**
+     * Normalizes the device model's key positions, then applies the user's enabled remaps
+     * ([enabledRemapIds], see [HardwareKeyRemapRegistry]) to the keycodes the app would otherwise
+     * see. [remapper] defaults to the process-wide instance; a consumer that does not see the
+     * same event stream as the IME service (MainActivity) passes its own to keep held-key state
+     * consistent.
+     */
     fun remapHardwareKeyEvent(
         keyCode: Int,
         event: KeyEvent?,
-        physicalProfileOverride: String? = null
+        physicalProfileOverride: String? = null,
+        enabledRemapIds: Set<String> = emptySet(),
+        remapper: HardwareKeyRemapper = hardwareKeyRemapper
     ): RemappedHardwareEvent {
         val model = resolveKeyboardModel(event, physicalProfileOverride)
         val positionNormalized = normalizePhysicalKeyPosition(model, keyCode, event)
-        return when (model) {
+        val modelRemapped = when (model) {
             KeyboardModel.Q25 -> remapQ25KeyEvent(
                 positionNormalized.keyCode,
                 positionNormalized.event
             )
             else -> positionNormalized
         }
+        return remapper.remap(modelRemapped.keyCode, modelRemapped.event, enabledRemapIds)
     }
 
     private fun normalizePhysicalKeyPosition(
@@ -520,6 +533,7 @@ object DeviceSpecific {
     internal fun clearTestOverrides() {
         testBuildFingerprintOverride = null
         lastQ25MetaState = 0
+        hardwareKeyRemapper.reset()
     }
 
     private fun isQ25(fp: BuildFingerprint): Boolean {

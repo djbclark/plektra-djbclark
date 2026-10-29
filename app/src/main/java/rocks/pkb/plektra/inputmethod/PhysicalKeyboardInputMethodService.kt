@@ -4566,7 +4566,8 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         val remapped = DeviceSpecific.remapHardwareKeyEvent(
             keyCode,
             event,
-            physicalKeyboardProfileOverride
+            physicalKeyboardProfileOverride,
+            SettingsManager.getEnabledKeyRemaps(this)
         )
         val isClicksPowerKeyboard = !dispatchingClicksAccessibilityKeyEvent &&
             (event

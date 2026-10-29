@@ -1106,4 +1106,7 @@ Cada tecla puede configurarse como Keycode, Acción, Native Ctrl o Ninguno. Usa 
     <string name="kw_modifiers_long_press_cycle">pulsación larga, mantener, alternar, una mano, shift, símbolos</string>
     <string name="kw_screen_trackpad">trackpad, cursor, deslizar, pantalla táctil, barra espaciadora, mantener, flechas, seleccionar, swipe</string>
     <string name="kw_screen_trackpad_terminal_apps">terminal, SSH, Termux, consola, flechas, aplicaciones, sin campo de texto, shell</string>
+    <string name="key_remap_section_title">Reasignación de teclas</string>
+    <string name="key_remap_swap_shift_right_enter_title">Intercambiar Shift derecho y Enter</string>
+    <string name="key_remap_swap_shift_right_enter_summary">La tecla Shift derecha escribe Enter y la tecla Enter actúa como Shift.</string>
 </resources>

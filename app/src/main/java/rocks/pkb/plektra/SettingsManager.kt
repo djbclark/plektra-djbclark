@@ -17,6 +17,7 @@ import rocks.pkb.plektra.commands.PlektraCommandSource
 import rocks.pkb.plektra.core.Punctuation
 import rocks.pkb.plektra.data.layout.BundledLayoutAssets
 import rocks.pkb.plektra.inputmethod.DeviceSpecific
+import rocks.pkb.plektra.inputmethod.HardwareKeyRemapRegistry
 import rocks.pkb.plektra.inputmethod.ScreenTrackpadTerminalApps
 import rocks.pkb.plektra.inputmethod.subtype.AdditionalSubtypeUtils
 import rocks.pkb.plektra.inputmethod.subtype.AdditionalSubtypeUtils.localeString
@@ -172,6 +173,7 @@ object SettingsManager {
     private const val KEY_SHIFT_BACKSPACE_DELETE = "shift_backspace_delete" // Shift + Backspace performs forward delete
     private const val KEY_ALT_BACKSPACE_DELETE = "alt_backspace_delete" // Alt + Backspace performs forward delete
     private const val KEY_BACKSPACE_AT_START_DELETE = "backspace_at_start_delete" // Backspace at line start performs forward delete
+    private const val KEY_KEY_REMAP_PREFIX = "key_remap_" // + KeyRemapOption.id; boolean, default off
     private const val KEY_SLIM_MODE_OVERRIDE = "slim_mode_override" // slim | full_status_bar
     private const val KEY_SLIM_MODE_ACTIVE = "slim_mode_active" // Current effective state
     private const val KEY_SOFTWARE_KEYBOARD_MODE = "software_keyboard_mode" // auto | force_hardware | force_virtual
@@ -2666,6 +2668,37 @@ object SettingsManager {
     fun setBackspaceAtStartDelete(context: Context, enabled: Boolean) {
         getPreferences(context).edit()
             .putBoolean(KEY_BACKSPACE_AT_START_DELETE, enabled)
+            .apply()
+    }
+
+    /**
+     * Returns the ids of the hardware key remap options that are switched on.
+     * Called per key event, so it only reads the in-memory preferences and allocates nothing when none is on.
+     */
+    fun getEnabledKeyRemaps(context: Context): Set<String> {
+        val prefs = getPreferences(context)
+        var enabled: MutableSet<String>? = null
+        for (option in HardwareKeyRemapRegistry.options) {
+            if (prefs.getBoolean(KEY_KEY_REMAP_PREFIX + option.id, false)) {
+                (enabled ?: HashSet<String>().also { enabled = it }).add(option.id)
+            }
+        }
+        return enabled ?: emptySet()
+    }
+
+    /**
+     * Returns whether the hardware key remap option with the given id is switched on.
+     */
+    fun isKeyRemapEnabled(context: Context, id: String): Boolean {
+        return getPreferences(context).getBoolean(KEY_KEY_REMAP_PREFIX + id, false)
+    }
+
+    /**
+     * Sets whether the hardware key remap option with the given id is switched on.
+     */
+    fun setKeyRemapEnabled(context: Context, id: String, enabled: Boolean) {
+        getPreferences(context).edit()
+            .putBoolean(KEY_KEY_REMAP_PREFIX + id, enabled)
             .apply()
     }
 

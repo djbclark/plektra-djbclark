@@ -1100,4 +1100,7 @@ Mỗi phím có thể cấu hình là Keycode, Action, Native Ctrl hoặc None. 
     <string name="kw_modifiers_long_press_cycle">nhấn giữ, giữ, xoay vòng, một tay, shift, ký hiệu</string>
     <string name="kw_screen_trackpad">bàn di chuột, con trỏ, vuốt, màn hình cảm ứng, phím cách, giữ, phím mũi tên, chọn, trackpad, cursor, swipe</string>
     <string name="kw_screen_trackpad_terminal_apps">terminal, SSH, Termux, dòng lệnh, phím mũi tên, ứng dụng, không có ô nhập văn bản, shell</string>
+    <string name="key_remap_section_title">Gán lại phím</string>
+    <string name="key_remap_swap_shift_right_enter_title">Hoán đổi Shift phải và Enter</string>
+    <string name="key_remap_swap_shift_right_enter_summary">Phím Shift phải nhập Enter và phím Enter hoạt động như Shift.</string>
 </resources>

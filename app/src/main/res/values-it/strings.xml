@@ -1233,4 +1233,7 @@ Ogni tasto può essere configurato come Keycode, Azione, Native Ctrl o Nessuno. 
     <string name="kw_modifiers_long_press_cycle">pressione lunga, tieni premuto, ciclo, una mano, shift, simboli</string>
     <string name="kw_screen_trackpad">trackpad, cursore, scorrere, touchscreen, barra spaziatrice, tenere premuto, frecce, selezionare, swipe</string>
     <string name="kw_screen_trackpad_terminal_apps">terminale, SSH, Termux, console, frecce, app, senza campo di testo, terminal, shell</string>
+    <string name="key_remap_section_title">Rimappatura dei tasti</string>
+    <string name="key_remap_swap_shift_right_enter_title">Scambia Shift destro ed Enter</string>
+    <string name="key_remap_swap_shift_right_enter_summary">Il tasto Shift destro digita Enter e il tasto Enter agisce come Shift.</string>
 </resources>

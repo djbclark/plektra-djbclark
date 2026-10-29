@@ -45,6 +45,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import rocks.pkb.plektra.inputmethod.DeviceSpecific
+import rocks.pkb.plektra.inputmethod.HardwareKeyRemapRegistry
+import rocks.pkb.plektra.inputmethod.KeyRemapOption
 
 private val hardwareKeyboardProfiles = listOf(
     "auto" to R.string.keyboard_profile_option_auto,
@@ -306,8 +308,30 @@ private fun HardwareKeyboardListScreen(
                     }
                 }
             }
+
+            HardwareKeyboardSectionDivider(stringResource(R.string.key_remap_section_title))
+            HardwareKeyRemapRegistry.options.forEach { option ->
+                HardwareKeyRemapSwitchRow(option)
+            }
         }
     }
+}
+
+@Composable
+private fun HardwareKeyRemapSwitchRow(option: KeyRemapOption) {
+    val context = LocalContext.current
+    var enabled by remember(option.id) {
+        mutableStateOf(SettingsManager.isKeyRemapEnabled(context, option.id))
+    }
+    HardwareKeyboardSwitchRow(
+        title = stringResource(option.titleRes),
+        description = stringResource(option.summaryRes),
+        checked = enabled,
+        onCheckedChange = { checked ->
+            enabled = checked
+            SettingsManager.setKeyRemapEnabled(context, option.id, checked)
+        }
+    )
 }
 
 @Composable
