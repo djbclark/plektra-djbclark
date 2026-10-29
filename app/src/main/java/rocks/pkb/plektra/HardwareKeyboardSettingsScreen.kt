@@ -309,9 +309,12 @@ private fun HardwareKeyboardListScreen(
                 }
             }
 
-            HardwareKeyboardSectionDivider(stringResource(R.string.key_remap_section_title))
-            HardwareKeyRemapRegistry.options.forEach { option ->
-                HardwareKeyRemapSwitchRow(option)
+            // User key remaps are a no-op on the Q25 (see DeviceSpecific.remapHardwareKeyEvent).
+            if (DeviceSpecific.supportsUserKeyRemaps(profile)) {
+                HardwareKeyboardSectionDivider(stringResource(R.string.key_remap_section_title))
+                HardwareKeyRemapRegistry.options.forEach { option ->
+                    HardwareKeyRemapSwitchRow(option)
+                }
             }
         }
     }

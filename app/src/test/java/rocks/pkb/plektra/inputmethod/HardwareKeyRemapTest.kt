@@ -226,7 +226,7 @@ class HardwareKeyRemapTest {
     }
 
     @Test
-    fun enabledSetShrinks_dropsHeldStateSoDisabledRemapCannotLinger() {
+    fun enabledSetShrinks_keepsHeldEntryUntilItsRelease() {
         val remapper = HardwareKeyRemapper()
         remapper.remap(
             KeyEvent.KEYCODE_ENTER,
@@ -234,15 +234,91 @@ class HardwareKeyRemapTest {
             enabled
         )
 
+        val a = remapper.remap(
+            KeyEvent.KEYCODE_A,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, 0),
+            emptySet()
+        )
+        val up = remapper.remap(
+            KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER, 0),
+            emptySet()
+        )
+        val enterAgain = keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0)
+        val enter = remapper.remap(KeyEvent.KEYCODE_ENTER, enterAgain, emptySet())
+
+        // The press began under the option, so it keeps its Shift until the release maps back.
+        assertEquals(shiftRightMeta, a.event?.metaState)
+        assertEquals(KeyEvent.KEYCODE_SHIFT_RIGHT, up.keyCode)
+        assertEquals(0, up.event?.metaState)
+        // The next press no longer remaps.
+        assertEquals(KeyEvent.KEYCODE_ENTER, enter.keyCode)
+        assertSame(enterAgain, enter.event)
+    }
+
+    @Test
+    fun repeatWithoutHeldEntry_isNotRemappedAndStartsNoHold() {
+        val remapper = HardwareKeyRemapper()
+        val repeat = keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0, repeatCount = 2)
+
+        val remappedRepeat = remapper.remap(KeyEvent.KEYCODE_ENTER, repeat, enabled)
+        val peeked = remapper.peekKeyCode(KeyEvent.KEYCODE_ENTER, repeat, enabled)
+        val up = keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER, 0)
+        val remappedUp = remapper.remap(KeyEvent.KEYCODE_ENTER, up, enabled)
         val aDown = keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, 0)
-        val a = remapper.remap(KeyEvent.KEYCODE_A, aDown, emptySet())
-        val enterUp = keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER, 0)
-        val up = remapper.remap(KeyEvent.KEYCODE_ENTER, enterUp, emptySet())
+
+        // The initial DOWN never reached the remapper, so a repeat must not pair with a later UP.
+        assertEquals(KeyEvent.KEYCODE_ENTER, remappedRepeat.keyCode)
+        assertSame(repeat, remappedRepeat.event)
+        assertEquals(KeyEvent.KEYCODE_ENTER, peeked)
+        assertSame(up, remappedUp.event)
+        assertSame(aDown, remapper.remap(KeyEvent.KEYCODE_A, aDown, enabled).event)
+    }
+
+    @Test
+    fun release_dropsHeldEntryAndTransformsNothing() {
+        val remapper = HardwareKeyRemapper()
+        remapper.remap(
+            KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0),
+            enabled
+        )
+
+        remapper.release(
+            KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER, 0)
+        )
+        val aDown = keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, 0)
+        val a = remapper.remap(KeyEvent.KEYCODE_A, aDown, enabled)
 
         assertSame(aDown, a.event)
         assertFalse(a.transformed)
-        assertEquals(KeyEvent.KEYCODE_ENTER, up.keyCode)
-        assertSame(enterUp, up.event)
+    }
+
+    @Test
+    fun release_leavesOtherDevicesAndKeysHeld() {
+        val remapper = HardwareKeyRemapper()
+        remapper.remap(
+            KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0, deviceId = 1),
+            enabled
+        )
+
+        remapper.release(
+            KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER, 0, deviceId = 2)
+        )
+        remapper.release(
+            KeyEvent.KEYCODE_A,
+            keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_A, 0, deviceId = 1)
+        )
+        val a = remapper.remap(
+            KeyEvent.KEYCODE_A,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, 0, deviceId = 1),
+            enabled
+        )
+
+        assertEquals(shiftRightMeta, a.event?.metaState)
     }
 
     @Test
@@ -628,8 +704,7 @@ class HardwareKeyRemapTest {
 
     @Test
     fun syntheticModifierSwap_usesModifierTableWithoutCodeChanges() {
-        // Escape stands in for any ordinary key. Caps Lock is deliberately not used: it toggles a
-        // lock bit in the meta state that the remapper does not model, so it is unsupported.
+        // Escape stands in for any ordinary key.
         val option = KeyRemapOption(
             id = "swap_ctrl_left_escape",
             titleRes = 1,
@@ -728,6 +803,216 @@ class HardwareKeyRemapTest {
         )
 
         assertEquals(KeyEvent.KEYCODE_ENTER, enter.keyCode)
+    }
+
+    @Test
+    fun capsLockAsSource_actsAsCtrlAndNeverLeaksTheLockBit() {
+        val option = KeyRemapOption(
+            id = "caps_as_ctrl",
+            titleRes = 1,
+            summaryRes = 1,
+            mappings = HardwareKeyRemapRegistry.swap(
+                KeyEvent.KEYCODE_CAPS_LOCK,
+                KeyEvent.KEYCODE_CTRL_LEFT
+            )
+        )
+        val remapper = HardwareKeyRemapper(listOf(option))
+        val ids = setOf("caps_as_ctrl")
+        val ctrlMeta = KeyEvent.META_CTRL_LEFT_ON or KeyEvent.META_CTRL_ON
+        val caps = KeyEvent.META_CAPS_LOCK_ON
+
+        // The framework toggles the lock bit when the key is released, not when it is pressed.
+        val down = remapper.remap(
+            KeyEvent.KEYCODE_CAPS_LOCK,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_CAPS_LOCK, 0),
+            ids
+        )
+        val aWhileHeld = remapper.remap(
+            KeyEvent.KEYCODE_A,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, 0),
+            ids
+        )
+        val up = remapper.remap(
+            KeyEvent.KEYCODE_CAPS_LOCK,
+            keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_CAPS_LOCK, caps),
+            ids
+        )
+        val aAfterOnePress = remapper.remap(
+            KeyEvent.KEYCODE_A,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, caps),
+            ids
+        )
+        val aAfterTwoPresses = remapper.remap(
+            KeyEvent.KEYCODE_A,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, 0),
+            ids
+        )
+
+        assertEquals(KeyEvent.KEYCODE_CTRL_LEFT, down.keyCode)
+        assertEquals(ctrlMeta, down.event?.metaState)
+        assertEquals(ctrlMeta, aWhileHeld.event?.metaState)
+        assertEquals(KeyEvent.KEYCODE_CTRL_LEFT, up.keyCode)
+        assertEquals(0, up.event?.metaState)
+        assertEquals(0, aAfterOnePress.event?.metaState)
+        assertTrue(aAfterOnePress.transformed)
+        assertFalse(aAfterTwoPresses.transformed)
+    }
+
+    @Test
+    fun ctrlAsCapsLockTarget_togglesOnEachDownAndPersistsOnLetters() {
+        val option = KeyRemapOption(
+            id = "ctrl_as_caps",
+            titleRes = 1,
+            summaryRes = 1,
+            mappings = listOf(KeyMapping(KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.KEYCODE_CAPS_LOCK))
+        )
+        val remapper = HardwareKeyRemapper(listOf(option))
+        val ids = setOf("ctrl_as_caps")
+        val ctrlMeta = KeyEvent.META_CTRL_LEFT_ON or KeyEvent.META_CTRL_ON
+        val caps = KeyEvent.META_CAPS_LOCK_ON
+
+        val firstDown = remapper.remap(
+            KeyEvent.KEYCODE_CTRL_LEFT,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_CTRL_LEFT, ctrlMeta),
+            ids
+        )
+        val firstRepeat = remapper.remap(
+            KeyEvent.KEYCODE_CTRL_LEFT,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_CTRL_LEFT, ctrlMeta, repeatCount = 1),
+            ids
+        )
+        val firstUp = remapper.remap(
+            KeyEvent.KEYCODE_CTRL_LEFT,
+            keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_CTRL_LEFT, 0),
+            ids
+        )
+        val aWhileOn = remapper.remap(
+            KeyEvent.KEYCODE_A,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, 0),
+            ids
+        )
+        val secondDown = remapper.remap(
+            KeyEvent.KEYCODE_CTRL_LEFT,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_CTRL_LEFT, ctrlMeta),
+            ids
+        )
+        remapper.remap(
+            KeyEvent.KEYCODE_CTRL_LEFT,
+            keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_CTRL_LEFT, 0),
+            ids
+        )
+        val aWhileOff = remapper.remap(
+            KeyEvent.KEYCODE_A,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, 0),
+            ids
+        )
+
+        assertEquals(KeyEvent.KEYCODE_CAPS_LOCK, firstDown.keyCode)
+        assertEquals(caps, firstDown.event?.metaState)
+        // A held key's repeats keep the one toggle.
+        assertEquals(caps, firstRepeat.event?.metaState)
+        assertEquals(KeyEvent.KEYCODE_CAPS_LOCK, firstUp.keyCode)
+        assertEquals(caps, firstUp.event?.metaState)
+        assertEquals(caps, aWhileOn.event?.metaState)
+        assertEquals(0, secondDown.event?.metaState)
+        assertFalse(aWhileOff.transformed)
+    }
+
+    @Test
+    fun remappedLockState_endsWithResetAndWithItsOption() {
+        val option = KeyRemapOption(
+            id = "ctrl_as_caps",
+            titleRes = 1,
+            summaryRes = 1,
+            mappings = listOf(KeyMapping(KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.KEYCODE_CAPS_LOCK))
+        )
+        val ids = setOf("ctrl_as_caps")
+        fun pressAndRelease(remapper: HardwareKeyRemapper) {
+            remapper.remap(
+                KeyEvent.KEYCODE_CTRL_LEFT,
+                keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_CTRL_LEFT, 0),
+                ids
+            )
+            remapper.remap(
+                KeyEvent.KEYCODE_CTRL_LEFT,
+                keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_CTRL_LEFT, 0),
+                ids
+            )
+        }
+        val afterReset = HardwareKeyRemapper(listOf(option))
+        pressAndRelease(afterReset)
+        afterReset.reset()
+        val afterDisable = HardwareKeyRemapper(listOf(option))
+        pressAndRelease(afterDisable)
+
+        val aAfterReset = afterReset.remap(
+            KeyEvent.KEYCODE_A,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, 0),
+            ids
+        )
+        val aAfterDisable = afterDisable.remap(
+            KeyEvent.KEYCODE_A,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, 0),
+            emptySet()
+        )
+
+        assertFalse(aAfterReset.transformed)
+        assertFalse(aAfterDisable.transformed)
+    }
+
+    @Test
+    fun peekRemappedKeyCode_seesDeviceNormalizationAndUserRemaps() {
+        val option = KeyRemapOption(
+            id = "m_as_escape",
+            titleRes = 1,
+            summaryRes = 1,
+            mappings = listOf(KeyMapping(KeyEvent.KEYCODE_M, KeyEvent.KEYCODE_ESCAPE))
+        )
+        val remapper = HardwareKeyRemapper(listOf(option))
+        val ids = setOf("m_as_escape")
+        // Scan code 50 is the physical M key; the KEY2 profile reports it as a comma.
+        val commaForPhysicalM = keyEvent(
+            KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_COMMA, 0, scanCode = 50
+        )
+        val shiftRight = keyEvent(
+            KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SHIFT_RIGHT, KeyEvent.META_SHIFT_RIGHT_ON
+        )
+
+        val key2 = DeviceSpecific.peekRemappedKeyCode(
+            KeyEvent.KEYCODE_COMMA, commaForPhysicalM, "key2", ids, remapper
+        )
+        val swapOnQ25 = DeviceSpecific.peekRemappedKeyCode(
+            KeyEvent.KEYCODE_SHIFT_RIGHT, shiftRight, "Q25", enabled
+        )
+        val swapElsewhere = DeviceSpecific.peekRemappedKeyCode(
+            KeyEvent.KEYCODE_SHIFT_RIGHT, shiftRight, "key2", enabled
+        )
+        val key2Result = DeviceSpecific.remapHardwareKeyEvent(
+            KeyEvent.KEYCODE_COMMA, commaForPhysicalM, "key2", ids, remapper
+        )
+
+        assertEquals(KeyEvent.KEYCODE_ESCAPE, key2)
+        // The Q25's right Shift is its Ctrl key and user remaps are off there.
+        assertEquals(KeyEvent.KEYCODE_CTRL_LEFT, swapOnQ25)
+        assertEquals(KeyEvent.KEYCODE_ENTER, swapElsewhere)
+        // The peek predicted what the full remap then produced.
+        assertEquals(key2, key2Result.keyCode)
+    }
+
+    @Test
+    fun supportsUserKeyRemaps_isFalseOnlyForTheQ25Profile() {
+        assertFalse(DeviceSpecific.supportsUserKeyRemaps("Q25"))
+        assertTrue(DeviceSpecific.supportsUserKeyRemaps("key2"))
+        assertTrue(DeviceSpecific.supportsUserKeyRemaps("clicks_power"))
+
+        DeviceSpecific.setBuildFingerprintForTests(
+            brand = "unihertz",
+            manufacturer = "unihertz",
+            model = "Titan 2",
+            device = "titan2",
+            product = "titan2"
+        )
+        assertTrue(DeviceSpecific.supportsUserKeyRemaps("auto"))
     }
 
     private fun keyEvent(

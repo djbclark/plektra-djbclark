@@ -108,7 +108,8 @@ object DeviceSpecific {
      * Normalizes the device model's key positions, then applies the user's enabled remaps
      * ([enabledRemapIds], see [HardwareKeyRemapRegistry]) to the keycodes the app would otherwise
      * see. [remapper] holds the held-key state: a consumer that remaps (the IME service,
-     * MainActivity) passes its own so it can reset it; it must see every physical DOWN and UP.
+     * MainActivity) passes its own so it can reset it; it must see every physical DOWN and UP (one
+     * that returns early instead calls [HardwareKeyRemapper.release]).
      */
     fun remapHardwareKeyEvent(
         keyCode: Int,
@@ -132,21 +133,57 @@ object DeviceSpecific {
         return remapper.remap(modelRemapped.keyCode, modelRemapped.event, effectiveRemapIds)
     }
 
+    /**
+     * The key code [remapHardwareKeyEvent] would return for this event, without changing any
+     * state: runs the same device normalization on the key code alone (the Q25 path keeps a meta
+     * state across events, which this never touches) and the remapper's peek. For key filters
+     * that must classify a physical key as the rest of the pipeline will see it.
+     */
+    fun peekRemappedKeyCode(
+        keyCode: Int,
+        event: KeyEvent?,
+        physicalProfileOverride: String? = null,
+        enabledRemapIds: Set<String> = emptySet(),
+        remapper: HardwareKeyRemapper = hardwareKeyRemapper
+    ): Int {
+        val model = resolveKeyboardModel(event, physicalProfileOverride)
+        val normalizedKeyCode = when (model) {
+            KeyboardModel.Q25 -> q25NormalizedKeyCode(keyCode)
+            else -> canonicalPositionKeyCode(model, keyCode, event)
+        }
+        val effectiveRemapIds = if (model == KeyboardModel.Q25) emptySet() else enabledRemapIds
+        return remapper.peekKeyCode(normalizedKeyCode, event, effectiveRemapIds)
+    }
+
+    /** False where user key remaps are a no-op: the Q25, see [remapHardwareKeyEvent]. */
+    fun supportsUserKeyRemaps(physicalProfileOverride: String? = null): Boolean =
+        keyboardModelForProfile(physicalProfileOverride) != KeyboardModel.Q25
+
+    private fun canonicalPositionKeyCode(
+        model: KeyboardModel,
+        keyCode: Int,
+        event: KeyEvent?
+    ): Int {
+        val usesCanonicalAlphabeticPositions =
+            model == KeyboardModel.KEY2 || model == KeyboardModel.CLICKS_POWER
+        if (!usesCanonicalAlphabeticPositions) return keyCode
+        return PhysicalKeyPositionNormalizer
+            .canonicalAlphabeticKeyCode(event?.scanCode ?: -1)
+            ?: keyCode
+    }
+
     private fun normalizePhysicalKeyPosition(
         model: KeyboardModel,
         keyCode: Int,
         event: KeyEvent?
     ): RemappedHardwareEvent {
-        val usesCanonicalAlphabeticPositions =
-            model == KeyboardModel.KEY2 || model == KeyboardModel.CLICKS_POWER
-        if (!usesCanonicalAlphabeticPositions) {
-            return RemappedHardwareEvent(keyCode, event)
-        }
+        return patchKeyCodeIfNeeded(keyCode, event, canonicalPositionKeyCode(model, keyCode, event))
+    }
 
-        val canonicalKeyCode = PhysicalKeyPositionNormalizer
-            .canonicalAlphabeticKeyCode(event?.scanCode ?: -1)
-            ?: keyCode
-        return patchKeyCodeIfNeeded(keyCode, event, canonicalKeyCode)
+    private fun q25NormalizedKeyCode(keyCode: Int): Int = when (keyCode) {
+        KEYCODE_Q25_CTRL -> KEYCODE_CTRL
+        KEYCODE_Q25_SYM -> KEYCODE_SYM
+        else -> keyCode
     }
 
     // Backward-compatible API used by existing callers.
@@ -167,11 +204,7 @@ object DeviceSpecific {
             return RemappedHardwareEvent(keyCode, event)
         }
 
-        val normalizedKeyCode = when (keyCode) {
-            KEYCODE_Q25_CTRL -> KEYCODE_CTRL
-            KEYCODE_Q25_SYM -> KEYCODE_SYM
-            else -> keyCode
-        }
+        val normalizedKeyCode = q25NormalizedKeyCode(keyCode)
 
         return RemappedHardwareEvent(
             keyCode = normalizedKeyCode,
