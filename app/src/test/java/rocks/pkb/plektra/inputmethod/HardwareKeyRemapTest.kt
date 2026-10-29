@@ -398,7 +398,7 @@ class HardwareKeyRemapTest {
             keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_B, 0),
             ids
         )
-        val disabled = remapper.remap(
+        val disabled = HardwareKeyRemapper(listOf(option)).remap(
             KeyEvent.KEYCODE_A,
             keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, 0),
             setOf("swap_shift_right_enter")
