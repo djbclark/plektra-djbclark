@@ -1000,10 +1000,11 @@ class HardwareKeyRemapTest {
     }
 
     @Test
-    fun supportsUserKeyRemaps_isFalseOnlyForTheQ25Profile() {
-        assertFalse(DeviceSpecific.supportsUserKeyRemaps("Q25"))
-        assertTrue(DeviceSpecific.supportsUserKeyRemaps("key2"))
-        assertTrue(DeviceSpecific.supportsUserKeyRemaps("clicks_power"))
+    fun supportsUserKeyRemap_isPerOption() {
+        val swap = HardwareKeyRemapRegistry.byId(swapId) ?: error("Missing swap option")
+        assertFalse(DeviceSpecific.supportsUserKeyRemap(swap, "Q25"))
+        assertTrue(DeviceSpecific.supportsUserKeyRemap(swap, "key2"))
+        assertTrue(DeviceSpecific.supportsUserKeyRemap(swap, "clicks_power"))
 
         DeviceSpecific.setBuildFingerprintForTests(
             brand = "unihertz",
@@ -1012,7 +1013,414 @@ class HardwareKeyRemapTest {
             device = "titan2",
             product = "titan2"
         )
-        assertTrue(DeviceSpecific.supportsUserKeyRemaps("auto"))
+        assertTrue(DeviceSpecific.supportsUserKeyRemap(swap, "auto"))
+
+        val everywhere = KeyRemapOption(
+            id = "m_as_escape",
+            titleRes = 1,
+            summaryRes = 1,
+            mappings = listOf(KeyMapping(KeyEvent.KEYCODE_M, KeyEvent.KEYCODE_ESCAPE))
+        )
+        val notOnKey2 = everywhere.copy(unsupportedModels = setOf(DeviceSpecific.KeyboardModel.KEY2))
+        assertTrue(DeviceSpecific.supportsUserKeyRemap(everywhere, "Q25"))
+        assertTrue(DeviceSpecific.supportsUserKeyRemap(notOnKey2, "Q25"))
+        assertFalse(DeviceSpecific.supportsUserKeyRemap(notOnKey2, "key2"))
+    }
+
+    @Test
+    fun unsupportedOption_isOffOnItsKeyboardsOnly() {
+        val option = KeyRemapOption(
+            id = "m_as_escape",
+            titleRes = 1,
+            summaryRes = 1,
+            mappings = listOf(KeyMapping(KeyEvent.KEYCODE_M, KeyEvent.KEYCODE_ESCAPE)),
+            unsupportedModels = setOf(DeviceSpecific.KeyboardModel.Q25)
+        )
+        val remapper = HardwareKeyRemapper(listOf(option))
+        val ids = setOf("m_as_escape")
+        val mDown = keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_M, 0)
+
+        assertEquals(
+            KeyEvent.KEYCODE_M,
+            DeviceSpecific.peekRemappedKeyCode(KeyEvent.KEYCODE_M, mDown, "Q25", ids, remapper)
+        )
+        assertEquals(
+            KeyEvent.KEYCODE_ESCAPE,
+            DeviceSpecific.peekRemappedKeyCode(KeyEvent.KEYCODE_M, mDown, "key2", ids, remapper)
+        )
+        assertTrue(remapper.supportedIds(ids, DeviceSpecific.KeyboardModel.Q25).isEmpty())
+        assertSame(ids, remapper.supportedIds(ids, DeviceSpecific.KeyboardModel.KEY2))
+        assertSame(
+            remapper.supportedIds(ids, DeviceSpecific.KeyboardModel.Q25),
+            remapper.supportedIds(ids, DeviceSpecific.KeyboardModel.Q25)
+        )
+    }
+
+    @Test
+    fun resetDuringHold_swallowsRepeatsAndUpOfAKeyThatActedAsShift() {
+        val remapper = HardwareKeyRemapper()
+        remapper.remap(
+            KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0),
+            enabled
+        )
+        remapper.reset()
+
+        val a = remapper.remap(
+            KeyEvent.KEYCODE_A,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, 0),
+            enabled
+        )
+        val repeat = remapper.remap(
+            KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0, repeatCount = 1),
+            enabled
+        )
+        val up = remapper.remap(
+            KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER, 0),
+            enabled
+        )
+        val unrelatedUp = remapper.remap(
+            KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER, 0),
+            enabled
+        )
+
+        // The cut-off hold adds no Shift to other keys.
+        assertFalse(a.transformed)
+        assertEquals(0, a.event?.metaState)
+        assertTrue(repeat.staleRelease)
+        assertTrue(up.staleRelease)
+        // The tombstone ended with the UP.
+        assertFalse(unrelatedUp.staleRelease)
+        assertFalse(unrelatedUp.transformed)
+    }
+
+    @Test
+    fun resetDuringHold_swallowsRepeatsAndUpOfAKeyThatActedAsEnter() {
+        val remapper = HardwareKeyRemapper()
+        remapper.remap(
+            KeyEvent.KEYCODE_SHIFT_RIGHT,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SHIFT_RIGHT, shiftRightMeta),
+            enabled
+        )
+        remapper.reset()
+
+        val repeat = remapper.remap(
+            KeyEvent.KEYCODE_SHIFT_RIGHT,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SHIFT_RIGHT, shiftRightMeta, repeatCount = 2),
+            enabled
+        )
+        val up = remapper.remap(
+            KeyEvent.KEYCODE_SHIFT_RIGHT,
+            keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SHIFT_RIGHT, 0),
+            enabled
+        )
+
+        assertTrue(repeat.staleRelease)
+        assertTrue(up.staleRelease)
+    }
+
+    @Test
+    fun tombstone_endsWithTheNextInitialDownOfItsKey() {
+        val remapper = HardwareKeyRemapper()
+        remapper.remap(
+            KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0),
+            enabled
+        )
+        remapper.reset()
+
+        // The UP was lost; a new press starts a normal hold.
+        val down = remapper.remap(
+            KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0),
+            enabled
+        )
+        val repeat = remapper.remap(
+            KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0, repeatCount = 1),
+            enabled
+        )
+        val up = remapper.remap(
+            KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER, 0),
+            enabled
+        )
+
+        assertFalse(down.staleRelease)
+        assertEquals(KeyEvent.KEYCODE_SHIFT_RIGHT, down.keyCode)
+        assertFalse(repeat.staleRelease)
+        assertEquals(KeyEvent.KEYCODE_SHIFT_RIGHT, repeat.keyCode)
+        assertFalse(up.staleRelease)
+        assertEquals(KeyEvent.KEYCODE_SHIFT_RIGHT, up.keyCode)
+    }
+
+    @Test
+    fun tombstone_isPerDeviceAndEndsWithClearDeviceOrRelease() {
+        val remapper = HardwareKeyRemapper()
+        fun hold(deviceId: Int) = remapper.remap(
+            KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0, deviceId = deviceId),
+            enabled
+        )
+        fun repeat(deviceId: Int) = remapper.remap(
+            KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0, repeatCount = 1, deviceId = deviceId),
+            enabled
+        )
+        hold(7)
+        hold(8)
+        hold(9)
+        remapper.reset()
+
+        remapper.clearDevice(7)
+        remapper.release(KeyEvent.KEYCODE_ENTER, keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER, 0, deviceId = 8))
+
+        assertFalse(repeat(7).staleRelease)
+        assertFalse(repeat(8).staleRelease)
+        assertTrue(repeat(9).staleRelease)
+        // A device that never held the key has no tombstone.
+        assertFalse(repeat(10).staleRelease)
+    }
+
+    @Test
+    fun resetWithForgetHolds_dropsTheTombstonesToo() {
+        val remapper = HardwareKeyRemapper()
+        remapper.remap(
+            KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0),
+            enabled
+        )
+        remapper.reset(forgetHolds = true)
+
+        val repeat = remapper.remap(
+            KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0, repeatCount = 1),
+            enabled
+        )
+        val up = remapper.remap(
+            KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER, 0),
+            enabled
+        )
+
+        assertFalse(repeat.staleRelease)
+        assertEquals(KeyEvent.KEYCODE_ENTER, repeat.keyCode)
+        assertFalse(up.staleRelease)
+        assertEquals(KeyEvent.KEYCODE_ENTER, up.keyCode)
+    }
+
+    @Test
+    fun peekOfATombstonedKey_stillSeesWhatItWasRemappedTo() {
+        val remapper = HardwareKeyRemapper()
+        remapper.remap(
+            KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0),
+            enabled
+        )
+        remapper.reset()
+
+        assertEquals(
+            KeyEvent.KEYCODE_SHIFT_RIGHT,
+            remapper.peekKeyCode(
+                KeyEvent.KEYCODE_ENTER,
+                keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER, 0),
+                enabled
+            )
+        )
+        // A new press is looked up afresh.
+        assertEquals(
+            KeyEvent.KEYCODE_SHIFT_RIGHT,
+            remapper.peekKeyCode(
+                KeyEvent.KEYCODE_ENTER,
+                keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0),
+                enabled
+            )
+        )
+        assertEquals(
+            KeyEvent.KEYCODE_ENTER,
+            remapper.peekKeyCode(
+                KeyEvent.KEYCODE_ENTER,
+                keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0),
+                emptySet()
+            )
+        )
+    }
+
+    @Test
+    fun symTarget_addsSymMetaWhileHeld() {
+        val option = KeyRemapOption(
+            id = "escape_as_sym",
+            titleRes = 1,
+            summaryRes = 1,
+            mappings = listOf(KeyMapping(KeyEvent.KEYCODE_ESCAPE, KeyEvent.KEYCODE_SYM))
+        )
+        val remapper = HardwareKeyRemapper(listOf(option))
+        val ids = setOf("escape_as_sym")
+
+        val down = remapper.remap(
+            KeyEvent.KEYCODE_ESCAPE,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ESCAPE, 0),
+            ids
+        )
+        val a = remapper.remap(
+            KeyEvent.KEYCODE_A,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, 0),
+            ids
+        )
+        remapper.remap(
+            KeyEvent.KEYCODE_ESCAPE,
+            keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ESCAPE, 0),
+            ids
+        )
+        val aAfter = remapper.remap(
+            KeyEvent.KEYCODE_A,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, 0),
+            ids
+        )
+
+        assertEquals(KeyEvent.KEYCODE_SYM, down.keyCode)
+        assertEquals(KeyEvent.META_SYM_ON, down.event?.metaState)
+        assertEquals(KeyEvent.META_SYM_ON, a.event?.metaState)
+        assertFalse(aAfter.transformed)
+    }
+
+    @Test
+    fun symSource_losesItsSymMeta() {
+        val option = KeyRemapOption(
+            id = "sym_as_escape",
+            titleRes = 1,
+            summaryRes = 1,
+            mappings = listOf(KeyMapping(KeyEvent.KEYCODE_SYM, KeyEvent.KEYCODE_ESCAPE))
+        )
+        val remapper = HardwareKeyRemapper(listOf(option))
+        val ids = setOf("sym_as_escape")
+        remapper.remap(
+            KeyEvent.KEYCODE_SYM,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SYM, KeyEvent.META_SYM_ON),
+            ids
+        )
+
+        val a = remapper.remap(
+            KeyEvent.KEYCODE_A,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, KeyEvent.META_SYM_ON),
+            ids
+        )
+
+        assertEquals(0, a.event?.metaState)
+        assertTrue(a.transformed)
+    }
+
+    @Test
+    fun isModifierKeyCode_isTheRemapperModifierTable() {
+        val modifiers = listOf(
+            KeyEvent.KEYCODE_SHIFT_LEFT, KeyEvent.KEYCODE_SHIFT_RIGHT,
+            KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.KEYCODE_CTRL_RIGHT,
+            KeyEvent.KEYCODE_ALT_LEFT, KeyEvent.KEYCODE_ALT_RIGHT,
+            KeyEvent.KEYCODE_META_LEFT, KeyEvent.KEYCODE_META_RIGHT,
+            KeyEvent.KEYCODE_SYM
+        )
+        for (keyCode in modifiers) assertTrue(HardwareKeyRemapper.isModifierKeyCode(keyCode))
+        for (keyCode in listOf(KeyEvent.KEYCODE_A, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_CAPS_LOCK)) {
+            assertFalse(HardwareKeyRemapper.isModifierKeyCode(keyCode))
+        }
+    }
+
+    @Test
+    fun toggledLockMeta_isTheRemappedLockKeysInitialDownOnly() {
+        val option = KeyRemapOption(
+            id = "ctrl_as_caps",
+            titleRes = 1,
+            summaryRes = 1,
+            mappings = listOf(KeyMapping(KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.KEYCODE_CAPS_LOCK))
+        )
+        val remapper = HardwareKeyRemapper(listOf(option))
+        val ids = setOf("ctrl_as_caps")
+        fun ctrl(action: Int, repeatCount: Int = 0) = remapper.remap(
+            KeyEvent.KEYCODE_CTRL_LEFT,
+            keyEvent(action, KeyEvent.KEYCODE_CTRL_LEFT, 0, repeatCount = repeatCount),
+            ids
+        )
+
+        val down = ctrl(KeyEvent.ACTION_DOWN)
+        val repeat = ctrl(KeyEvent.ACTION_DOWN, repeatCount = 1)
+        val up = ctrl(KeyEvent.ACTION_UP)
+        val secondDown = ctrl(KeyEvent.ACTION_DOWN)
+        val realCapsLock = remapper.remap(
+            KeyEvent.KEYCODE_CAPS_LOCK,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_CAPS_LOCK, 0),
+            emptySet()
+        )
+        val letter = remapper.remap(
+            KeyEvent.KEYCODE_A,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, 0),
+            ids
+        )
+
+        assertEquals(KeyEvent.META_CAPS_LOCK_ON, HardwareKeyRemapper.toggledLockMeta(down))
+        assertEquals(0, HardwareKeyRemapper.toggledLockMeta(repeat))
+        assertEquals(0, HardwareKeyRemapper.toggledLockMeta(up))
+        assertEquals(KeyEvent.META_CAPS_LOCK_ON, HardwareKeyRemapper.toggledLockMeta(secondDown))
+        assertEquals(0, HardwareKeyRemapper.toggledLockMeta(realCapsLock))
+        assertEquals(0, HardwareKeyRemapper.toggledLockMeta(letter))
+    }
+
+    @Test
+    fun physicalKeySet_tracksKeysPerDeviceWithoutLimit() {
+        val keys = PhysicalKeySet()
+        val a = PhysicalKeySet.keyId(1, KeyEvent.KEYCODE_A)
+        val sameKeyOtherDevice = PhysicalKeySet.keyId(2, KeyEvent.KEYCODE_A)
+        keys.add(a)
+        keys.add(a)
+        keys.add(sameKeyOtherDevice)
+        for (keyCode in 100 until 130) keys.add(PhysicalKeySet.keyId(3, keyCode))
+
+        assertTrue(a in keys)
+        assertTrue(keys.remove(a))
+        assertFalse(keys.remove(a))
+        assertFalse(a in keys)
+        assertTrue(sameKeyOtherDevice in keys)
+        assertTrue(PhysicalKeySet.keyId(3, 129) in keys)
+
+        keys.removeDevice(3)
+        assertFalse(PhysicalKeySet.keyId(3, 100) in keys)
+        assertTrue(sameKeyOtherDevice in keys)
+
+        keys.clear()
+        assertFalse(sameKeyOtherDevice in keys)
+    }
+
+    @Test
+    fun injectedKeyEvents_recognizesByTimesActionAndKeyCodeWithinItsBound() {
+        val first = keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0, downTime = 9_001L, eventTime = 9_002L)
+        InjectedKeyEvents.record(first)
+
+        // The input connection may hand on a copy.
+        assertTrue(InjectedKeyEvents.wasInjected(KeyEvent(first)))
+        assertFalse(
+            InjectedKeyEvents.wasInjected(
+                keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER, 0, downTime = 9_001L, eventTime = 9_002L)
+            )
+        )
+        assertFalse(
+            InjectedKeyEvents.wasInjected(
+                keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SHIFT_RIGHT, 0, downTime = 9_001L, eventTime = 9_002L)
+            )
+        )
+        assertFalse(
+            InjectedKeyEvents.wasInjected(
+                keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0, downTime = 9_001L, eventTime = 9_003L)
+            )
+        )
+
+        for (i in 0 until 16) {
+            InjectedKeyEvents.record(
+                keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, 0, downTime = 9_100L + i, eventTime = 9_100L + i)
+            )
+        }
+        assertFalse(InjectedKeyEvents.wasInjected(first))
     }
 
     private fun keyEvent(

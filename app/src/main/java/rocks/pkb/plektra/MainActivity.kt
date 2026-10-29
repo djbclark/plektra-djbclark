@@ -70,6 +70,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.FileProvider
 import rocks.pkb.plektra.inputmethod.DeviceSpecific
 import rocks.pkb.plektra.inputmethod.HardwareKeyRemapper
+import rocks.pkb.plektra.inputmethod.InjectedKeyEvents
 import kotlinx.coroutines.delay
 import java.io.File
 import java.security.MessageDigest
@@ -92,12 +93,25 @@ class MainActivity : LocalizedComponentActivity() {
 
     private val hardwareKeyRemapper = HardwareKeyRemapper()
 
+    /**
+     * The IME injects the events it remapped into the focused app through its input connection,
+     * and they bubble up to this activity: remapping them again would undo a swap (an
+     * involution). [InjectedKeyEvents] recognizes them by times, action and key code, which the
+     * input connection hands on unchanged within this process. A flag on the event would
+     * change what apps see, so none is used. Limit: only injected events are recognized; the
+     * raw physical events the system delivers (nothing remapped them) are remapped here.
+     */
     private fun remapHardwareEvent(keyCode: Int, event: KeyEvent?): Pair<Int, KeyEvent?> {
+        val enabledRemaps = if (event != null && InjectedKeyEvents.wasInjected(event)) {
+            emptySet()
+        } else {
+            SettingsManager.getEnabledKeyRemaps(this)
+        }
         val remapped = DeviceSpecific.remapHardwareKeyEvent(
             keyCode,
             event,
             SettingsManager.getPhysicalKeyboardProfileOverride(this),
-            SettingsManager.getEnabledKeyRemaps(this),
+            enabledRemaps,
             hardwareKeyRemapper
         )
         return remapped.keyCode to remapped.event

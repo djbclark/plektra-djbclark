@@ -2672,18 +2672,39 @@ object SettingsManager {
     }
 
     /**
+     * The pref keys of the hardware key remap options, in [HardwareKeyRemapRegistry.options] order.
+     * Built once: [getEnabledKeyRemaps] runs per key event.
+     */
+    private val keyRemapPrefKeys: List<String> = HardwareKeyRemapRegistry.options.map {
+        KEY_KEY_REMAP_PREFIX + it.id
+    }.also { require(it.size <= Long.SIZE_BITS) { "Too many key remap options for the enabled mask" } }
+
+    private class EnabledKeyRemaps(val mask: Long, val ids: Set<String>)
+
+    @Volatile
+    private var enabledKeyRemapsCache = EnabledKeyRemaps(0L, emptySet())
+
+    /**
      * Returns the ids of the hardware key remap options that are switched on.
-     * Called per key event, so it only reads the in-memory preferences and allocates nothing when none is on.
+     * Called per key event, so it only reads the in-memory preferences and allocates nothing when
+     * none is on, or when the set of options that are on has not changed since the last call:
+     * callers get the same set instance then.
      */
     fun getEnabledKeyRemaps(context: Context): Set<String> {
         val prefs = getPreferences(context)
-        var enabled: MutableSet<String>? = null
-        for (option in HardwareKeyRemapRegistry.options) {
-            if (prefs.getBoolean(KEY_KEY_REMAP_PREFIX + option.id, false)) {
-                (enabled ?: HashSet<String>().also { enabled = it }).add(option.id)
-            }
+        var mask = 0L
+        for (i in keyRemapPrefKeys.indices) {
+            if (prefs.getBoolean(keyRemapPrefKeys[i], false)) mask = mask or (1L shl i)
         }
-        return enabled ?: emptySet()
+        if (mask == 0L) return emptySet()
+        val cached = enabledKeyRemapsCache
+        if (cached.mask == mask) return cached.ids
+        val ids = HashSet<String>()
+        for (i in keyRemapPrefKeys.indices) {
+            if ((mask and (1L shl i)) != 0L) ids.add(HardwareKeyRemapRegistry.options[i].id)
+        }
+        enabledKeyRemapsCache = EnabledKeyRemaps(mask, ids)
+        return ids
     }
 
     /**

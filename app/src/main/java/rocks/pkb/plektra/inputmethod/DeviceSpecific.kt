@@ -32,22 +32,19 @@ object DeviceSpecific {
     /**
      * [transformed]: a user remap changed the key code or the meta state of the event relative to
      * what [HardwareKeyRemapper] received. [keyCodeRemapped]: it changed the key code.
+     * [staleRelease]: a repeat or the UP of a key whose hold a [HardwareKeyRemapper.reset] cut
+     * off; the owner swallows it, see [HardwareKeyRemapper].
      */
     data class RemappedHardwareEvent(
         val keyCode: Int,
         val event: KeyEvent?,
         val transformed: Boolean = false,
-        val keyCodeRemapped: Boolean = false
+        val keyCodeRemapped: Boolean = false,
+        val staleRelease: Boolean = false
     )
 
-    private enum class KeyboardFamily {
-        BLACKBERRY,
-        UNIHERTZ,
-        MINIMAL,
-        UNKNOWN
-    }
-
-    private enum class KeyboardModel {
+    // Public so a [KeyRemapOption] can name the keyboards it does not apply to.
+    enum class KeyboardModel {
         Q25,
         KEY2,
         TITAN_2_ELITE_QWERTY,
@@ -59,6 +56,13 @@ object DeviceSpecific {
         CLICKS_RAZR,
         CLICKS_PIXEL,
         CLICKS_POWER,
+        UNKNOWN
+    }
+
+    private enum class KeyboardFamily {
+        BLACKBERRY,
+        UNIHERTZ,
+        MINIMAL,
         UNKNOWN
     }
 
@@ -107,7 +111,8 @@ object DeviceSpecific {
     /**
      * Normalizes the device model's key positions, then applies the user's enabled remaps
      * ([enabledRemapIds], see [HardwareKeyRemapRegistry]) to the keycodes the app would otherwise
-     * see. [remapper] holds the held-key state: a consumer that remaps (the IME service,
+     * see, bar the options the keyboard does not support ([KeyRemapOption.unsupportedModels]).
+     * [remapper] holds the held-key state: a consumer that remaps (the IME service,
      * MainActivity) passes its own so it can reset it; it must see every physical DOWN and UP (one
      * that returns early instead calls [HardwareKeyRemapper.release]).
      */
@@ -127,9 +132,7 @@ object DeviceSpecific {
             )
             else -> positionNormalized
         }
-        // The Q25's physical right Shift is its Ctrl key, so the Shift/Enter swap would only half apply
-        // (Enter would become Shift and nothing would type Enter): leave user remaps off there.
-        val effectiveRemapIds = if (model == KeyboardModel.Q25) emptySet() else enabledRemapIds
+        val effectiveRemapIds = remapper.supportedIds(enabledRemapIds, model)
         return remapper.remap(modelRemapped.keyCode, modelRemapped.event, effectiveRemapIds)
     }
 
@@ -151,13 +154,16 @@ object DeviceSpecific {
             KeyboardModel.Q25 -> q25NormalizedKeyCode(keyCode)
             else -> canonicalPositionKeyCode(model, keyCode, event)
         }
-        val effectiveRemapIds = if (model == KeyboardModel.Q25) emptySet() else enabledRemapIds
+        val effectiveRemapIds = remapper.supportedIds(enabledRemapIds, model)
         return remapper.peekKeyCode(normalizedKeyCode, event, effectiveRemapIds)
     }
 
-    /** False where user key remaps are a no-op: the Q25, see [remapHardwareKeyEvent]. */
-    fun supportsUserKeyRemaps(physicalProfileOverride: String? = null): Boolean =
-        keyboardModelForProfile(physicalProfileOverride) != KeyboardModel.Q25
+    /**
+     * False where [option] is a no-op ([KeyRemapOption.unsupportedModels]): the settings screen
+     * hides it and [remapHardwareKeyEvent] leaves it off.
+     */
+    fun supportsUserKeyRemap(option: KeyRemapOption, physicalProfileOverride: String? = null): Boolean =
+        keyboardModelForProfile(physicalProfileOverride) !in option.unsupportedModels
 
     private fun canonicalPositionKeyCode(
         model: KeyboardModel,

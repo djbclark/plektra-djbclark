@@ -309,10 +309,13 @@ private fun HardwareKeyboardListScreen(
                 }
             }
 
-            // User key remaps are a no-op on the Q25 (see DeviceSpecific.remapHardwareKeyEvent).
-            if (DeviceSpecific.supportsUserKeyRemaps(profile)) {
+            // Each option hides where the keyboard does not support it (see KeyRemapOption.unsupportedModels).
+            val supportedKeyRemaps = HardwareKeyRemapRegistry.options.filter {
+                DeviceSpecific.supportsUserKeyRemap(it, profile)
+            }
+            if (supportedKeyRemaps.isNotEmpty()) {
                 HardwareKeyboardSectionDivider(stringResource(R.string.key_remap_section_title))
-                HardwareKeyRemapRegistry.options.forEach { option ->
+                supportedKeyRemaps.forEach { option ->
                     HardwareKeyRemapSwitchRow(option)
                 }
             }
