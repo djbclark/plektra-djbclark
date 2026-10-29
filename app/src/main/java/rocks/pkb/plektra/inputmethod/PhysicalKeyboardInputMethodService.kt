@@ -340,6 +340,16 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
     private var replayingProtectedNumberKey = false
     // djb/screen-trackpad: a replayed trigger key bypasses the key filters that already saw it
     private var screenTrackpadReplaying = false
+    /**
+     * Set by [remapHardwareEvent] when a user key remap changed the key code, cleared on entry to
+     * [onKeyDown]/[onKeyUp]. Lets those wrappers keep the raw key from reaching the app when the
+     * handler leaves the remapped key unconsumed.
+     */
+    private var keyRemapPassthrough: ClicksPowerButtonEventMapper.Result? = null
+    private val keyRemapSourceKeyCodes: IntArray = HardwareKeyRemapRegistry.options
+        .flatMap { option -> option.mappings.map { it.fromKeyCode } }
+        .distinct()
+        .toIntArray()
     private lateinit var screenTrackpadController: ScreenTrackpadController
     /**
      * True between onStartInput and onFinishInput/onUnbindInput. InputMethodService keeps the
@@ -736,6 +746,17 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             keyCode == KeyEvent.KEYCODE_ALT_LEFT ||
             keyCode == KeyEvent.KEYCODE_ALT_RIGHT ||
             keyCode == KEYCODE_SYM
+    }
+
+    private fun isRemapModifierKey(keyCode: Int): Boolean {
+        return keyCode == KeyEvent.KEYCODE_SHIFT_LEFT ||
+            keyCode == KeyEvent.KEYCODE_SHIFT_RIGHT ||
+            keyCode == KeyEvent.KEYCODE_CTRL_LEFT ||
+            keyCode == KeyEvent.KEYCODE_CTRL_RIGHT ||
+            keyCode == KeyEvent.KEYCODE_ALT_LEFT ||
+            keyCode == KeyEvent.KEYCODE_ALT_RIGHT ||
+            keyCode == KeyEvent.KEYCODE_META_LEFT ||
+            keyCode == KeyEvent.KEYCODE_META_RIGHT
     }
 
     private fun isMinimalPhoneHardwareActive(): Boolean {
@@ -4577,7 +4598,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
                         InputDevice.getDevice(inputEvent.deviceId)
                             ?.let(DeviceSpecific::isClicksPowerKeyboard) == true
                 } == true)
-        return clicksPowerButtonEventMapper.map(
+        val result = clicksPowerButtonEventMapper.map(
             keyCode = remapped.keyCode,
             event = remapped.event,
             isClicksPowerKeyboard = isClicksPowerKeyboard,
@@ -4586,6 +4607,25 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             altButtonMode = SettingsManager.getClicksAltButtonMode(this),
             microphoneButtonMode = SettingsManager.getClicksMicrophoneButtonMode(this)
         )
+        // Only user remaps: device normalization and Clicks button modes also change key codes.
+        keyRemapPassthrough =
+            if (result.keyCode != keyCode && keyCode in keyRemapSourceKeyCodes) result else null
+        return result
+    }
+
+    /**
+     * The handler returned false for a key the user remapped, so the system would deliver the raw
+     * physical key. Swallows a remapped modifier (modifier state is tracked internally) and
+     * injects any other remapped key. Without an input connection nothing better is possible.
+     * Accessibility-dispatched events never reached the app, so they are left alone.
+     */
+    private fun passRemappedKeyToApp(remap: ClicksPowerButtonEventMapper.Result): Boolean {
+        if (dispatchingClicksAccessibilityKeyEvent) return false
+        if (isRemapModifierKey(remap.keyCode)) return true
+        val event = remap.event ?: return false
+        val inputConnection = currentInputConnection ?: return false
+        inputConnection.sendKeyEvent(event)
+        return true
     }
 
     override fun dispatchClicksAccessibilityKeyEvent(event: KeyEvent): Boolean {
@@ -4767,11 +4807,24 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
     }
 
     override fun onKeyDown(keyCode_: Int, event_: KeyEvent?): Boolean {
-        if (liveSpeechEditor != null && (event_?.unicodeChar?.let { it != 0 } == true ||
-            keyCode_ in listOf(KeyEvent.KEYCODE_DEL, KeyEvent.KEYCODE_FORWARD_DEL, KeyEvent.KEYCODE_ENTER,
+        // Re-entered by replays: keep the caller's pending remap for when the nested call returns.
+        val outerRemap = keyRemapPassthrough
+        keyRemapPassthrough = null
+        val handled = onKeyDownImpl(keyCode_, event_)
+        val remap = keyRemapPassthrough
+        keyRemapPassthrough = outerRemap
+        return handled || (remap != null && passRemappedKeyToApp(remap))
+    }
+
+    private fun cancelLiveSpeechOnTyping(keyCode: Int, event: KeyEvent?) {
+        if (liveSpeechEditor != null && (event?.unicodeChar?.let { it != 0 } == true ||
+            keyCode in listOf(KeyEvent.KEYCODE_DEL, KeyEvent.KEYCODE_FORWARD_DEL, KeyEvent.KEYCODE_ENTER,
                 KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN))) {
             cancelSpeechRecognition()
         }
+    }
+
+    private fun onKeyDownImpl(keyCode_: Int, event_: KeyEvent?): Boolean {
         val perfStart = ImePerfLogger.mark()
         try {
         if (!replayingProtectedNumberKey && !screenTrackpadReplaying) {
@@ -4782,6 +4835,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
                 resolution = accidentalInput.resolution,
                 configuration = accidentalInput.configuration
             )?.let { suppressed ->
+                cancelLiveSpeechOnTyping(keyCode_, event_)
                 notifyDebugKeyEvent(
                     keyCode = keyCode_,
                     event = event_,
@@ -4793,6 +4847,8 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             }
         }
         val remapped = remapHardwareEvent(keyCode_, event_)
+        val userRemap = keyRemapPassthrough
+        cancelLiveSpeechOnTyping(userRemap?.keyCode ?: keyCode_, userRemap?.event ?: event_)
         if (remapped.consume) {
             remapped.directAction?.let { ClicksButtonDirectActionExecutor.execute(this, it) }
             return true
@@ -5552,6 +5608,16 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
     }
 
     override fun onKeyUp(keyCode_: Int, event_: KeyEvent?): Boolean {
+        // Re-entered by replays: keep the caller's pending remap for when the nested call returns.
+        val outerRemap = keyRemapPassthrough
+        keyRemapPassthrough = null
+        val handled = onKeyUpImpl(keyCode_, event_)
+        val remap = keyRemapPassthrough
+        keyRemapPassthrough = outerRemap
+        return handled || (remap != null && passRemappedKeyToApp(remap))
+    }
+
+    private fun onKeyUpImpl(keyCode_: Int, event_: KeyEvent?): Boolean {
         if (!replayingProtectedNumberKey && !screenTrackpadReplaying) {
             when (val result = accidentalKeyPressFilter.onKeyUp(keyCode_, event_)) {
                 is AccidentalKeyPressFilter.KeyUpResult.Suppressed -> {
