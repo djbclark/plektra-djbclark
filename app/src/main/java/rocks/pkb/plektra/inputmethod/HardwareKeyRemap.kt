@@ -1,11 +1,16 @@
 package rocks.pkb.plektra.inputmethod
 
-import android.util.SparseIntArray
 import android.view.KeyEvent
 import androidx.annotation.StringRes
 import rocks.pkb.plektra.R
 
-/** One user-facing toggle. A toggle owns one or more one-way key mappings (a swap = two). */
+/**
+ * One user-facing toggle. A toggle owns one or more one-way key mappings (a swap = two).
+ *
+ * Mappings are between ordinary keys and momentary modifiers (shift, ctrl, alt, meta), or between
+ * two of those. Toggling keys such as Caps Lock are unsupported: they carry a lock bit in the meta
+ * state that the remapper neither removes nor synthesizes.
+ */
 data class KeyRemapOption(
     val id: String,
     @StringRes val titleRes: Int,
@@ -44,18 +49,45 @@ object HardwareKeyRemapRegistry {
  * The framework computes [KeyEvent.metaState] from the physical keys, so after a remap it is wrong
  * for modifiers: a held physical key that now acts as a modifier is missing from it, and a held
  * physical modifier that now acts as another key is still in it. The remapper therefore tracks
- * held remapped keys (physical key code -> target key code, set on DOWN, cleared on UP so a toggle
- * flipped mid-hold still releases consistently) and rebuilds the meta state of every event.
+ * held remapped keys (device and physical key code -> target key code, set on DOWN, cleared on UP
+ * so a toggle flipped mid-hold still releases consistently) and rebuilds the meta state of every
+ * event. Held state is per device so one keyboard's release cannot clear another's press; the meta
+ * state is rebuilt from the held keys of every device because the framework reports it globally.
  *
- * Stateful but free of Android context; callers pass the enabled option ids on every call.
+ * Only momentary modifiers (shift, ctrl, alt, meta) and ordinary keys are supported as mapping
+ * ends; toggling keys such as Caps Lock are not (see [KeyRemapOption]).
+ *
+ * Stateful but free of Android context; callers pass the enabled option ids on every call. The
+ * owner must [reset] the held state when it loses track of key releases (editor teardown, focus
+ * loss) and [clearDevice] when a keyboard disconnects. Shrinking the enabled set also drops the
+ * held state: a release that was already lost would otherwise keep a disabled remap alive.
  */
 class HardwareKeyRemapper(
     private val options: List<KeyRemapOption> = HardwareKeyRemapRegistry.options
 ) {
-    private val held = SparseIntArray()
+    private class HeldKey(val deviceId: Int, val keyCode: Int, val targetKeyCode: Int)
+
+    private val held = ArrayList<HeldKey>()
+    private var lastEnabledIds: Set<String> = emptySet()
 
     fun reset() {
         held.clear()
+    }
+
+    /** Forgets the held keys of one keyboard, e.g. when it is disconnected. */
+    fun clearDevice(deviceId: Int) {
+        held.removeAll { it.deviceId == deviceId }
+    }
+
+    /**
+     * The key code [remap] would produce for this event, without touching any state. For callers
+     * that must classify a physical key before it is remapped (e.g. key filters).
+     */
+    fun peekKeyCode(keyCode: Int, event: KeyEvent?, enabledIds: Set<String>): Int {
+        val heldIndex = indexOfHeld(event?.deviceId ?: NO_DEVICE, keyCode)
+        if (heldIndex >= 0) return held[heldIndex].targetKeyCode
+        if (event?.action == KeyEvent.ACTION_UP) return keyCode
+        return mappingFor(keyCode, enabledIds)
     }
 
     fun remap(
@@ -63,28 +95,41 @@ class HardwareKeyRemapper(
         event: KeyEvent?,
         enabledIds: Set<String>
     ): DeviceSpecific.RemappedHardwareEvent {
-        val heldTarget = held.get(keyCode, NO_KEY)
+        if (lastEnabledIds.isNotEmpty() && !enabledIds.containsAll(lastEnabledIds)) held.clear()
+        lastEnabledIds = enabledIds
+
+        val deviceId = event?.deviceId ?: NO_DEVICE
+        val heldIndex = indexOfHeld(deviceId, keyCode)
+        val heldTarget = if (heldIndex >= 0) held[heldIndex].targetKeyCode else NO_KEY
         val targetKeyCode = when (event?.action) {
             KeyEvent.ACTION_DOWN -> {
                 // A repeat or long press keeps the mapping chosen on the initial DOWN.
                 val target = if (heldTarget != NO_KEY) heldTarget else mappingFor(keyCode, enabledIds)
-                if (heldTarget == NO_KEY && target != keyCode) held.put(keyCode, target)
+                if (heldTarget == NO_KEY && target != keyCode) {
+                    held.add(HeldKey(deviceId, keyCode, target))
+                }
                 target
             }
             KeyEvent.ACTION_UP -> {
                 // No held entry: the DOWN was not remapped (or was never seen), so stay identity.
-                if (heldTarget != NO_KEY) held.delete(keyCode)
+                if (heldIndex >= 0) held.removeAt(heldIndex)
                 if (heldTarget != NO_KEY) heldTarget else keyCode
             }
             // No event, or an action without press/release semantics: remap statelessly.
             else -> if (heldTarget != NO_KEY) heldTarget else mappingFor(keyCode, enabledIds)
         }
+        val keyCodeRemapped = targetKeyCode != keyCode
         if (event == null) {
-            return DeviceSpecific.RemappedHardwareEvent(targetKeyCode, null)
+            return DeviceSpecific.RemappedHardwareEvent(
+                keyCode = targetKeyCode,
+                event = null,
+                transformed = keyCodeRemapped,
+                keyCodeRemapped = keyCodeRemapped
+            )
         }
 
         val metaState = rebuildMetaState(event.metaState)
-        if (targetKeyCode == keyCode && metaState == event.metaState) {
+        if (!keyCodeRemapped && metaState == event.metaState) {
             return DeviceSpecific.RemappedHardwareEvent(keyCode, event)
         }
         return DeviceSpecific.RemappedHardwareEvent(
@@ -100,8 +145,18 @@ class HardwareKeyRemapper(
                 event.scanCode,
                 event.flags,
                 event.source
-            )
+            ),
+            transformed = true,
+            keyCodeRemapped = keyCodeRemapped
         )
+    }
+
+    private fun indexOfHeld(deviceId: Int, keyCode: Int): Int {
+        for (i in held.indices) {
+            val entry = held[i]
+            if (entry.deviceId == deviceId && entry.keyCode == keyCode) return i
+        }
+        return -1
     }
 
     private fun mappingFor(keyCode: Int, enabledIds: Set<String>): Int {
@@ -119,17 +174,17 @@ class HardwareKeyRemapper(
     }
 
     /**
-     * Removes the bits of every held remapped modifier key (it no longer acts as that modifier),
-     * then adds the bits of every held key that now acts as a modifier. Clearing runs first so
-     * a swap between two modifiers ends with both targets set.
+     * Removes the bits of every held remapped modifier key of any device (it no longer acts as
+     * that modifier), then adds the bits of every held key that now acts as a modifier. Clearing
+     * runs first so a swap between two modifiers ends with both targets set.
      */
     private fun rebuildMetaState(metaState: Int): Int {
-        val heldCount = held.size()
+        val heldCount = held.size
         if (heldCount == 0) return metaState
 
         var result = metaState
         for (i in 0 until heldCount) {
-            val source = modifierBits(held.keyAt(i)) ?: continue
+            val source = modifierBits(held[i].keyCode) ?: continue
             result = result and source.sideMeta.inv()
             // The generic bit stays while the opposite side still holds the modifier.
             if ((result and source.oppositeSideMeta) == 0) {
@@ -137,7 +192,7 @@ class HardwareKeyRemapper(
             }
         }
         for (i in 0 until heldCount) {
-            val target = modifierBits(held.valueAt(i)) ?: continue
+            val target = modifierBits(held[i].targetKeyCode) ?: continue
             result = result or target.sideMeta or target.genericMeta
         }
         return result
@@ -151,6 +206,12 @@ class HardwareKeyRemapper(
 
     private companion object {
         const val NO_KEY: Int = Int.MIN_VALUE
+
+        /**
+         * Device id of events that carry no [KeyEvent] (so no device). Real ids are >= -1, where
+         * -1 is the virtual keyboard, so this never collides with a keyboard.
+         */
+        const val NO_DEVICE: Int = Int.MIN_VALUE
 
         val SHIFT_LEFT = ModifierBits(
             KeyEvent.META_SHIFT_LEFT_ON, KeyEvent.META_SHIFT_ON, KeyEvent.META_SHIFT_RIGHT_ON

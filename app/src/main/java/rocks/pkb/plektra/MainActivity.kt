@@ -153,6 +153,12 @@ class MainActivity : LocalizedComponentActivity() {
         return super.onKeyUp(keyCode, event)
     }
 
+    override fun onPause() {
+        super.onPause()
+        // Key releases go elsewhere once the activity is not in the foreground.
+        hardwareKeyRemapper.reset()
+    }
+
     private fun getKeyCodeName(keyCode: Int): String {
         return when (keyCode) {
             KeyEvent.KEYCODE_Q -> "KEYCODE_Q"

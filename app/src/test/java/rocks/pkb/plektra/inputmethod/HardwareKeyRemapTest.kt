@@ -3,6 +3,7 @@ package rocks.pkb.plektra.inputmethod
 import android.view.KeyEvent
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
@@ -225,7 +226,7 @@ class HardwareKeyRemapTest {
     }
 
     @Test
-    fun toggleTurnedOffMidHold_stillReleasesRemappedKey() {
+    fun enabledSetShrinks_dropsHeldStateSoDisabledRemapCannotLinger() {
         val remapper = HardwareKeyRemapper()
         remapper.remap(
             KeyEvent.KEYCODE_ENTER,
@@ -233,21 +234,19 @@ class HardwareKeyRemapTest {
             enabled
         )
 
-        val up = remapper.remap(
-            KeyEvent.KEYCODE_ENTER,
-            keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER, 0),
-            emptySet()
-        )
         val aDown = keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, 0)
         val a = remapper.remap(KeyEvent.KEYCODE_A, aDown, emptySet())
+        val enterUp = keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER, 0)
+        val up = remapper.remap(KeyEvent.KEYCODE_ENTER, enterUp, emptySet())
 
-        assertEquals(KeyEvent.KEYCODE_SHIFT_RIGHT, up.keyCode)
-        assertEquals(KeyEvent.KEYCODE_SHIFT_RIGHT, up.event?.keyCode)
         assertSame(aDown, a.event)
+        assertFalse(a.transformed)
+        assertEquals(KeyEvent.KEYCODE_ENTER, up.keyCode)
+        assertSame(enterUp, up.event)
     }
 
     @Test
-    fun toggleTurnedOffMidHold_keepsHeldMetaUntilRelease() {
+    fun enabledSetGrowing_keepsHeldState() {
         val remapper = HardwareKeyRemapper()
         remapper.remap(
             KeyEvent.KEYCODE_ENTER,
@@ -258,7 +257,7 @@ class HardwareKeyRemapTest {
         val a = remapper.remap(
             KeyEvent.KEYCODE_A,
             keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, 0),
-            emptySet()
+            enabled + "some_other_remap"
         )
 
         assertEquals(shiftRightMeta, a.event?.metaState)
@@ -327,6 +326,220 @@ class HardwareKeyRemapTest {
         val aDown = keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, 0)
 
         assertSame(aDown, remapper.remap(KeyEvent.KEYCODE_A, aDown, enabled).event)
+    }
+
+    @Test
+    fun reset_leavesLaterEventsUntransformed() {
+        val remapper = HardwareKeyRemapper()
+        remapper.remap(
+            KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0),
+            enabled
+        )
+        remapper.reset()
+
+        val a = remapper.remap(
+            KeyEvent.KEYCODE_A,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, 0),
+            enabled
+        )
+
+        assertFalse(a.transformed)
+    }
+
+    @Test
+    fun metaOnlyChange_isTransformedWithoutKeyCodeRemap() {
+        val remapper = HardwareKeyRemapper()
+        val noRemap = remapper.remap(
+            KeyEvent.KEYCODE_A,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, 0),
+            enabled
+        )
+        val enter = remapper.remap(
+            KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0),
+            enabled
+        )
+
+        val dpad = remapper.remap(
+            KeyEvent.KEYCODE_DPAD_LEFT,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_LEFT, 0),
+            enabled
+        )
+
+        assertFalse(noRemap.transformed)
+        assertFalse(noRemap.keyCodeRemapped)
+        assertTrue(enter.transformed)
+        assertTrue(enter.keyCodeRemapped)
+        assertTrue(dpad.transformed)
+        assertFalse(dpad.keyCodeRemapped)
+        assertEquals(KeyEvent.KEYCODE_DPAD_LEFT, dpad.keyCode)
+        assertEquals(shiftRightMeta, dpad.event?.metaState)
+    }
+
+    @Test
+    fun heldPhysicalShiftRight_stripsShiftFromOtherKeysAsTransformed() {
+        val remapper = HardwareKeyRemapper()
+        remapper.remap(
+            KeyEvent.KEYCODE_SHIFT_RIGHT,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SHIFT_RIGHT, shiftRightMeta),
+            enabled
+        )
+
+        val dpad = remapper.remap(
+            KeyEvent.KEYCODE_DPAD_LEFT,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_LEFT, shiftRightMeta),
+            enabled
+        )
+
+        assertTrue(dpad.transformed)
+        assertFalse(dpad.keyCodeRemapped)
+        assertEquals(0, dpad.event?.metaState)
+    }
+
+    @Test
+    fun keyUpAfterMetaOnlyChange_isTransformedToo() {
+        val remapper = HardwareKeyRemapper()
+        remapper.remap(
+            KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0),
+            enabled
+        )
+
+        val up = remapper.remap(
+            KeyEvent.KEYCODE_DPAD_LEFT,
+            keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_LEFT, 0),
+            enabled
+        )
+
+        assertTrue(up.transformed)
+        assertEquals(shiftRightMeta, up.event?.metaState)
+    }
+
+    @Test
+    fun heldState_isPerDevice() {
+        val remapper = HardwareKeyRemapper()
+        remapper.remap(
+            KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0, deviceId = 1),
+            enabled
+        )
+        remapper.remap(
+            KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0, deviceId = 2),
+            enabled
+        )
+
+        val upFirst = remapper.remap(
+            KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER, 0, deviceId = 1),
+            enabled
+        )
+        val aWhileSecondHeld = remapper.remap(
+            KeyEvent.KEYCODE_A,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, 0, deviceId = 1),
+            enabled
+        )
+        val upSecond = remapper.remap(
+            KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER, 0, deviceId = 2),
+            enabled
+        )
+        val aAfterBoth = remapper.remap(
+            KeyEvent.KEYCODE_A,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, 0, deviceId = 1),
+            enabled
+        )
+
+        assertEquals(KeyEvent.KEYCODE_SHIFT_RIGHT, upFirst.keyCode)
+        // Releasing keyboard 1's Enter must not clear keyboard 2's press.
+        assertEquals(shiftRightMeta, aWhileSecondHeld.event?.metaState)
+        assertEquals(KeyEvent.KEYCODE_SHIFT_RIGHT, upSecond.keyCode)
+        assertFalse(aAfterBoth.transformed)
+    }
+
+    @Test
+    fun clearDevice_dropsOnlyThatDevicesHeldKeys() {
+        val remapper = HardwareKeyRemapper()
+        remapper.remap(
+            KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0, deviceId = 1),
+            enabled
+        )
+        remapper.remap(
+            KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0, deviceId = 2),
+            enabled
+        )
+
+        remapper.clearDevice(1)
+
+        val a = remapper.remap(
+            KeyEvent.KEYCODE_A,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, 0, deviceId = 2),
+            enabled
+        )
+        val up2 = remapper.remap(
+            KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER, 0, deviceId = 2),
+            enabled
+        )
+        // Keyboard 2 is released, so nothing is held: keyboard 1's forgotten press stays identity.
+        val strayUp = keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER, 0, deviceId = 1)
+        val up1 = remapper.remap(KeyEvent.KEYCODE_ENTER, strayUp, enabled)
+
+        assertEquals(shiftRightMeta, a.event?.metaState)
+        assertEquals(KeyEvent.KEYCODE_ENTER, up1.keyCode)
+        assertSame(strayUp, up1.event)
+        assertEquals(KeyEvent.KEYCODE_SHIFT_RIGHT, up2.keyCode)
+    }
+
+    @Test
+    fun nullEvent_usesSentinelDeviceAndLeavesNoHeldState() {
+        val remapper = HardwareKeyRemapper()
+        val enter = remapper.remap(KeyEvent.KEYCODE_ENTER, null, enabled)
+
+        val aDown = keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, 0)
+        val a = remapper.remap(KeyEvent.KEYCODE_A, aDown, enabled)
+
+        assertEquals(KeyEvent.KEYCODE_SHIFT_RIGHT, enter.keyCode)
+        assertTrue(enter.transformed)
+        assertTrue(enter.keyCodeRemapped)
+        assertSame(aDown, a.event)
+    }
+
+    @Test
+    fun peekKeyCode_predictsRemapWithoutChangingState() {
+        val remapper = HardwareKeyRemapper()
+        val enterDown = keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0)
+
+        val peeked = remapper.peekKeyCode(KeyEvent.KEYCODE_ENTER, enterDown, enabled)
+        val aDown = keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, 0)
+        val a = remapper.remap(KeyEvent.KEYCODE_A, aDown, enabled)
+        remapper.remap(KeyEvent.KEYCODE_ENTER, enterDown, enabled)
+        val peekedWhileHeld = remapper.peekKeyCode(
+            KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0, repeatCount = 1),
+            emptySet()
+        )
+        val peekedUp = remapper.peekKeyCode(
+            KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER, 0),
+            emptySet()
+        )
+        val peekedOtherDevice = remapper.peekKeyCode(
+            KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER, 0, deviceId = 9),
+            enabled
+        )
+
+        assertEquals(KeyEvent.KEYCODE_SHIFT_RIGHT, peeked)
+        // The peek recorded no held Enter, so the unrelated key stayed untouched.
+        assertSame(aDown, a.event)
+        assertEquals(KeyEvent.KEYCODE_SHIFT_RIGHT, peekedWhileHeld)
+        assertEquals(KeyEvent.KEYCODE_SHIFT_RIGHT, peekedUp)
+        // An UP on a device that never pressed it stays identity.
+        assertEquals(KeyEvent.KEYCODE_ENTER, peekedOtherDevice)
     }
 
     @Test
@@ -415,22 +628,24 @@ class HardwareKeyRemapTest {
 
     @Test
     fun syntheticModifierSwap_usesModifierTableWithoutCodeChanges() {
+        // Escape stands in for any ordinary key. Caps Lock is deliberately not used: it toggles a
+        // lock bit in the meta state that the remapper does not model, so it is unsupported.
         val option = KeyRemapOption(
-            id = "swap_ctrl_left_caps",
+            id = "swap_ctrl_left_escape",
             titleRes = 1,
             summaryRes = 1,
             mappings = HardwareKeyRemapRegistry.swap(
-                KeyEvent.KEYCODE_CAPS_LOCK,
+                KeyEvent.KEYCODE_ESCAPE,
                 KeyEvent.KEYCODE_CTRL_LEFT
             )
         )
         val remapper = HardwareKeyRemapper(listOf(option))
-        val ids = setOf("swap_ctrl_left_caps")
+        val ids = setOf("swap_ctrl_left_escape")
         val ctrlMeta = KeyEvent.META_CTRL_LEFT_ON or KeyEvent.META_CTRL_ON
 
         remapper.remap(
-            KeyEvent.KEYCODE_CAPS_LOCK,
-            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_CAPS_LOCK, 0),
+            KeyEvent.KEYCODE_ESCAPE,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ESCAPE, 0),
             ids
         )
         val a = remapper.remap(

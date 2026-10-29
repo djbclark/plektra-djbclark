@@ -29,9 +29,15 @@ object DeviceSpecific {
         val autoDetected: Boolean
     )
 
+    /**
+     * [transformed]: a user remap changed the key code or the meta state of the event relative to
+     * what [HardwareKeyRemapper] received. [keyCodeRemapped]: it changed the key code.
+     */
     data class RemappedHardwareEvent(
         val keyCode: Int,
-        val event: KeyEvent?
+        val event: KeyEvent?,
+        val transformed: Boolean = false,
+        val keyCodeRemapped: Boolean = false
     )
 
     private enum class KeyboardFamily {
@@ -92,7 +98,8 @@ object DeviceSpecific {
 
     private var lastQ25MetaState: Int = 0
 
-    // Shared by the IME service; its held-key state must see every physical DOWN and UP.
+    // Fallback for callers that pass no remapper: without enabled remap ids it never holds state.
+    // The IME service and MainActivity own theirs so they control its lifecycle.
     private val hardwareKeyRemapper = HardwareKeyRemapper()
 
     fun needsRemapping(): Boolean = currentDeviceProfile().needsEventRemapping
@@ -100,9 +107,8 @@ object DeviceSpecific {
     /**
      * Normalizes the device model's key positions, then applies the user's enabled remaps
      * ([enabledRemapIds], see [HardwareKeyRemapRegistry]) to the keycodes the app would otherwise
-     * see. [remapper] defaults to the process-wide instance; a consumer that does not see the
-     * same event stream as the IME service (MainActivity) passes its own to keep held-key state
-     * consistent.
+     * see. [remapper] holds the held-key state: a consumer that remaps (the IME service,
+     * MainActivity) passes its own so it can reset it; it must see every physical DOWN and UP.
      */
     fun remapHardwareKeyEvent(
         keyCode: Int,
