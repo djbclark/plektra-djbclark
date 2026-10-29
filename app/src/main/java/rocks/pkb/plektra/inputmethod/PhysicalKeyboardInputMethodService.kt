@@ -765,9 +765,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             keyCode == KeyEvent.KEYCODE_CTRL_LEFT ||
             keyCode == KeyEvent.KEYCODE_CTRL_RIGHT ||
             keyCode == KeyEvent.KEYCODE_ALT_LEFT ||
-            keyCode == KeyEvent.KEYCODE_ALT_RIGHT ||
-            keyCode == KeyEvent.KEYCODE_META_LEFT ||
-            keyCode == KeyEvent.KEYCODE_META_RIGHT
+            keyCode == KeyEvent.KEYCODE_ALT_RIGHT
     }
 
     private fun isMinimalPhoneHardwareActive(): Boolean {

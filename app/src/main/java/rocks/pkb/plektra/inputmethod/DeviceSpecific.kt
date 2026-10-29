@@ -126,7 +126,10 @@ object DeviceSpecific {
             )
             else -> positionNormalized
         }
-        return remapper.remap(modelRemapped.keyCode, modelRemapped.event, enabledRemapIds)
+        // The Q25's physical right Shift is its Ctrl key, so the Shift/Enter swap would only half apply
+        // (Enter would become Shift and nothing would type Enter): leave user remaps off there.
+        val effectiveRemapIds = if (model == KeyboardModel.Q25) emptySet() else enabledRemapIds
+        return remapper.remap(modelRemapped.keyCode, modelRemapped.event, effectiveRemapIds)
     }
 
     private fun normalizePhysicalKeyPosition(

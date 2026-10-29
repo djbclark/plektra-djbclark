@@ -718,6 +718,18 @@ class HardwareKeyRemapTest {
         assertEquals(KeyEvent.KEYCODE_CTRL_LEFT, remapped.event?.keyCode)
     }
 
+    @Test
+    fun deviceSpecific_q25LeavesTheShiftEnterSwapOff() {
+        val enter = DeviceSpecific.remapHardwareKeyEvent(
+            keyCode = KeyEvent.KEYCODE_ENTER,
+            event = keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0),
+            physicalProfileOverride = "Q25",
+            enabledRemapIds = enabled
+        )
+
+        assertEquals(KeyEvent.KEYCODE_ENTER, enter.keyCode)
+    }
+
     private fun keyEvent(
         action: Int,
         keyCode: Int,
