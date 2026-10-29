@@ -340,6 +340,40 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
     private var replayingProtectedNumberKey = false
     // djb/screen-trackpad: a replayed trigger key bypasses the key filters that already saw it
     private var screenTrackpadReplaying = false
+    /**
+     * A user key remap's transformed event ([result]); [keyCodeRemapped] when the key code itself
+     * changed, not only the meta state. A meta-only change reaches the app as [rawEvent] with
+     * [rebuiltMetaState], so device normalization and Clicks button modes stay out of it.
+     * [toggledLockMeta]: the lock bit this DOWN toggles, see [HardwareKeyRemapper.toggledLockMeta].
+     */
+    private class KeyRemapPassthrough(
+        val result: ClicksPowerButtonEventMapper.Result,
+        val keyCodeRemapped: Boolean,
+        val rawEvent: KeyEvent?,
+        val rebuiltMetaState: Int,
+        val toggledLockMeta: Int
+    )
+    /**
+     * Set by [remapHardwareEvent] when a user key remap changed the key code or the meta state of
+     * the event, cleared on entry to [onKeyDown]/[onKeyUp]. Lets those wrappers keep the raw key
+     * from reaching the app when the handler leaves the transformed key unconsumed.
+     */
+    private var keyRemapPassthrough: KeyRemapPassthrough? = null
+    /**
+     * Owned by the service so it can drop the held-key state wherever modifier state is reset and
+     * when a keyboard disconnects; a lost key release would otherwise leave a phantom modifier.
+     */
+    private val hardwareKeyRemapper = HardwareKeyRemapper()
+    /**
+     * Physical keys (device and key code, see [physicalKeyId]) whose DOWN reached the app: the
+     * system delivers it raw after the handler left it alone, or [passRemappedKeyToApp] injected
+     * it. A transformed UP or repeat the handler leaves alone is only passed on for a key listed
+     * here; the app never saw a DOWN for the others, so an injected event would be an orphan.
+     */
+    private val appSeenKeyDowns = PhysicalKeySet()
+    /** The event [enabledKeyRemapsFor] last looked up and its answer: one event asks a few times. */
+    private var enabledKeyRemapsEvent: KeyEvent? = null
+    private var enabledKeyRemapsOfEvent: Set<String> = emptySet()
     private lateinit var screenTrackpadController: ScreenTrackpadController
     /**
      * True between onStartInput and onFinishInput/onUnbindInput. InputMethodService keeps the
@@ -376,6 +410,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             clicksPowerShiftTapFilter.resetDevice(deviceId)
             accidentalKeyPressFilter.resetDevice(deviceId)
             clicksPowerButtonEventMapper.resetDevice(deviceId)
+            clearHardwareKeyRemapDevice(deviceId)
             val clicksDisconnected = connectedClicksInputDeviceIds.remove(deviceId)
             if (
                 clicksDisconnected &&
@@ -395,6 +430,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             clicksPowerShiftTapFilter.resetDevice(deviceId)
             accidentalKeyPressFilter.resetDevice(deviceId)
             clicksPowerButtonEventMapper.resetDevice(deviceId)
+            clearHardwareKeyRemapDevice(deviceId)
             SoftwareKeyboardAutoDetector.onInputDevicesChanged()
             val wasClicksKeyboard = deviceId in connectedClicksInputDeviceIds
             val device = InputDevice.getDevice(deviceId)
@@ -1327,7 +1363,8 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         inputConnection: InputConnection?,
         event: KeyEvent?,
         isAutoCorrectEnabled: Boolean,
-        ctrlActiveBeforePrelude: Boolean = false
+        ctrlActiveBeforePrelude: Boolean = false,
+        shiftOneShotBeforeConsume: Boolean = false
     ): Boolean {
         if (keyCode != KeyEvent.KEYCODE_ENTER) {
             return false
@@ -1336,6 +1373,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         val ic = inputConnection ?: return false
         val actionId = resolveEditorAction(info)
         val ctrlActiveForEnter = ctrlActiveBeforePrelude || isCtrlModifierActive(event)
+        val shiftActiveForEnter = shiftOneShotBeforeConsume || isShiftModifierActive(event)
         val symEnterSendActive =
             symTogglePendingOnKeyUp &&
                 resolveAppEnterAdditionalSendShortcut(info) == SettingsManager.ENTER_ADDITIONAL_SEND_SHORTCUT_SYM_ENTER
@@ -1387,7 +1425,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
                         consumeCtrlState = true
                     )
                 }
-                if (isShiftModifierActive(event)) {
+                if (shiftActiveForEnter) {
                     return commitEnterNewline(keyCode, ic, event, "app_shift_enter_newline")
                 }
                 return performConfiguredAppEnterSend(
@@ -2980,6 +3018,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         clicksPowerShiftTapFilter.reset()
         accidentalKeyPressFilter.reset()
         clicksPowerButtonEventMapper.reset()
+        resetHardwareKeyRemap()
         expansionAssetScope.cancel()
         super.onDestroy()
         pendingInputDeviceModeRefresh?.let { uiHandler.removeCallbacks(it) }
@@ -3213,6 +3252,8 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         symTogglePendingOnKeyUp = false
         symChordUsedSinceKeyDown = false
         symPhysicallyPressed = false
+        // Releases of remapped physical keys may never arrive once the editor is gone.
+        resetHardwareKeyRemap()
 
         modifierStateController.resetModifiers(
             preserveNavMode = preserveNavMode,
@@ -3687,6 +3728,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         pendingKeyboardSurfaceTransition?.let(uiHandler::removeCallbacks)
         pendingKeyboardSurfaceTransition = null
         isInputViewActive = false
+        resetHardwareKeyRemap()
         if (::keyboardVisibilityController.isInitialized) keyboardVisibilityController.onInputUnbound()
         inputStarted = false
         if (::screenTrackpadController.isInitialized) screenTrackpadController.deactivate()
@@ -4562,12 +4604,31 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         )
     }
 
+    /** User remaps apply to physical keys only: an on-screen key must keep its own meaning. */
+    private fun enabledKeyRemapsFor(event: KeyEvent?): Set<String> {
+        if (event == null) return SettingsManager.getEnabledKeyRemaps(this)
+        if ((event.flags and KeyEvent.FLAG_SOFT_KEYBOARD) != 0) return emptySet()
+        if (event === enabledKeyRemapsEvent) return enabledKeyRemapsOfEvent
+        val enabled = SettingsManager.getEnabledKeyRemaps(this)
+        enabledKeyRemapsEvent = event
+        enabledKeyRemapsOfEvent = enabled
+        return enabled
+    }
+
     private fun remapHardwareEvent(keyCode: Int, event: KeyEvent?): ClicksPowerButtonEventMapper.Result {
         val remapped = DeviceSpecific.remapHardwareKeyEvent(
             keyCode,
             event,
-            physicalKeyboardProfileOverride
+            physicalKeyboardProfileOverride,
+            enabledKeyRemapsFor(event),
+            hardwareKeyRemapper
         )
+        // A reset cut this key's hold short while it is still down: its repeats and its UP
+        // belong to no remap and no app, so they end here instead of arriving as raw events.
+        if (remapped.staleRelease) {
+            keyRemapPassthrough = null
+            return ClicksPowerButtonEventMapper.Result(remapped.keyCode, remapped.event, consume = true)
+        }
         val isClicksPowerKeyboard = !dispatchingClicksAccessibilityKeyEvent &&
             (event
                 ?.takeIf { it.deviceId >= 0 }
@@ -4576,7 +4637,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
                         InputDevice.getDevice(inputEvent.deviceId)
                             ?.let(DeviceSpecific::isClicksPowerKeyboard) == true
                 } == true)
-        return clicksPowerButtonEventMapper.map(
+        val result = clicksPowerButtonEventMapper.map(
             keyCode = remapped.keyCode,
             event = remapped.event,
             isClicksPowerKeyboard = isClicksPowerKeyboard,
@@ -4585,6 +4646,86 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             altButtonMode = SettingsManager.getClicksAltButtonMode(this),
             microphoneButtonMode = SettingsManager.getClicksMicrophoneButtonMode(this)
         )
+        // Only the user remaps' own changes: device normalization and Clicks button modes also
+        // change key codes and meta state, and the system's raw event stays right for those.
+        keyRemapPassthrough = if (remapped.transformed) {
+            KeyRemapPassthrough(
+                result = result,
+                keyCodeRemapped = remapped.keyCodeRemapped,
+                rawEvent = event,
+                rebuiltMetaState = remapped.event?.metaState ?: 0,
+                toggledLockMeta = HardwareKeyRemapper.toggledLockMeta(remapped)
+            )
+        } else {
+            null
+        }
+        return result
+    }
+
+    /** How a transformed event the handler left alone reaches the app, see [passRemappedKeyToApp]. */
+    private enum class RemapDelivery { SYSTEM_DELIVERS, SWALLOWED, INJECTED }
+
+    /**
+     * The handler returned false for an event a user remap transformed, so the system would
+     * deliver the raw physical event (wrong key code and/or meta state). Injects the transformed
+     * key, a modifier the remap produced included: an app reads a Shift press from the key
+     * listener state its own DOWN sets (Shift+arrow selection), not from the meta state of the
+     * arrow. The input connection delivers to the app after the IME stage, so the IME's own
+     * handling of the key does not run again on the injected event. A modifier whose meta state
+     * alone changed is left to the system, which delivers that key as it is; any other meta-only
+     * change injects the raw event with the rebuilt meta state, not the device-normalized or
+     * Clicks-mapped one. Without an input connection nothing better is possible, except that a
+     * modifier the remap produced is swallowed rather than leaked as the physical key. This includes
+     * events dispatched by the accessibility key bridge: their original was already consumed, and
+     * the input connection delivers to the app directly, so it does not re-enter
+     * [onKeyDown]/[onKeyUp] or the accessibility filter. The wrappers call it only for a DOWN, or
+     * a key whose DOWN the app saw ([appSeenKeyDowns]).
+     */
+    private fun passRemappedKeyToApp(pending: KeyRemapPassthrough): RemapDelivery {
+        val remap = pending.result
+        if (!pending.keyCodeRemapped && HardwareKeyRemapper.isModifierKeyCode(remap.keyCode)) {
+            return RemapDelivery.SYSTEM_DELIVERS
+        }
+        val raw = pending.rawEvent
+        val event = if (pending.keyCodeRemapped || raw == null) {
+            remap.event
+        } else {
+            raw.withKeyCodeAndMetaState(raw.keyCode, pending.rebuiltMetaState)
+        }
+        if (event == null) return RemapDelivery.SYSTEM_DELIVERS
+        val inputConnection = currentInputConnection
+        if (inputConnection == null) {
+            // Nowhere to inject: a modifier the remap produced would reach the app as the raw
+            // physical key (Enter for a Shift) and do the wrong thing, so it ends here.
+            return if (HardwareKeyRemapper.isModifierKeyCode(remap.keyCode)) {
+                RemapDelivery.SWALLOWED
+            } else {
+                RemapDelivery.SYSTEM_DELIVERS
+            }
+        }
+        // MainActivity must not remap what is already remapped.
+        InjectedKeyEvents.record(event)
+        inputConnection.sendKeyEvent(event)
+        return RemapDelivery.INJECTED
+    }
+
+    private fun physicalKeyId(keyCode: Int, event: KeyEvent?): Long =
+        PhysicalKeySet.keyId(event?.deviceId ?: Int.MIN_VALUE, keyCode)
+
+    private fun resetHardwareKeyRemap() {
+        hardwareKeyRemapper.reset()
+        appSeenKeyDowns.clear()
+    }
+
+    private fun clearHardwareKeyRemapDevice(deviceId: Int) {
+        hardwareKeyRemapper.clearDevice(deviceId)
+        appSeenKeyDowns.removeDevice(deviceId)
+    }
+
+    /** A replay injects the raw pair itself, so the wrappers never see this key's UP. */
+    private fun forgetReplayedKey(keyCode: Int, upEvent: KeyEvent) {
+        hardwareKeyRemapper.release(keyCode, upEvent)
+        appSeenKeyDowns.remove(physicalKeyId(keyCode, upEvent))
     }
 
     override fun dispatchClicksAccessibilityKeyEvent(event: KeyEvent): Boolean {
@@ -4660,6 +4801,18 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         } else {
             null
         }
+        // A physical key the user remapped to a modifier (Enter as Shift) is a modifier for the
+        // filter too, or chords over it would be suppressed as overlapping keys. The reverse, a
+        // physical modifier remapped to a key, stays exempt so its UP still pairs with its DOWN.
+        val isUserRemappedModifier = HardwareKeyRemapper.isModifierKeyCode(
+            DeviceSpecific.peekRemappedKeyCode(
+                keyCode,
+                event,
+                physicalKeyboardProfileOverride,
+                enabledKeyRemapsFor(event),
+                hardwareKeyRemapper
+            )
+        )
         val isConfiguredModifier = when (configuredButtonMode) {
             SettingsManager.ClicksPowerButtonMode.ALT,
             SettingsManager.ClicksPowerButtonMode.SYM,
@@ -4672,7 +4825,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             null -> resolved.isModifier
         }
         return AccidentalKeyInput(
-            resolution = resolved.copy(isModifier = isConfiguredModifier),
+            resolution = resolved.copy(isModifier = isConfiguredModifier || isUserRemappedModifier),
             configuration = AccidentalKeyPressPolicy.configuration(
                 isPhysicalKeyboard = isPhysicalKeyboard,
                 isClicksPowerKeyboard = isClicksPowerKeyboard,
@@ -4702,6 +4855,8 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
                     inputConnection.sendKeyEvent(downEvent)
                     if (upEvent != null) inputConnection.sendKeyEvent(upEvent)
                 }
+                // The raw pair above never reaches the wrappers' release of this key.
+                if (upEvent != null) forgetReplayedKey(keyCode, upEvent)
             }
         } finally {
             screenTrackpadReplaying = false
@@ -4722,6 +4877,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
                     inputConnection.sendKeyEvent(replay.downEvent)
                     inputConnection.sendKeyEvent(replay.upEvent)
                 }
+                forgetReplayedKey(keyCode, replay.upEvent)
             }
         } finally {
             replayingProtectedNumberKey = false
@@ -4729,6 +4885,16 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
     }
 
     override fun onKeyLongPress(keyCode_: Int, event_: KeyEvent?): Boolean {
+        // remapHardwareEvent records a passthrough nothing here consumes: keep the caller's.
+        val outerRemap = keyRemapPassthrough
+        try {
+            return onKeyLongPressImpl(keyCode_, event_)
+        } finally {
+            keyRemapPassthrough = outerRemap
+        }
+    }
+
+    private fun onKeyLongPressImpl(keyCode_: Int, event_: KeyEvent?): Boolean {
         if (!replayingProtectedNumberKey) {
             val accidentalInput = accidentalKeyInput(keyCode_, event_)
             accidentalKeyPressFilter.shouldConsumeKeyDown(
@@ -4766,11 +4932,48 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
     }
 
     override fun onKeyDown(keyCode_: Int, event_: KeyEvent?): Boolean {
-        if (liveSpeechEditor != null && (event_?.unicodeChar?.let { it != 0 } == true ||
-            keyCode_ in listOf(KeyEvent.KEYCODE_DEL, KeyEvent.KEYCODE_FORWARD_DEL, KeyEvent.KEYCODE_ENTER,
+        val physicalKey = physicalKeyId(keyCode_, event_)
+        val initialDown = (event_?.repeatCount ?: 0) == 0
+        // A new press supersedes a record whose UP was lost.
+        if (initialDown) appSeenKeyDowns.remove(physicalKey)
+        // Re-entered by replays: keep the caller's pending remap for when the nested call returns.
+        val outerRemap = keyRemapPassthrough
+        keyRemapPassthrough = null
+        val handled = onKeyDownImpl(keyCode_, event_)
+        val remap = keyRemapPassthrough
+        keyRemapPassthrough = outerRemap
+        if (handled) return true
+        // Unconsumed, the system delivers the raw key (not for accessibility-bridge events: their
+        // original was already consumed).
+        val systemDelivers = !dispatchingClicksAccessibilityKeyEvent
+        if (remap == null) {
+            if (systemDelivers) appSeenKeyDowns.add(physicalKey)
+            return false
+        }
+        // A transformed repeat belongs to a DOWN the app saw, or it is an orphan.
+        if (!initialDown && physicalKey !in appSeenKeyDowns) return true
+        return when (passRemappedKeyToApp(remap)) {
+            RemapDelivery.INJECTED -> {
+                appSeenKeyDowns.add(physicalKey)
+                true
+            }
+            RemapDelivery.SWALLOWED -> true
+            RemapDelivery.SYSTEM_DELIVERS -> {
+                if (systemDelivers) appSeenKeyDowns.add(physicalKey)
+                false
+            }
+        }
+    }
+
+    private fun cancelLiveSpeechOnTyping(keyCode: Int, event: KeyEvent?) {
+        if (liveSpeechEditor != null && (event?.unicodeChar?.let { it != 0 } == true ||
+            keyCode in listOf(KeyEvent.KEYCODE_DEL, KeyEvent.KEYCODE_FORWARD_DEL, KeyEvent.KEYCODE_ENTER,
                 KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN))) {
             cancelSpeechRecognition()
         }
+    }
+
+    private fun onKeyDownImpl(keyCode_: Int, event_: KeyEvent?): Boolean {
         val perfStart = ImePerfLogger.mark()
         try {
         if (!replayingProtectedNumberKey && !screenTrackpadReplaying) {
@@ -4781,6 +4984,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
                 resolution = accidentalInput.resolution,
                 configuration = accidentalInput.configuration
             )?.let { suppressed ->
+                cancelLiveSpeechOnTyping(keyCode_, event_)
                 notifyDebugKeyEvent(
                     keyCode = keyCode_,
                     event = event_,
@@ -4792,6 +4996,8 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             }
         }
         val remapped = remapHardwareEvent(keyCode_, event_)
+        val userRemap = keyRemapPassthrough?.result
+        cancelLiveSpeechOnTyping(userRemap?.keyCode ?: keyCode_, userRemap?.event ?: event_)
         if (remapped.consume) {
             remapped.directAction?.let { ClicksButtonDirectActionExecutor.execute(this, it) }
             return true
@@ -4830,6 +5036,14 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             screenTrackpadController.onKeyDown(keyCode, event, keyCode_, event_)
         ) {
             return true
+        }
+
+        // A key remapped to Caps Lock drives the IME's own caps state, which the IME-typed text
+        // and the status bar read instead of the meta state. Only the remapped press toggles it:
+        // a physical Caps Lock nothing remapped keeps being the system's business.
+        if (((keyRemapPassthrough?.toggledLockMeta ?: 0) and KeyEvent.META_CAPS_LOCK_ON) != 0) {
+            capsLockEnabled = !capsLockEnabled
+            updateStatusBarText()
         }
 
         // Check if we have an editable field at the very start
@@ -5137,6 +5351,8 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             otherKeyInteractedDuringHold = false
             modifierDownTimes[keyCode] = event.eventTime
         } else if (!isModifierKey && event?.repeatCount == 0) {
+            // Enter is the key that consumes the user's one-shot Shift, so it keeps the marker.
+            if (keyCode != KeyEvent.KEYCODE_ENTER) modifierStateController.markShiftOneShotFromUserTap(false)
             if (
                 CompatibilityWorkarounds.isClicksPowerSyntheticShiftChord(
                     profileId = DeviceSpecific.resolveInputProfile(
@@ -5341,6 +5557,11 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         }
 
         clearAltOnBoundaryIfNeeded(keyCode) { updateStatusBarText() }
+        // Enter consumes a one-shot Shift before the Enter routing reads it: carry the user's own
+        // one-shot into the routing so it behaves as Shift+Enter. Auto-capitalization arms the
+        // same one-shot, and Enter right after a sentence must still send, so it does not count.
+        val userShiftOneShotForEnter = keyCode == KeyEvent.KEYCODE_ENTER &&
+            modifierStateController.shiftOneShotFromUserTap
         if (keyCode == KeyEvent.KEYCODE_ENTER && modifierStateController.consumeShiftOneShot()) {
             updateStatusBarText()
         }
@@ -5351,7 +5572,8 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
                 ic,
                 event,
                 isAutoCorrectEnabled,
-                ctrlActiveBeforePrelude
+                ctrlActiveBeforePrelude,
+                userShiftOneShotForEnter
             )
         ) {
             return true
@@ -5551,6 +5773,22 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
     }
 
     override fun onKeyUp(keyCode_: Int, event_: KeyEvent?): Boolean {
+        // Re-entered by replays: keep the caller's pending remap for when the nested call returns.
+        val outerRemap = keyRemapPassthrough
+        keyRemapPassthrough = null
+        val handled = onKeyUpImpl(keyCode_, event_)
+        val remap = keyRemapPassthrough
+        keyRemapPassthrough = outerRemap
+        val appSawDown = appSeenKeyDowns.remove(physicalKeyId(keyCode_, event_))
+        if (handled) return true
+        if (remap == null) return false
+        // The app never saw this key's DOWN (the handler consumed it, or the remap swallowed it),
+        // so an injected UP would be an orphan.
+        if (!appSawDown) return true
+        return passRemappedKeyToApp(remap) != RemapDelivery.SYSTEM_DELIVERS
+    }
+
+    private fun onKeyUpImpl(keyCode_: Int, event_: KeyEvent?): Boolean {
         if (!replayingProtectedNumberKey && !screenTrackpadReplaying) {
             when (val result = accidentalKeyPressFilter.onKeyUp(keyCode_, event_)) {
                 is AccidentalKeyPressFilter.KeyUpResult.Suppressed -> {
@@ -5561,6 +5799,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
                         origin = "accidental_keys",
                         outputKeyCodeName = result.event.debugOutput()
                     )
+                    hardwareKeyRemapper.release(keyCode_, event_)
                     return true
                 }
                 is AccidentalKeyPressFilter.KeyUpResult.ReplayTap -> {
@@ -5570,7 +5809,10 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
                 null -> Unit
             }
         }
-        if (consumedLanguageSwitchKeys.remove(keyCode_)) return true
+        if (consumedLanguageSwitchKeys.remove(keyCode_)) {
+            hardwareKeyRemapper.release(keyCode_, event_)
+            return true
+        }
         val remapped = remapHardwareEvent(keyCode_, event_)
         if (remapped.consume) return true
         val keyCode = remapped.keyCode
@@ -5678,6 +5920,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
 
                 if (isIntentionalHold) {
                     modifierStateBeforeHold?.let { modifierStateController.restoreLogicalState(it) }
+                    modifierStateController.markShiftOneShotFromUserTap(false)
                     // Sticky layer activation is handled via double-tap, not hold.
                     shiftLayerLatched = false
                     lastShiftTapUpTime = 0L
@@ -5693,6 +5936,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
                         updateStatusBarText()
                     }
                     val isQuickTap = holdDuration < 300L && !variationInteractedDuringHold && !otherKeyInteractedDuringHold
+                    modifierStateController.markShiftOneShotFromUserTap(isQuickTap)
                     if (stickyEnabled && isQuickTap) {
                         val now = event?.eventTime ?: System.currentTimeMillis()
                         if (lastShiftTapUpTime > 0L && now - lastShiftTapUpTime <= DOUBLE_TAP_THRESHOLD) {

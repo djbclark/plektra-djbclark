@@ -462,6 +462,10 @@ internal object BackupPreferenceContract {
             PreferenceFileSchema.DynamicKey(
                 prefix = "clicks_power_soc_calibration_",
                 type = PreferenceValueType.STRING
+            ),
+            PreferenceFileSchema.DynamicKey(
+                prefix = "key_remap_",
+                type = PreferenceValueType.BOOLEAN
             )
         )
     )

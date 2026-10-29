@@ -473,4 +473,67 @@ class ModifierStateControllerTest {
         )
         assertEquals(true, quick.ctrlLatchActive)
     }
+
+    @Test
+    fun userTapOneShot_isRemembered_andConsumeClearsIt() {
+        val controller = ModifierStateController(doubleTapThreshold)
+        controller.handleShiftKeyDown(KeyEvent.KEYCODE_SHIFT_RIGHT)
+        controller.handleShiftKeyUp(KeyEvent.KEYCODE_SHIFT_RIGHT)
+        controller.markShiftOneShotFromUserTap(true)
+
+        assertTrue(controller.shiftOneShot)
+        assertTrue(controller.shiftOneShotFromUserTap)
+
+        assertTrue(controller.consumeShiftOneShot())
+        assertFalse(controller.shiftOneShotFromUserTap)
+    }
+
+    @Test
+    fun autoCapRearm_afterUserTapConsumed_isNotAUserOneShot() {
+        val controller = ModifierStateController(doubleTapThreshold)
+        controller.handleShiftKeyDown(KeyEvent.KEYCODE_SHIFT_RIGHT)
+        controller.handleShiftKeyUp(KeyEvent.KEYCODE_SHIFT_RIGHT)
+        controller.markShiftOneShotFromUserTap(true)
+        // A touch cursor move consumes the one-shot and auto-capitalization arms it again.
+        controller.consumeShiftOneShot()
+        assertTrue(controller.requestShiftOneShotFromAutoCap())
+
+        assertTrue(controller.shiftOneShot)
+        assertFalse(controller.shiftOneShotFromUserTap)
+    }
+
+    @Test
+    fun userOriginMark_needsAnArmedOneShot_andDiesWithEveryStateChange() {
+        val controller = ModifierStateController(doubleTapThreshold)
+        controller.markShiftOneShotFromUserTap(true)
+        assertFalse(controller.shiftOneShotFromUserTap)
+
+        controller.shiftOneShot = true
+        controller.markShiftOneShotFromUserTap(true)
+        assertTrue(controller.shiftOneShotFromUserTap)
+        controller.capsLockEnabled = true
+        controller.capsLockEnabled = false
+        controller.shiftOneShot = true
+        assertFalse(controller.shiftOneShotFromUserTap)
+
+        controller.markShiftOneShotFromUserTap(true)
+        controller.clearShiftState()
+        controller.shiftOneShot = true
+        assertFalse(controller.shiftOneShotFromUserTap)
+    }
+
+    @Test
+    fun restoredLogicalState_keepsTheOriginOfItsOneShot() {
+        val controller = ModifierStateController(doubleTapThreshold)
+        controller.shiftOneShot = true
+        controller.markShiftOneShotFromUserTap(true)
+        val captured = controller.captureLogicalState()
+        controller.consumeShiftOneShot()
+        controller.shiftOneShot = true
+        assertFalse(controller.shiftOneShotFromUserTap)
+
+        controller.restoreLogicalState(captured)
+
+        assertTrue(controller.shiftOneShotFromUserTap)
+    }
 }

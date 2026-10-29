@@ -2272,4 +2272,7 @@ Each key can be configured as Keycode, Action, Native Ctrl, or None. Use overrid
     <string name="kw_titan2_elite_tools_show_status_bar">status bar, hide, strip, collapse, bar, full screen</string>
     <string name="kw_titan2_elite_tools_reset_to_stock">reset, stock, undo, revert, uninstall, factory, default</string>
     <string name="kw_screen_trackpad_terminal_apps">terminal, SSH, Termux, shell, console, arrow keys, apps, no text field</string>
+    <string name="key_remap_section_title">Key remapping</string>
+    <string name="key_remap_swap_shift_right_enter_title">Swap right Shift and Enter</string>
+    <string name="key_remap_swap_shift_right_enter_summary">The right Shift key types Enter and the Enter key acts as Shift.</string>
 </resources>

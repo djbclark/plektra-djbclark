@@ -1109,4 +1109,7 @@ Każdy klawisz można skonfigurować jako Keycode, Akcja, Native Ctrl lub Brak. 
     <string name="kw_modifiers_long_press_cycle">długie naciśnięcie, przytrzymaj, przełączaj, jedna ręka, shift, symbole</string>
     <string name="kw_screen_trackpad">trackpad, kursor, przesuwanie, ekran dotykowy, spacja, przytrzymaj, strzałki, zaznacz, swipe</string>
     <string name="kw_screen_trackpad_terminal_apps">terminal, SSH, Termux, konsola, strzałki, aplikacje, bez pola tekstowego, shell</string>
+    <string name="key_remap_section_title">Zmiana przypisania klawiszy</string>
+    <string name="key_remap_swap_shift_right_enter_title">Zamień prawy Shift i Enter</string>
+    <string name="key_remap_swap_shift_right_enter_summary">Prawy klawisz Shift wpisuje Enter, a klawisz Enter działa jak Shift.</string>
 </resources>

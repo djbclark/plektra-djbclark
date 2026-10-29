@@ -23,6 +23,13 @@ class ModifierStateController(
         var state: ShiftState = ShiftState.OFF
             private set
 
+        /**
+         * True while the ONE_SHOT state was armed by the user's own Shift tap, not by
+         * auto-capitalization. Every transition clears it; only [markUserArmed] sets it.
+         */
+        var userArmed: Boolean = false
+            private set
+
         private var lastTapTime: Long = 0
 
         fun tap(
@@ -32,6 +39,7 @@ class ModifierStateController(
         ): ShiftState {
             val doubleTap = isConsecutiveTap && now - lastTapTime < doubleTapThreshold
             lastTapTime = now
+            userArmed = false
             state = when {
                 doubleTap -> if (state == ShiftState.CAPS) ShiftState.OFF else ShiftState.CAPS
                 singleTapLatches -> if (state == ShiftState.CAPS) ShiftState.OFF else ShiftState.CAPS
@@ -47,6 +55,7 @@ class ModifierStateController(
             }
             if (state != ShiftState.ONE_SHOT) {
                 state = ShiftState.ONE_SHOT
+                userArmed = false
                 return true
             }
             return false
@@ -55,6 +64,7 @@ class ModifierStateController(
         fun consumeOneShot(): Boolean {
             return if (state == ShiftState.ONE_SHOT) {
                 state = ShiftState.OFF
+                userArmed = false
                 true
             } else {
                 false
@@ -62,14 +72,21 @@ class ModifierStateController(
         }
 
         fun setCapsLock(enabled: Boolean) {
+            userArmed = false
             state = if (enabled) ShiftState.CAPS else ShiftState.OFF
         }
 
-        fun restore(newState: ShiftState) {
+        fun markUserArmed(fromUserTap: Boolean) {
+            userArmed = fromUserTap && state == ShiftState.ONE_SHOT
+        }
+
+        fun restore(newState: ShiftState, newUserArmed: Boolean) {
             state = newState
+            userArmed = newUserArmed && newState == ShiftState.ONE_SHOT
         }
 
         fun reset() {
+            userArmed = false
             state = ShiftState.OFF
             lastTapTime = 0
         }
@@ -113,6 +130,7 @@ class ModifierStateController(
 
     data class LogicalState(
         val shiftState: ShiftState,
+        val shiftOneShotFromUserTap: Boolean,
         val ctrlOneShot: Boolean,
         val ctrlLatchActive: Boolean,
         val ctrlLatchFromNavMode: Boolean,
@@ -123,6 +141,7 @@ class ModifierStateController(
     fun captureLogicalState(): LogicalState {
         return LogicalState(
             shiftState = shiftStateMachine.state,
+            shiftOneShotFromUserTap = shiftStateMachine.userArmed,
             ctrlOneShot = ctrlState.oneShot,
             ctrlLatchActive = ctrlState.latchActive,
             ctrlLatchFromNavMode = ctrlState.latchFromNavMode,
@@ -132,7 +151,7 @@ class ModifierStateController(
     }
 
     fun restoreLogicalState(captured: LogicalState) {
-        shiftStateMachine.restore(captured.shiftState)
+        shiftStateMachine.restore(captured.shiftState, captured.shiftOneShotFromUserTap)
         ctrlState.oneShot = captured.ctrlOneShot
         ctrlState.latchActive = captured.ctrlLatchActive
         ctrlState.latchFromNavMode = captured.ctrlLatchFromNavMode
@@ -142,6 +161,20 @@ class ModifierStateController(
 
     val shiftState: ShiftState
         get() = shiftStateMachine.state
+
+    /**
+     * True while the one-shot Shift was armed by the user's own quick Shift tap ([markShiftOneShotFromUserTap]),
+     * not by auto-capitalization, which arms the same state. Lets the Enter that consumes the
+     * one-shot still count as Shift+Enter. Any change of the Shift state clears it, so it cannot
+     * outlive the one-shot it describes.
+     */
+    val shiftOneShotFromUserTap: Boolean
+        get() = shiftStateMachine.userArmed
+
+    /** Records where the current one-shot Shift came from; no effect unless one is armed. */
+    fun markShiftOneShotFromUserTap(fromUserTap: Boolean) {
+        shiftStateMachine.markUserArmed(fromUserTap)
+    }
 
     var capsLockEnabled: Boolean
         get() = shiftStateMachine.state == ShiftState.CAPS

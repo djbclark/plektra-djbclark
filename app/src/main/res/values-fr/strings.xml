@@ -1106,4 +1106,7 @@ Chaque touche peut être configurée comme Keycode, Action, Native Ctrl ou Aucun
     <string name="kw_modifiers_long_press_cycle">appui long, maintenir, alterner, une main, shift, symboles</string>
     <string name="kw_screen_trackpad">trackpad, curseur, glisser, écran tactile, barre d\'espace, maintenir, flèches, sélectionner, swipe</string>
     <string name="kw_screen_trackpad_terminal_apps">terminal, SSH, Termux, console, flèches, applications, sans champ de texte, shell</string>
+    <string name="key_remap_section_title">Remappage des touches</string>
+    <string name="key_remap_swap_shift_right_enter_title">Intervertir Shift droit et Entrée</string>
+    <string name="key_remap_swap_shift_right_enter_summary">La touche Shift droite saisit Entrée et la touche Entrée agit comme Shift.</string>
 </resources>
