@@ -1,5 +1,6 @@
 package rocks.pkb.plektra.toolbox
 
+import android.view.KeyEvent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -86,5 +87,15 @@ class ToolboxParsingTest {
     fun `short names keep only the tail of an activity`() {
         assertEquals("ShortcutActivity", KeyInventory.shortName("com.agui.shortcutsettings.ShortcutActivity"))
         assertEquals("plain", KeyInventory.shortName("plain"))
+    }
+
+    @Test
+    fun `a Shift key the vendor Key setting turned into Alt says so`() {
+        val shiftRight = KeyEvent.KEYCODE_SHIFT_RIGHT
+        // Seen on a Titan 2: persist.sys.agui_programmable_shift_r_key = 58 (ALT_RIGHT).
+        assertEquals("Types Alt (vendor Key setting)", KeyInventory.modifierBinding(null, "58", shiftRight))
+        assertEquals("Types Shift", KeyInventory.modifierBinding(null, null, shiftRight))
+        assertEquals("Types Shift", KeyInventory.modifierBinding(null, "$shiftRight", shiftRight))
+        assertEquals("Vendor remapping enabled", KeyInventory.modifierBinding("1", "58", shiftRight))
     }
 }

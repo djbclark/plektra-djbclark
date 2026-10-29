@@ -1,5 +1,7 @@
 package rocks.pkb.plektra
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -12,6 +14,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import rocks.pkb.plektra.inputmethod.DeviceSpecific
+import rocks.pkb.plektra.inputmethod.HardwareKeyRemapRegistry
 import rocks.pkb.plektra.toolbox.KeyInventory
 
 /**
@@ -87,6 +91,58 @@ fun KeyMappingScreen(
                                 modifier = Modifier.size(20.dp)
                             )
                         }
+                    }
+                }
+            }
+
+            // djb/key-remap: the keyboard's own remaps live on Built-in Keyboards; each row opens
+            // its switch there, so this list points at every way a key can change.
+            val profile = SettingsManager.getPhysicalKeyboardProfileOverride(context)
+            val keyRemaps = HardwareKeyRemapRegistry.options.filter { DeviceSpecific.supportsUserKeyRemap(it, profile) }
+            if (keyRemaps.isNotEmpty()) {
+                Text(
+                    text = stringResource(R.string.key_remap_section_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+            keyRemaps.forEach { option ->
+                val id = keyRemapSettingId(option)
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 72.dp)
+                        .clickable {
+                            context.startActivity(
+                                Intent(context, SettingsActivity::class.java)
+                                    .setData(Uri.parse("${SettingLinkRegistry.LINK_SCHEME}://${SettingLinkRegistry.LINK_HOST}/$id"))
+                            )
+                        }
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(option.titleRes),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = stringResource(option.summaryRes),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 }
             }
