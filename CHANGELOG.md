@@ -8,6 +8,7 @@
 - Prepared geometry, content placement, LED paths and touch regions replace repeated pixel searches.
 - Effective system-theme selection and previews, dynamic snippet visibility, safer accent-aware autocorrection and 250px Titan 2 Elite flick defaults.
 - Optional keyboard-bar visibility on the Niagara home screen.
+- User-configurable hardware key remapping on a data-driven mechanism; first option: swap right Shift and Enter (hidden on the Q25).
 
 
 ## New Features Pastiera 0.2
