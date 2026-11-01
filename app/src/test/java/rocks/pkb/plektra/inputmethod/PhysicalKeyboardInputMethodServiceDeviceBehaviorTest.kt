@@ -1068,6 +1068,116 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
         }
     }
 
+    // The Titan 2 with the vendor Key setting that makes physical right Shift (scan 54) arrive as
+    // Alt, and the "Swap right Shift and Enter" remap on: scan 54 must act as Enter, and the
+    // physical Enter key (scan 28) as Shift, in an app on the messenger preset.
+    private fun enableSwapOnVendorShiftAsAlt() {
+        DeviceSpecific.setBuildFingerprintForTests(
+            brand = "unihertz",
+            manufacturer = "unihertz",
+            model = "Titan 2",
+            device = "titan2",
+            product = "titan2"
+        )
+        setField(service, "physicalKeyboardProfileOverride", "auto")
+        SettingsManager.setKeyRemapEnabled(
+            RuntimeEnvironment.getApplication(),
+            HardwareKeyRemapRegistry.SWAP_SHIFT_RIGHT_ENTER,
+            true
+        )
+        focusNewField(
+            newRecorder = RecordingInputConnection(),
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE,
+            packageName = "com.beeper.android"
+        )
+        recorder.performEditorActionResult = true
+    }
+
+    private fun scanKey(
+        action: Int,
+        keyCode: Int,
+        scanCode: Int,
+        downTime: Long,
+        eventTime: Long,
+        metaState: Int = 0
+    ): KeyEvent = KeyEvent(
+        downTime, eventTime, action, keyCode, 0, metaState, 0, scanCode, 0,
+        android.view.InputDevice.SOURCE_KEYBOARD
+    )
+
+    @Test
+    fun swapOn_vendorRewrittenRightShiftAlone_sendsInMessengerApp() {
+        enableSwapOnVendorShiftAsAlt()
+
+        service.onKeyDown(
+            KeyEvent.KEYCODE_ALT_RIGHT,
+            scanKey(
+                KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ALT_RIGHT, 54, 9_000L, 9_000L,
+                KeyEvent.META_ALT_RIGHT_ON or KeyEvent.META_ALT_ON
+            )
+        )
+
+        assertEquals(
+            "sent=${recorder.editorActions} text=${recorder.committedTexts}",
+            listOf(EditorInfo.IME_ACTION_SEND),
+            recorder.editorActions
+        )
+        assertFalse(recorder.committedTexts.contains("\n"))
+    }
+
+    @Test
+    fun swapOn_heldPhysicalEnterThenRightShift_isNewlineInMessengerApp() {
+        enableSwapOnVendorShiftAsAlt()
+
+        // Physical Enter (scan 28) is held and acts as Shift.
+        service.onKeyDown(
+            KeyEvent.KEYCODE_ENTER,
+            scanKey(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 28, 9_100L, 9_100L)
+        )
+        // Physical right Shift (scan 54, arrives as Alt) acts as Enter.
+        service.onKeyDown(
+            KeyEvent.KEYCODE_ALT_RIGHT,
+            scanKey(
+                KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ALT_RIGHT, 54, 9_100L, 9_200L,
+                KeyEvent.META_ALT_RIGHT_ON or KeyEvent.META_ALT_ON
+            )
+        )
+
+        assertTrue(
+            "text=${recorder.committedTexts} sent=${recorder.editorActions}",
+            recorder.committedTexts.contains("\n")
+        )
+        assertTrue(recorder.editorActions.isEmpty())
+    }
+
+    @Test
+    fun swapOn_heldVendorShiftThenRightShift_isNewlineInMessengerApp() {
+        enableSwapOnVendorShiftAsAlt()
+
+        // Physical Alt (scan 56) arrives as Shift through the vendor Key setting.
+        service.onKeyDown(
+            KeyEvent.KEYCODE_SHIFT_LEFT,
+            scanKey(
+                KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SHIFT_LEFT, 56, 9_300L, 9_300L,
+                KeyEvent.META_SHIFT_LEFT_ON or KeyEvent.META_SHIFT_ON
+            )
+        )
+        service.onKeyDown(
+            KeyEvent.KEYCODE_ALT_RIGHT,
+            scanKey(
+                KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ALT_RIGHT, 54, 9_300L, 9_400L,
+                KeyEvent.META_SHIFT_LEFT_ON or KeyEvent.META_SHIFT_ON or
+                    KeyEvent.META_ALT_RIGHT_ON or KeyEvent.META_ALT_ON
+            )
+        )
+
+        assertTrue(
+            "text=${recorder.committedTexts} sent=${recorder.editorActions}",
+            recorder.committedTexts.contains("\n")
+        )
+        assertTrue(recorder.editorActions.isEmpty())
+    }
+
     private fun focusNewField(
         newRecorder: RecordingInputConnection,
         inputType: Int = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES,
