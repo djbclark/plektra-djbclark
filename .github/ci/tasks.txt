@@ -1,0 +1,1 @@
+:app:testStableDebugUnitTest --tests rocks.pkb.plektra.inputmethod.PhysicalKeyboardInputMethodServiceDeviceBehaviorTest
