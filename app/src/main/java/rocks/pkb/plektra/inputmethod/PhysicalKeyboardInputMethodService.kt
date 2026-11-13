@@ -6211,7 +6211,6 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         val delivered = keyDeliveries.deliveredKeyCode(physicalKey)
         val sentByIme = keyDeliveries.sentByIme(physicalKey) != null
         val insteadOfRemapped = keyDeliveries.isDeliveredInsteadOfRemapped(physicalKey)
-        val deliveredBeforeThisConnection = keyDeliveries.isDeliveredBeforeThisConnection(physicalKey)
         keyDeliveries.onUp(physicalKey)
         if (event_ == null) return handled
         val remap = dispatch.result
@@ -6243,7 +6242,6 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
                 // Held since before this connection, the raw key is left to the system at once:
                 // this connection saw nothing of the press, so no UP of the IME's making goes
                 // into it.
-                if (deliveredBeforeThisConnection) return false
                 val cancelled = KeyEvent.changeFlags(event_, event_.flags or KeyEvent.FLAG_CANCELED)
                 if (currentInputConnection?.sendKeyEvent(cancelled) != true) return false
             }
