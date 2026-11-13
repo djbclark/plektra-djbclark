@@ -366,8 +366,36 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
     }
     /** The held remapped keys; who resets them when is in the design note of HardwareKeyRemap.kt. */
     private val hardwareKeyRemapper = HardwareKeyRemapper(::onRemappedKeyHoldCancelled)
-    /** A key DOWN the IME sent to the app: the event, and the connection that took it. */
-    private class SentKey(val down: KeyEvent, val via: InputConnection)
+    /**
+     * A key DOWN the IME sent to the app: the event, the connection that took it, and the editor
+     * that connection was made for, as its package and field id read when the key went down
+     * (empty and 0 without a started editor). The two are copied: the framework's EditorInfo is
+     * replaced before the IME hears of the next start.
+     */
+    private class SentKey(
+        val down: KeyEvent,
+        val via: InputConnection,
+        val packageName: String,
+        val fieldId: Int
+    ) {
+        /**
+         * True when this key's release may go into the connection of a restarting start for
+         * [editor] instead of into [via]: it is a Shift, Ctrl or Alt key, and both editors name
+         * the same package and the same field id. See "What the app sees" in HardwareKeyRemap.kt
+         * for why these keys only, and for what equal ids do not prove.
+         */
+        fun mayEndInARestartFor(editor: EditorInfo?): Boolean = editor != null &&
+            isShiftCtrlOrAlt(down.keyCode) &&
+            packageName.isNotEmpty() && packageName == editor.packageName &&
+            fieldId > 0 && fieldId == editor.fieldId
+
+        private fun isShiftCtrlOrAlt(keyCode: Int): Boolean = when (keyCode) {
+            KeyEvent.KEYCODE_SHIFT_LEFT, KeyEvent.KEYCODE_SHIFT_RIGHT,
+            KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.KEYCODE_CTRL_RIGHT,
+            KeyEvent.KEYCODE_ALT_LEFT, KeyEvent.KEYCODE_ALT_RIGHT -> true
+            else -> false
+        }
+    }
     /** What the app saw go down for each key, so that its press goes on and ends as that key. */
     private val keyDeliveries = KeyDeliveryLedger<SentKey>()
     private lateinit var screenTrackpadController: ScreenTrackpadController
@@ -3864,10 +3892,14 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         // Every start comes with an input connection of its own, a restarting one too, and the
         // IME cannot tell whether it leads to the view that saw the held keys go down. What the
         // app saw of them therefore counts for the connection before this start only: the keys
-        // the IME sent down through that one are released through it, as far as it still takes
-        // them, and no UP goes into this one unless a repeat brought the key there first. The
-        // held keys themselves go on (see the design note in HardwareKeyRemap.kt).
-        endKeyDeliveriesOfThisConnection()
+        // the IME sent down through that one are released, and no UP goes into this one unless
+        // a repeat brought the key there first. The release goes through the connection that
+        // took the key, as far as it still takes anything; a held Shift, Ctrl or Alt goes into
+        // this one instead when the start is a restarting one for what looks like the same
+        // field. The held keys themselves go on (see the design note in HardwareKeyRemap.kt).
+        // The framework has installed this start's connection and editor by now, also before
+        // super.onStartInput: currentInputConnection is the new one.
+        endKeyDeliveriesOfThisConnection(restarting, info, currentInputConnection)
         super.onStartInput(info, restarting)
         inputStarted = true
         if (::textExpansionController.isInitialized) textExpansionController.clear()
@@ -4869,7 +4901,13 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         val connection = currentInputConnection
         if (connection?.sendKeyEvent(event) == true) {
             if (rawEvent.action == KeyEvent.ACTION_DOWN) {
-                keyDeliveries.onSentByIme(physicalKey, event.keyCode, SentKey(event, connection))
+                // The editor is read now, while it is the one this connection was made for.
+                val editor = if (inputStarted) currentInputEditorInfo else null
+                keyDeliveries.onSentByIme(
+                    physicalKey,
+                    event.keyCode,
+                    SentKey(event, connection, editor?.packageName.orEmpty(), editor?.fieldId ?: 0)
+                )
             }
             return RemapDelivery.INJECTED
         }
@@ -4891,13 +4929,14 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
     /**
      * Ends, as a cancelled press, a key the IME sent down to the app whose own UP will not come
      * (lost, or cut off) or will not go to the connection that took the DOWN. The UP is the
-     * DOWN's own (key, down time, device, scan code), sent through that same connection. Best
-     * effort: there is no other route to the view that saw the DOWN, and a connection the app
-     * has replaced takes nothing more (see "What the app sees" in HardwareKeyRemap.kt).
+     * DOWN's own (key, down time, device, scan code), sent once, through [via]: that same
+     * connection unless the caller names another. Best effort: a connection the app has
+     * replaced takes nothing more, and the IME is not told (see "What the app sees" in
+     * HardwareKeyRemap.kt).
      */
-    private fun sendCancelledUpToApp(sent: SentKey) {
+    private fun sendCancelledUpToApp(sent: SentKey, via: InputConnection = sent.via) {
         val down = sent.down
-        sent.via.sendKeyEvent(
+        via.sendKeyEvent(
             KeyEvent(
                 down.downTime, SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, down.keyCode, 0,
                 HardwareKeyRemapper.metaStateAfterRelease(down.keyCode, down.metaState),
@@ -4909,12 +4948,26 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
     }
 
     /**
-     * The input connection is about to change, or may have (a start, restarting or not, or a
-     * finish): what the app saw of the held keys ends with it. Each key the IME sent down
-     * through it is released there as a cancelled press; the held keys themselves go on.
+     * The input connection is about to change, or has (a start, restarting or not, or a finish):
+     * what the app saw of the held keys ends with it. Each key the IME sent down through it is
+     * released as a cancelled press, once; the held keys themselves go on.
+     *
+     * The release goes through the connection that took the DOWN, with one exception. A start
+     * names itself ([restarting], with its editor [info] and its [connection]); when it is a
+     * restarting one, a Shift, Ctrl or Alt key whose editor had the package and field id of
+     * [info] is released through [connection] instead: the app has replaced the old connection
+     * by then and drops what comes through it, and such a start is most often the same view
+     * starting input again. Never through both. A finish names nothing and redirects nothing.
      */
-    private fun endKeyDeliveriesOfThisConnection() {
-        keyDeliveries.onConnectionChanged(::sendCancelledUpToApp)
+    private fun endKeyDeliveriesOfThisConnection(
+        restarting: Boolean = false,
+        info: EditorInfo? = null,
+        connection: InputConnection? = null
+    ) {
+        keyDeliveries.onConnectionChanged { sent ->
+            val intoThisStart = restarting && sent.mayEndInARestartFor(info)
+            sendCancelledUpToApp(sent, if (intoThisStart) connection ?: sent.via else sent.via)
+        }
     }
 
     /**
@@ -5221,7 +5274,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         val initialDown = (event_?.repeatCount ?: 0) == 0
         if (initialDown) {
             // An earlier press of this key lost its UP while the app held a key the IME sent.
-            keyDeliveries.onInitialDown(physicalKey)?.let(::sendCancelledUpToApp)
+            keyDeliveries.onInitialDown(physicalKey)?.let { sendCancelledUpToApp(it) }
         }
         val dispatch = KeyRemapDispatch()
         if (onKeyDownImpl(keyCode_, event_, dispatch)) return true

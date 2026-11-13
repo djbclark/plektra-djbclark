@@ -101,10 +101,39 @@ import android.view.KeyEvent
  * connection the app already had), and not where the app replaced it, whether for another view
  * or for the same one (InputMethodManager.restartInput, which a TextView calls after setText).
  * There the view keeps a press it saw begin and not end, until the key's next repeat brings it
- * back or it is pressed again. The release is not retried through the new connection: a key event goes to whatever
- * view has focus in the connection's window, not to the view the connection was made for, and
- * nothing the IME can observe (package, field id) proves that two connections lead to one view;
- * a retry would be the UP without a DOWN this rule exists to prevent.
+ * back or it is pressed again.
+ *
+ * The other route is the new connection: a key event sent through it goes to whatever view has
+ * focus in its window, which after a view restarted its own input is the view that saw the
+ * DOWN, and after focus moved is one that did not. Nothing the IME can observe proves which.
+ * One case is let through that route all the same, because a modifier the app believes held
+ * changes what every later key does there: a held Shift, Ctrl or Alt (left or right) that the
+ * IME sent down is released through the new connection instead of the old one, never through
+ * both, when all of this holds:
+ *
+ *   - the start is a restarting one (a finish, and a start that is not restarting, mean the
+ *     editor is gone or new);
+ *   - the editor the key went down in and the editor of this start name the same package, and
+ *     it is not empty;
+ *   - they name the same field id, and it is positive (a view without an id reports none);
+ *   - the start has a connection.
+ *
+ * The package and field id are copied when the key goes down: by the time a start is reported,
+ * the framework has already replaced the editor it reports as current.
+ *
+ * Equal ids are a filter, not identity. Two views can share an id (rows of a list, fields
+ * inside one web view, which reports the id of the web view for all of them), so the release
+ * can still land in a view that saw no DOWN; a modifier's UP is the key event least likely to
+ * do anything there. Where the ids are missing or differ, nothing is redirected and the limit
+ * above stands: a view without an id that restarts its input keeps the modifier down until the
+ * key repeats or is pressed again.
+ *
+ * Every other key keeps the old route. Enter and other keys that act: a view can act on an UP
+ * alone, cancelled or not (a single-line TextView moves focus on an Enter UP without looking
+ * at the cancel flag or for the DOWN), so an UP in the wrong view costs more than a missing
+ * one. Sym: it is the IME's own modifier, whose held state the IME ends itself, and nothing
+ * in the framework says that a Sym UP without its DOWN is harmless to an app. A raw key the
+ * system delivered is not the IME's to release at all.
  *
  * A raw key the system delivered in place of a remapped one that could not be sent is the
  * system's to continue and to end, with one exception: when the IME consumes its UP (as the
