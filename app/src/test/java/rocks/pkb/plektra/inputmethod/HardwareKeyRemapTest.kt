@@ -25,7 +25,6 @@ class HardwareKeyRemapTest {
     /** The Shift/Enter swap as the settings preset writes it. */
     private val swap = rules(
         KeyRemapRule(KeySource.scan(SCAN_SHIFT_RIGHT, KeyEvent.KEYCODE_SHIFT_RIGHT), KeyEvent.KEYCODE_ENTER),
-        KeyRemapRule(KeySource.key(KeyEvent.KEYCODE_SHIFT_RIGHT), KeyEvent.KEYCODE_ENTER),
         KeyRemapRule(KeySource.key(KeyEvent.KEYCODE_ENTER), KeyEvent.KEYCODE_SHIFT_RIGHT)
     )
 

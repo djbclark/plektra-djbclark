@@ -50,7 +50,10 @@ class HardwareKeyRemapSettingsTest {
         val rules = KeyRemapRules.compile(swap.rules)
         assertEquals(KeyEvent.KEYCODE_ENTER, rules.targetFor(KeyEvent.KEYCODE_SHIFT_RIGHT, 54))
         assertEquals(KeyEvent.KEYCODE_ENTER, rules.targetFor(KeyEvent.KEYCODE_ALT_RIGHT, 54))
-        assertEquals(KeyEvent.KEYCODE_ENTER, rules.targetFor(KeyEvent.KEYCODE_SHIFT_RIGHT, 0))
+        // Another key that sends a Shift key code (the vendor setting moves Shift there) stays one.
+        assertEquals(KeyEvent.KEYCODE_SHIFT_RIGHT, rules.targetFor(KeyEvent.KEYCODE_SHIFT_RIGHT, 100))
+        assertEquals(KeyEvent.KEYCODE_SHIFT_RIGHT, rules.targetFor(KeyEvent.KEYCODE_SHIFT_RIGHT, 0))
+        assertEquals(KeyEvent.KEYCODE_SHIFT_LEFT, rules.targetFor(KeyEvent.KEYCODE_SHIFT_LEFT, 56))
         assertEquals(KeyEvent.KEYCODE_SHIFT_RIGHT, rules.targetFor(KeyEvent.KEYCODE_ENTER, 28))
         assertEquals(KeyEvent.KEYCODE_NUMPAD_ENTER, rules.targetFor(KeyEvent.KEYCODE_NUMPAD_ENTER, 96))
     }

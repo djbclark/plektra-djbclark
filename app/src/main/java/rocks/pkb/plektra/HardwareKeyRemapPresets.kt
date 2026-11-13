@@ -37,13 +37,14 @@ object HardwareKeyRemapPresets {
             // keyboards: accessories are not remapped.
             profiles = setOf("key2", "titan", "titan2", "titan2elite_qwerty", "mp01"),
             rules = listOf(
-                // By scan code first: a vendor key setting can make the right Shift key send
-                // another key code (the Titan 2's Shortcut keys > Key setting turns it into Alt).
+                // The right Shift key by scan code, and by nothing else: a vendor key setting
+                // rewrites key codes (the Titan 2's Shortcut keys > Key setting makes this key
+                // send Alt), so its key code may be missing here and may come from another key
+                // there, which must stay a Shift.
                 KeyRemapRule(
                     KeySource.scan(SCAN_CODE_RIGHT_SHIFT, KeyEvent.KEYCODE_SHIFT_RIGHT),
                     KeyEvent.KEYCODE_ENTER
                 ),
-                KeyRemapRule(KeySource.key(KeyEvent.KEYCODE_SHIFT_RIGHT), KeyEvent.KEYCODE_ENTER),
                 // Only the main Enter key, not the numpad one.
                 KeyRemapRule(KeySource.key(KeyEvent.KEYCODE_ENTER), KeyEvent.KEYCODE_SHIFT_RIGHT)
             )

@@ -1863,6 +1863,26 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
     }
 
     @Test
+    fun swapOn_anotherKeyThatSendsRightShift_staysAShift() {
+        enableSwapInPlainTextField()
+        // The vendor Key setting may give another key (here the Alt key, scan 100) the right
+        // Shift's key code: only the key at scan 54 is the one the swap turns into Enter.
+        val down = tick()
+        service.onKeyDown(
+            KeyEvent.KEYCODE_SHIFT_RIGHT,
+            scanKey(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SHIFT_RIGHT, 100, down, down, rightShiftMeta)
+        )
+        assertEquals("A", typeA(rightShiftMeta))
+        service.onKeyUp(
+            KeyEvent.KEYCODE_SHIFT_RIGHT,
+            scanKey(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SHIFT_RIGHT, 100, down, tick())
+        )
+        assertEquals("a", typeA())
+        assertTrue(recorder.editorActions.isEmpty())
+        assertTrue(sentKeys(recorder).toString(), recorder.sentKeyEvents.isEmpty())
+    }
+
+    @Test
     fun swapOn_tappedEnterArmsTheUsersOneShotShift_soTheNextEnterIsANewline() {
         enableSwapOnVendorShiftAsAlt()
         modifierController().consumeShiftOneShot()
