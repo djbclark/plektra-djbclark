@@ -4902,7 +4902,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         if (connection?.sendKeyEvent(event) == true) {
             if (rawEvent.action == KeyEvent.ACTION_DOWN) {
                 // The editor is read now, while it is the one this connection was made for.
-                val editor = if (inputStarted) currentInputEditorInfo else null
+                val editor = currentInputEditorInfo
                 keyDeliveries.onSentByIme(
                     physicalKey,
                     event.keyCode,
