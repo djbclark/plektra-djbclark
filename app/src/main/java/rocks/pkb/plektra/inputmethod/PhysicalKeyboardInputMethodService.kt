@@ -4091,7 +4091,6 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
     override fun onFinishInput() {
         cancelSpeechRecognition()
         ++speechEditorSession
-        endKeyDeliveriesOfThisConnection()
         disableSmoothCaretExperiment()
         pendingKeyboardSurfaceTransition?.let(uiHandler::removeCallbacks)
         pendingKeyboardSurfaceTransition = null
