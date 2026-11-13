@@ -32,10 +32,15 @@ class HardwareKeyRemapSettingsTest {
     private val altAsSym = KeyRemapRule(KeySource.key(KeyEvent.KEYCODE_ALT_RIGHT), KeyEvent.KEYCODE_SYM)
     private val enterAsTab = KeyRemapRule(KeySource.key(KeyEvent.KEYCODE_ENTER), KeyEvent.KEYCODE_TAB)
 
+    private companion object {
+        /** The one keyboard profile that has the swap preset. */
+        const val ELITE = "titan2elite_qwerty"
+    }
+
     @Before
     fun setUp() {
         prefs.edit().clear().commit()
-        SettingsManager.setPhysicalKeyboardProfileOverride(context, "titan2")
+        SettingsManager.setPhysicalKeyboardProfileOverride(context, ELITE)
     }
 
     @Test
@@ -66,10 +71,10 @@ class HardwareKeyRemapSettingsTest {
         assertTrue(SettingsManager.setKeyRemapPresetEnabled(context, swapId, true))
 
         assertTrue(SettingsManager.isKeyRemapPresetEnabled(context, swapId))
-        assertEquals(swap.rules, SettingsManager.getHardwareKeyRemapRules(context, "titan2"))
+        assertEquals(swap.rules, SettingsManager.getHardwareKeyRemapRules(context, ELITE))
         val stored = JSONObject(prefs.getString(SettingsManager.KEY_HARDWARE_KEY_REMAPS, null)!!)
         assertEquals(KeyRemapJson.VERSION, stored.getInt("v"))
-        assertEquals(swap.rules.size, stored.getJSONObject("profiles").getJSONObject("titan2").getJSONArray("rules").length())
+        assertEquals(swap.rules.size, stored.getJSONObject("profiles").getJSONObject(ELITE).getJSONArray("rules").length())
 
         assertFalse(SettingsManager.setKeyRemapPresetEnabled(context, swapId, false))
 
@@ -79,32 +84,36 @@ class HardwareKeyRemapSettingsTest {
 
     @Test
     fun presetSwitch_replacesRulesForItsKeysAndKeepsTheOthers() {
-        assertTrue(SettingsManager.setHardwareKeyRemapRules(context, "titan2", listOf(altAsSym, enterAsTab)))
+        assertTrue(SettingsManager.setHardwareKeyRemapRules(context, ELITE, listOf(altAsSym, enterAsTab)))
 
         assertTrue(SettingsManager.setKeyRemapPresetEnabled(context, swapId, true))
-        assertEquals(swap.rules + altAsSym, SettingsManager.getHardwareKeyRemapRules(context, "titan2"))
+        assertEquals(swap.rules + altAsSym, SettingsManager.getHardwareKeyRemapRules(context, ELITE))
 
         assertFalse(SettingsManager.setKeyRemapPresetEnabled(context, swapId, false))
-        assertEquals(listOf(altAsSym), SettingsManager.getHardwareKeyRemapRules(context, "titan2"))
+        assertEquals(listOf(altAsSym), SettingsManager.getHardwareKeyRemapRules(context, ELITE))
     }
 
     @Test
     fun presetSwitch_isPerKeyboardProfile() {
         SettingsManager.setKeyRemapPresetEnabled(context, swapId, true)
 
-        SettingsManager.setPhysicalKeyboardProfileOverride(context, "key2")
+        // Another keyboard has its own rules: none, and no such preset.
+        SettingsManager.setPhysicalKeyboardProfileOverride(context, "titan2")
         assertFalse(SettingsManager.isKeyRemapPresetEnabled(context, swapId))
-        assertTrue(SettingsManager.setKeyRemapPresetEnabled(context, swapId, true))
+        assertTrue(SettingsManager.getHardwareKeyRemapRules(context, "titan2").isEmpty())
+        assertFalse(SettingsManager.setKeyRemapPresetEnabled(context, swapId, true))
         assertFalse(SettingsManager.setKeyRemapPresetEnabled(context, swapId, false))
 
-        SettingsManager.setPhysicalKeyboardProfileOverride(context, "titan2")
+        SettingsManager.setPhysicalKeyboardProfileOverride(context, ELITE)
         assertTrue(SettingsManager.isKeyRemapPresetEnabled(context, swapId))
     }
 
     @Test
-    fun preset_isOnlyForTheKeyboardsThatHaveItsKeys() {
-        assertEquals(listOf(swap), HardwareKeyRemapPresets.forProfile("titan2elite_qwerty"))
-        for (profile in listOf("q25", "Q25", "clicks_power", "unknown")) {
+    fun preset_isOnlyForTheKeyboardWhoseRightShiftIsKnown() {
+        assertEquals(listOf(swap), HardwareKeyRemapPresets.forProfile(ELITE))
+        // The Titan 2 has one Shift (scan code 42), the Q25's right Shift is its Ctrl key, an
+        // accessory is never remapped; the rest is unverified.
+        for (profile in listOf("titan2", "titan", "key2", "mp01", "q25", "Q25", "clicks_power", "unknown")) {
             assertTrue(profile, HardwareKeyRemapPresets.forProfile(profile).isEmpty())
         }
 
@@ -116,24 +125,24 @@ class HardwareKeyRemapSettingsTest {
 
     @Test
     fun compiledTable_isKeptUntilTheStoredRulesChange() {
-        SettingsManager.setHardwareKeyRemapRules(context, "titan2", listOf(altAsSym))
+        SettingsManager.setHardwareKeyRemapRules(context, ELITE, listOf(altAsSym))
         val table = SettingsManager.getHardwareKeyRemaps(context)
 
         assertSame(table, SettingsManager.getHardwareKeyRemaps(context))
 
-        SettingsManager.setHardwareKeyRemapRules(context, "titan2", listOf(enterAsTab))
+        SettingsManager.setHardwareKeyRemapRules(context, ELITE, listOf(enterAsTab))
         assertNotSame(table, SettingsManager.getHardwareKeyRemaps(context))
-        assertEquals(listOf(enterAsTab), SettingsManager.getHardwareKeyRemaps(context).rules("titan2"))
+        assertEquals(listOf(enterAsTab), SettingsManager.getHardwareKeyRemaps(context).rules(ELITE))
     }
 
     @Test
     fun invalidRules_areNotStored() {
         val capsAsCtrl = KeyRemapRule(KeySource.key(KeyEvent.KEYCODE_CAPS_LOCK), KeyEvent.KEYCODE_CTRL_LEFT)
 
-        assertTrue(SettingsManager.setHardwareKeyRemapRules(context, "titan2", listOf(capsAsCtrl, altAsSym)))
-        assertEquals(listOf(altAsSym), SettingsManager.getHardwareKeyRemapRules(context, "titan2"))
+        assertTrue(SettingsManager.setHardwareKeyRemapRules(context, ELITE, listOf(capsAsCtrl, altAsSym)))
+        assertEquals(listOf(altAsSym), SettingsManager.getHardwareKeyRemapRules(context, ELITE))
 
-        assertTrue(SettingsManager.setHardwareKeyRemapRules(context, "titan2", listOf(capsAsCtrl)))
+        assertTrue(SettingsManager.setHardwareKeyRemapRules(context, ELITE, listOf(capsAsCtrl)))
         assertFalse(prefs.contains(SettingsManager.KEY_HARDWARE_KEY_REMAPS))
     }
 
@@ -143,17 +152,17 @@ class HardwareKeyRemapSettingsTest {
 
         assertTrue(SettingsManager.getHardwareKeyRemaps(context).isEmpty)
         assertTrue(SettingsManager.setKeyRemapPresetEnabled(context, swapId, true))
-        assertEquals(swap.rules, SettingsManager.getHardwareKeyRemapRules(context, "titan2"))
+        assertEquals(swap.rules, SettingsManager.getHardwareKeyRemapRules(context, ELITE))
     }
 
     @Test
     fun storeOfANewerVersion_isNotUsedAndNotReplaced() {
-        val newer = """{"v":${KeyRemapJson.VERSION + 1},"profiles":{"titan2":{"rules":[{"match":"key","key":66,"to":60}]}}}"""
+        val newer = """{"v":${KeyRemapJson.VERSION + 1},"profiles":{"$ELITE":{"rules":[{"match":"key","key":66,"to":60}]}}}"""
         prefs.edit().putString(SettingsManager.KEY_HARDWARE_KEY_REMAPS, newer).commit()
 
         assertTrue(SettingsManager.getHardwareKeyRemaps(context).isEmpty)
         assertFalse(SettingsManager.setKeyRemapPresetEnabled(context, swapId, true))
-        assertFalse(SettingsManager.setHardwareKeyRemapRules(context, "titan2", listOf(altAsSym)))
+        assertFalse(SettingsManager.setHardwareKeyRemapRules(context, ELITE, listOf(altAsSym)))
         assertEquals(newer, prefs.getString(SettingsManager.KEY_HARDWARE_KEY_REMAPS, null))
     }
 
@@ -161,7 +170,7 @@ class HardwareKeyRemapSettingsTest {
     fun forkSwitch_migratesToThePresetsRulesOnce() {
         prefs.edit().putBoolean(SettingsManager.LEGACY_KEY_REMAP_SWAP_SHIFT_RIGHT_ENTER, true).commit()
 
-        assertEquals(swap.rules, SettingsManager.getHardwareKeyRemapRules(context, "titan2"))
+        assertEquals(swap.rules, SettingsManager.getHardwareKeyRemapRules(context, ELITE))
         assertTrue(SettingsManager.isKeyRemapPresetEnabled(context, swapId))
         assertFalse(prefs.contains(SettingsManager.LEGACY_KEY_REMAP_SWAP_SHIFT_RIGHT_ENTER))
 
@@ -172,26 +181,51 @@ class HardwareKeyRemapSettingsTest {
 
     @Test
     fun forkSwitch_neverReplacesStoredRules() {
-        SettingsManager.setHardwareKeyRemapRules(context, "titan2", listOf(altAsSym))
+        SettingsManager.setHardwareKeyRemapRules(context, ELITE, listOf(altAsSym))
         // A restored backup of an early fork build brings the old switch back.
         prefs.edit().putBoolean(SettingsManager.LEGACY_KEY_REMAP_SWAP_SHIFT_RIGHT_ENTER, true).commit()
 
-        assertEquals(listOf(altAsSym), SettingsManager.getHardwareKeyRemapRules(context, "titan2"))
+        assertEquals(listOf(altAsSym), SettingsManager.getHardwareKeyRemapRules(context, ELITE))
         assertFalse(prefs.contains(SettingsManager.LEGACY_KEY_REMAP_SWAP_SHIFT_RIGHT_ENTER))
-        assertEquals(listOf(altAsSym), SettingsManager.getHardwareKeyRemapRules(context, "titan2"))
+        assertEquals(listOf(altAsSym), SettingsManager.getHardwareKeyRemapRules(context, ELITE))
     }
 
     @Test
-    fun forkSwitch_thatWasOffOrOnAKeyboardWithoutThePreset_leavesNoRules() {
+    fun forkSwitch_thatWasOff_leavesNoRules() {
         prefs.edit().putBoolean(SettingsManager.LEGACY_KEY_REMAP_SWAP_SHIFT_RIGHT_ENTER, false).commit()
         assertTrue(SettingsManager.getHardwareKeyRemaps(context).isEmpty)
         assertFalse(prefs.contains(SettingsManager.LEGACY_KEY_REMAP_SWAP_SHIFT_RIGHT_ENTER))
+        assertFalse(prefs.contains(SettingsManager.KEY_HARDWARE_KEY_REMAPS))
+    }
 
-        SettingsManager.setPhysicalKeyboardProfileOverride(context, "q25")
+    @Test
+    fun forkSwitch_onAKeyboardWithoutThePreset_waitsForOneThatHasIt() {
+        SettingsManager.setPhysicalKeyboardProfileOverride(context, "titan2")
+        prefs.edit().putBoolean(SettingsManager.LEGACY_KEY_REMAP_SWAP_SHIFT_RIGHT_ENTER, true).commit()
+
+        assertTrue(SettingsManager.getHardwareKeyRemaps(context).isEmpty)
+        assertFalse(prefs.contains(SettingsManager.KEY_HARDWARE_KEY_REMAPS))
+        assertTrue(prefs.contains(SettingsManager.LEGACY_KEY_REMAP_SWAP_SHIFT_RIGHT_ENTER))
+
+        // The keyboard turns out to be the one with the preset (detection, or the manual choice).
+        SettingsManager.setPhysicalKeyboardProfileOverride(context, ELITE)
+        assertEquals(swap.rules, SettingsManager.getHardwareKeyRemapRules(context, ELITE))
+        assertFalse(prefs.contains(SettingsManager.LEGACY_KEY_REMAP_SWAP_SHIFT_RIGHT_ENTER))
+        assertTrue(SettingsManager.getHardwareKeyRemapRules(context, "titan2").isEmpty())
+    }
+
+    @Test
+    fun forkSwitch_onAKeyboardWithoutThePreset_endsWhenRulesAreStored() {
+        SettingsManager.setPhysicalKeyboardProfileOverride(context, "titan2")
         prefs.edit().putBoolean(SettingsManager.LEGACY_KEY_REMAP_SWAP_SHIFT_RIGHT_ENTER, true).commit()
         assertTrue(SettingsManager.getHardwareKeyRemaps(context).isEmpty)
+
+        assertTrue(SettingsManager.setHardwareKeyRemapRules(context, "titan2", listOf(altAsSym)))
+        assertEquals(listOf(altAsSym), SettingsManager.getHardwareKeyRemapRules(context, "titan2"))
         assertFalse(prefs.contains(SettingsManager.LEGACY_KEY_REMAP_SWAP_SHIFT_RIGHT_ENTER))
-        assertFalse(prefs.contains(SettingsManager.KEY_HARDWARE_KEY_REMAPS))
+
+        SettingsManager.setPhysicalKeyboardProfileOverride(context, ELITE)
+        assertFalse(SettingsManager.isKeyRemapPresetEnabled(context, swapId))
     }
 
     @Test

@@ -2854,7 +2854,9 @@ object SettingsManager {
     /**
      * Turns the boolean of the first fork builds into the preset's rules for the built-in
      * keyboard, once: the boolean is removed, and rules already stored (set here, or restored
-     * from a backup) are never replaced.
+     * from a backup) are never replaced. A switch that was on stays as it is while the keyboard
+     * profile has no such preset (the detected profile or the manual override may still change
+     * to one that has), unless rules are stored: those say what the user wants now.
      */
     private fun migrateLegacyKeyRemap(context: Context, prefs: SharedPreferences) {
         val wasOn = try {
@@ -2862,13 +2864,14 @@ object SettingsManager {
         } catch (_: ClassCastException) {
             false
         }
-        val editor = prefs.edit().remove(LEGACY_KEY_REMAP_SWAP_SHIFT_RIGHT_ENTER)
-        val preset = HardwareKeyRemapPresets.byId(HardwareKeyRemapPresets.SWAP_SHIFT_RIGHT_ENTER)
-        val profileId = builtInKeyboardProfileId(context)
-        if (wasOn && preset != null && preset.supports(profileId) && !prefs.contains(KEY_HARDWARE_KEY_REMAPS)) {
+        val editor = prefs.edit()
+        if (wasOn && !prefs.contains(KEY_HARDWARE_KEY_REMAPS)) {
+            val preset = HardwareKeyRemapPresets.byId(HardwareKeyRemapPresets.SWAP_SHIFT_RIGHT_ENTER)
+            val profileId = builtInKeyboardProfileId(context)
+            if (preset == null || !preset.supports(profileId)) return
             editor.putString(KEY_HARDWARE_KEY_REMAPS, KeyRemapJson.encode(mapOf(profileId to preset.rules)))
         }
-        editor.apply()
+        editor.remove(LEGACY_KEY_REMAP_SWAP_SHIFT_RIGHT_ENTER).apply()
     }
 
     /** The profile of the built-in keyboard: the manual override, else the detected device. */

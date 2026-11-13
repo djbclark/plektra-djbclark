@@ -1663,7 +1663,7 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
         }
     }
 
-    // ---- User key remaps: "Swap right Shift and Enter" on the Titan 2 ----
+    // ---- User key remaps: "Swap right Shift and Enter" on the Titan 2 Elite ----
     // Physical keys by Linux scan code: Enter 28, right Shift 54, left Alt 56, A 30, Tab 15.
 
     private val rightShiftMeta = KeyEvent.META_SHIFT_RIGHT_ON or KeyEvent.META_SHIFT_ON
@@ -1674,9 +1674,9 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
         return remapClock
     }
 
-    /** A Titan 2 whose keys come from a built-in keyboard device, with the swap switched on. */
+    /** A Titan 2 Elite whose keys come from a built-in keyboard device, with the swap switched on. */
     private fun enableShiftEnterSwap() {
-        useTitan2BuiltInKeyboard()
+        useTitan2EliteBuiltInKeyboard()
         assertTrue(
             SettingsManager.setKeyRemapPresetEnabled(
                 RuntimeEnvironment.getApplication(),
@@ -1686,13 +1686,16 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
         )
     }
 
-    private fun useTitan2BuiltInKeyboard() {
+    /** A Titan 2 Elite reports itself as a Titan 2; its board and display name tell it apart. */
+    private fun useTitan2EliteBuiltInKeyboard() {
         DeviceSpecific.setBuildFingerprintForTests(
             brand = "unihertz",
             manufacturer = "unihertz",
             model = "Titan 2",
-            device = "titan2",
-            product = "titan2"
+            device = "Titan_2",
+            product = "Titan_2_EEA",
+            board = "G72BoardV1",
+            display = "Titan 2 Elite"
         )
         setField(service, "physicalKeyboardProfileOverride", "auto")
         FakeKeyboards.register()
@@ -2178,12 +2181,12 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
 
     @Test
     fun keyRemappedToSym_actsAsSym_andAnUnbindLeavesNoPressedStateBehind() {
-        useTitan2BuiltInKeyboard()
+        useTitan2EliteBuiltInKeyboard()
         val context = RuntimeEnvironment.getApplication()
         assertTrue(
             SettingsManager.setHardwareKeyRemapRules(
                 context,
-                "titan2",
+                "titan2elite_qwerty",
                 listOf(KeyRemapRule(KeySource.key(KeyEvent.KEYCODE_ALT_RIGHT), KeyEvent.KEYCODE_SYM))
             )
         )

@@ -84,13 +84,15 @@ class InputDeviceSettingLinkTest {
     @Test
     fun keyRemapSwitchIsSearchableWhereTheKeyboardSupportsIt() {
         val id = "hardware.key_remap.swap_shift_right_enter"
-        SettingsManager.setPhysicalKeyboardProfileOverride(context, "titan2")
+        SettingsManager.setPhysicalKeyboardProfileOverride(context, "titan2elite_qwerty")
         val results = SettingLinkRegistry.search(context, "swap")
         assertTrue("Search does not expose $id", results.any { it.id == id })
         assertEquals(KeyboardsDevicesDestination.BuiltIn, results.first { it.id == id }.route.keyboardsDevicesDestination)
 
-        // The Q25 screen hides the option, so search must not offer it either.
-        SettingsManager.setPhysicalKeyboardProfileOverride(context, "q25")
-        assertFalse(SettingLinkRegistry.search(context, "swap").any { it.id == id })
+        // The screens of the other keyboards hide the option, so search must not offer it either.
+        for (profile in listOf("titan2", "q25")) {
+            SettingsManager.setPhysicalKeyboardProfileOverride(context, profile)
+            assertFalse(profile, SettingLinkRegistry.search(context, "swap").any { it.id == id })
+        }
     }
 }
