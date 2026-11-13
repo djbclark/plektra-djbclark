@@ -174,7 +174,7 @@ class KeyProbeActivity : Activity() {
             log("$name onCreateInputConnection #$serial viewId=$id publishes fieldId=${outAttrs.fieldId} package=${outAttrs.packageName}")
             return object : BaseInputConnection(this@ProbeView, false) {
                 override fun sendKeyEvent(e: KeyEvent): Boolean {
-                    log("$name connection #$serial sendKeyEvent ${KeyEvent.actionToString(e.action)} ${KeyEvent.keyCodeToString(e.keyCode)}")
+                    log("$name connection #$serial sendKeyEvent ${if (e.action == KeyEvent.ACTION_DOWN) "DOWN" else "UP"} ${KeyEvent.keyCodeToString(e.keyCode)}")
                     return super.sendKeyEvent(e)
                 }
             }
