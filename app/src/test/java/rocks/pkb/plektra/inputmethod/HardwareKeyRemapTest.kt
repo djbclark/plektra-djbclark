@@ -29,7 +29,11 @@ class HardwareKeyRemapTest {
     )
 
     private val cancelled = ArrayList<Int>()
-    private val remapper = HardwareKeyRemapper { cancelled.add(it) }
+    private val cancelledKeys = ArrayList<Long>()
+    private val remapper = HardwareKeyRemapper { key, target ->
+        cancelledKeys.add(key)
+        cancelled.add(target)
+    }
     private var clock = 1_000L
 
     @Test
@@ -175,10 +179,13 @@ class HardwareKeyRemapTest {
 
     @Test
     fun reset_turnsAHeldKeyIntoATombstoneThatSwallowsTheRestOfItsPress() {
-        remap(down(KeyEvent.KEYCODE_ENTER), swap)
+        val pressed = down(KeyEvent.KEYCODE_ENTER)
+        remap(pressed, swap)
 
         assertTrue(remapper.reset())
         assertEquals(listOf(KeyEvent.KEYCODE_SHIFT_RIGHT), cancelled)
+        // The owner is told which physical key it was, not only what it acted as.
+        assertEquals(listOf(HardwareKeyRemapper.physicalKeyId(pressed.keyCode, pressed)), cancelledKeys)
         assertFalse(remapper.isIdle)
 
         val repeat = down(KeyEvent.KEYCODE_ENTER, repeat = 1)

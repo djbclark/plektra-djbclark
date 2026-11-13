@@ -68,6 +68,14 @@ import android.view.KeyEvent
  * event no longer carries the bit a held modifier source set on its own DOWN, the key was
  * released and its UP never arrived. A source that is not a modifier (Enter as Shift) has no such
  * signal; its lost UP is repaired by pressing the key again.
+ *
+ * What the app sees
+ * -----------------
+ * The remapper only transforms events. An owner that passes remapped keys on (the IME service,
+ * through the input connection) keeps its own record of what the app saw go down, per physical
+ * key and per connection ([KeyDeliveryLedger]): a press ends with the key it began with, or not
+ * at all. That record ends with the connection, not with the hold: a held key survives a new
+ * editor, what the previous one saw of it does not.
  */
 
 /** How a [KeySource] names its physical key. */
@@ -211,11 +219,14 @@ class KeyRemapResult(val keyCode: Int, val event: KeyEvent, val change: Change) 
  * must call when. Stateful, main thread only, free of Android context: the caller resolves the
  * rules of each event and passes them in.
  *
- * [onHoldCancelled] is called with the target key code when a remapped key's hold ends without
- * its UP passing through [remap] (reset, device removal, lost UP, a new DOWN over it), so an
- * owner that keeps its own pressed state for the target key can end it too.
+ * [onHoldCancelled] is called with the physical key and its target key code when a remapped
+ * key's hold ends without its UP passing through [remap] (reset, device removal, lost UP, a new
+ * DOWN over it), so an owner that keeps its own pressed state for the target key, or that told
+ * someone else the target key is down, can end that too.
  */
-class HardwareKeyRemapper(private val onHoldCancelled: ((targetKeyCode: Int) -> Unit)? = null) {
+class HardwareKeyRemapper(
+    private val onHoldCancelled: ((physicalKey: Long, targetKeyCode: Int) -> Unit)? = null
+) {
     private class Hold(
         val key: Long,
         /** The key code that arrived: it names the meta bit the framework sets for this key. */
@@ -398,7 +409,7 @@ class HardwareKeyRemapper(private val onHoldCancelled: ((targetKeyCode: Int) -> 
     }
 
     private fun cancelled(hold: Hold) {
-        if (hold.remapped) onHoldCancelled?.invoke(hold.targetKeyCode)
+        if (hold.remapped) onHoldCancelled?.invoke(hold.key, hold.targetKeyCode)
     }
 
     private fun indexOf(holds: ArrayList<Hold>, key: Long): Int {
@@ -475,7 +486,7 @@ class HardwareKeyRemapper(private val onHoldCancelled: ((targetKeyCode: Int) -> 
         fun deviceIdOf(physicalKeyId: Long): Int = (physicalKeyId shr 32).toInt()
 
         /** The scan code inside a [physicalKeyId]: the raw event's, 0 when it had none. */
-        private fun scanCodeOf(physicalKeyId: Long): Int =
+        fun scanCodeOf(physicalKeyId: Long): Int =
             if ((physicalKeyId and SCAN_CODE_FLAG) != 0L) (physicalKeyId and 0x7FFFFFFFL).toInt() else 0
 
         private val MODIFIERS = arrayOf(

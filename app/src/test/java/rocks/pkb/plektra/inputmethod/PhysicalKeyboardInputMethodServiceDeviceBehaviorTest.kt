@@ -2122,6 +2122,187 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
     }
 
     @Test
+    fun swapOn_rawShiftTheSystemDelivered_staysARawShift_whenTheConnectionTakesKeysAgain() {
+        enableShiftEnterSwap()
+        val connection = keyEventField()
+        connection.sendKeyEventResult = false
+        val down = tick()
+        assertFalse(service.onKeyDown(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_DOWN, down, down)))
+        val refused = listOf("ENTER down repeat=0 shift=false")
+        assertEquals(refused, sentKeys(connection))
+
+        // The app holds the raw Shift. An Enter repeat or an Enter UP now would belong to no press.
+        connection.sendKeyEventResult = true
+        assertFalse(
+            service.onKeyDown(
+                KeyEvent.KEYCODE_SHIFT_RIGHT,
+                rightShiftKey(KeyEvent.ACTION_DOWN, down, tick(), repeatCount = 1)
+            )
+        )
+        assertFalse(service.onKeyUp(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_UP, down, tick())))
+        assertEquals(refused, sentKeys(connection))
+
+        // The next press is an Enter again.
+        val again = tick()
+        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_DOWN, again, again)))
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_UP, again, tick())))
+        assertEquals(
+            refused + listOf("ENTER down repeat=0 shift=false", "ENTER up repeat=0 shift=false"),
+            sentKeys(connection)
+        )
+    }
+
+    @Test
+    fun swapOn_enterTheAppHolds_neverTurnsIntoARawShift_whenTheConnectionStopsTakingKeys() {
+        enableShiftEnterSwap()
+        val connection = keyEventField()
+        val down = tick()
+        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_DOWN, down, down)))
+
+        // Returning false here would let the system deliver a Shift into the app's Enter press.
+        connection.sendKeyEventResult = false
+        assertTrue(
+            service.onKeyDown(
+                KeyEvent.KEYCODE_SHIFT_RIGHT,
+                rightShiftKey(KeyEvent.ACTION_DOWN, down, tick(), repeatCount = 1)
+            )
+        )
+        // The connection takes keys again: the press goes on, and ends, as Enter.
+        connection.sendKeyEventResult = true
+        assertTrue(
+            service.onKeyDown(
+                KeyEvent.KEYCODE_SHIFT_RIGHT,
+                rightShiftKey(KeyEvent.ACTION_DOWN, down, tick(), repeatCount = 2)
+            )
+        )
+        connection.sendKeyEventResult = false
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_UP, down, tick())))
+        // Every attempt was an Enter, the refused ones included.
+        assertEquals(
+            listOf(
+                "ENTER down repeat=0 shift=false",
+                "ENTER down repeat=1 shift=false",
+                "ENTER down repeat=2 shift=false",
+                "ENTER up repeat=0 shift=false"
+            ),
+            sentKeys(connection)
+        )
+    }
+
+    @Test
+    fun swapOn_shiftTheConnectionRefused_staysSwallowed_whenTheConnectionTakesKeysAgain() {
+        enableShiftEnterSwap()
+        val connection = keyEventField()
+        connection.sendKeyEventResult = false
+        val down = tick()
+        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, down, down)))
+        val refused = listOf("SHIFT_RIGHT down repeat=0 shift=true")
+        assertEquals(refused, sentKeys(connection))
+
+        // The app saw no Shift go down: no repeat and no UP of one, and no raw Enter either.
+        connection.sendKeyEventResult = true
+        assertTrue(
+            service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, down, tick(), repeatCount = 1))
+        )
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_UP, down, tick())))
+        assertEquals(refused, sentKeys(connection))
+    }
+
+    @Test
+    fun swapOn_shiftTheAppHolds_neverTurnsIntoARawEnter_whenTheConnectionStopsTakingKeys() {
+        enableShiftEnterSwap()
+        val connection = keyEventField()
+        val down = tick()
+        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, down, down)))
+
+        connection.sendKeyEventResult = false
+        assertTrue(
+            service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, down, tick(), repeatCount = 1))
+        )
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_UP, down, tick())))
+        assertEquals(
+            listOf(
+                "SHIFT_RIGHT down repeat=0 shift=true",
+                "SHIFT_RIGHT down repeat=1 shift=true",
+                "SHIFT_RIGHT up repeat=0 shift=false"
+            ),
+            sentKeys(connection)
+        )
+    }
+
+    @Test
+    fun swapOn_upTheImeConsumes_stillEndsTheKeyTheAppHolds() {
+        enableShiftEnterSwap()
+        val connection = keyEventField()
+        val down = tick()
+        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_DOWN, down, down)))
+
+        // The handler takes this Enter UP for itself (the tail of an Alt+Enter).
+        setField(service, "consumeAltEnterUntilKeyUp", true)
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_UP, down, tick())))
+        assertFalse(getField<Boolean>(service, "consumeAltEnterUntilKeyUp"))
+        assertEquals(
+            listOf("ENTER down repeat=0 shift=false", "ENTER up repeat=0 shift=false"),
+            sentKeys(connection)
+        )
+    }
+
+    @Test
+    fun swapOn_keyTheAppHolds_isReleasedAsCancelled_whenItsOwnUpIsLost() {
+        enableShiftEnterSwap()
+        val connection = keyEventField()
+
+        // Physical Enter went down as Shift and its UP never came: the next press says so.
+        val first = tick()
+        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, first, first)))
+        val second = tick()
+        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, second, second)))
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_UP, second, tick())))
+        assertEquals(
+            listOf(
+                "SHIFT_RIGHT down repeat=0 shift=true",
+                "SHIFT_RIGHT up repeat=0 shift=false",
+                "SHIFT_RIGHT down repeat=0 shift=true",
+                "SHIFT_RIGHT up repeat=0 shift=false"
+            ),
+            sentKeys(connection)
+        )
+        assertEquals(listOf(false, true, false, false), connection.sentKeyEvents.map { it.isCanceled })
+        assertEquals(FakeKeyboards.BUILT_IN, connection.sentKeyEvents[1].deviceId)
+        assertEquals(28, connection.sentKeyEvents[1].scanCode)
+
+        // Physical right Shift went down as Enter; a later key no longer carries its Shift bit.
+        connection.sentKeyEvents.clear()
+        val shift = tick()
+        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_DOWN, shift, shift)))
+        val tab = tick()
+        service.onKeyDown(KeyEvent.KEYCODE_TAB, scanKey(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_TAB, 15, tab, tab))
+        assertEquals(
+            listOf("ENTER down repeat=0 shift=false", "ENTER up repeat=0 shift=false"),
+            sentKeys(connection)
+        )
+        assertTrue(connection.sentKeyEvents[1].isCanceled)
+        assertEquals(54, connection.sentKeyEvents[1].scanCode)
+    }
+
+    @Test
+    fun swapOn_keyTheAppHolds_isReleasedAsCancelled_whenItsKeyboardGoesAway() {
+        enableShiftEnterSwap()
+        val connection = keyEventField()
+        val down = tick()
+        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_DOWN, down, down)))
+
+        getField<android.hardware.input.InputManager.InputDeviceListener>(service, "inputDeviceListener")
+            .onInputDeviceRemoved(FakeKeyboards.BUILT_IN)
+
+        assertEquals(
+            listOf("ENTER down repeat=0 shift=false", "ENTER up repeat=0 shift=false"),
+            sentKeys(connection)
+        )
+        assertTrue(connection.sentKeyEvents[1].isCanceled)
+    }
+
+    @Test
     fun swapOn_overlappingKeysFilter_treatsEnterAsTheModifierItActsAs() {
         enableSwapInPlainTextField()
         SettingsManager.setOverlappingKeysEnabled(RuntimeEnvironment.getApplication(), true)

@@ -3,61 +3,112 @@ package rocks.pkb.plektra.inputmethod
 import android.util.LongSparseArray
 
 /**
- * Which physical keys ([HardwareKeyRemapper.physicalKeyId]) the app has seen go down, and in
- * which editor. The IME passes a remapped key to the app itself (through the input connection)
- * when its own handling leaves the key alone, and must keep what the app sees paired: no repeat
- * and no UP of a key whose DOWN the IME consumed, and no UP into an editor that never saw the key
- * go down (a key held from one field into the next).
+ * What the app has seen go down for each physical key ([HardwareKeyRemapper.physicalKeyId]): which
+ * key code, by which route, and through which input connection. The IME passes a remapped key to
+ * the app itself (through the input connection) when its own handling leaves the key alone, and
+ * the system delivers the raw key when the IME returns false; the two routes carry different key
+ * codes. A press must go on and end as the key it began with, by the route that can still reach
+ * the app:
  *
- * Lifetimes follow the held keys of [HardwareKeyRemapper]: entries survive an editor change
- * (which only starts a new editor generation, [onEditorChanged]) and end with [clear] where the
- * client unbinds, or with [clearDevice].
+ * - a key the IME sent ([onSentByIme]) is the IME's to repeat and to release, also when a later
+ *   send fails or the handler consumes the UP: the raw key the system would deliver instead is a
+ *   different key;
+ * - a key the system delivered ([onDeliveredBySystem]) stays the system's, also when the remapped
+ *   key could be sent by now;
+ * - a key the app never saw go down gets no repeat and no UP.
+ *
+ * What was delivered counts for one input connection only ([onConnectionChanged]): a key held
+ * into the next connection starts there with a repeat, and its UP goes nowhere unless that
+ * connection saw it go down. The entries themselves live as long as the held keys of
+ * [HardwareKeyRemapper]: until [clear] where the client unbinds, or [clearDevice].
  */
 internal class KeyDeliveryLedger {
-    private class Entry(var downEditor: Int, var seenEditor: Int)
+    private class Entry(var downGeneration: Int) {
+        var seenGeneration = NONE
+        var seenKeyCode = NONE
+        var sentByIme = false
 
-    // One entry per key ever pressed, reused: bounded by the keys of the connected keyboards.
-    private val entries = LongSparseArray<Entry>()
-    private var editor = 0
-
-    /** A new editor has the input connection: nothing was delivered to it yet. */
-    fun onEditorChanged() {
-        editor++
-    }
-
-    /** A new press: whatever the app saw of an earlier one (its UP lost) no longer counts. */
-    fun onInitialDown(key: Long) {
-        val entry = entries.get(key)
-        if (entry == null) {
-            entries.put(key, Entry(editor, NOT_SEEN))
-        } else {
-            entry.downEditor = editor
-            entry.seenEditor = NOT_SEEN
+        fun forget() {
+            seenGeneration = NONE
+            seenKeyCode = NONE
+            sentByIme = false
         }
     }
 
-    /** The current editor's app received a DOWN (initial or repeat) of this key. */
-    fun onDelivered(key: Long) {
-        val entry = entries.get(key)
-        if (entry == null) entries.put(key, Entry(editor, editor)) else entry.seenEditor = editor
+    // One entry per key ever pressed, reused: bounded by the keys of the connected keyboards.
+    private val entries = LongSparseArray<Entry>()
+    private var generation = 0
+
+    /**
+     * Another input connection may have taken over: what the previous one saw no longer counts.
+     * Called where the connection can change, whether or not it did (its identity is not
+     * observable from the IME).
+     */
+    fun onConnectionChanged() {
+        generation++
     }
 
     /**
-     * Whether a remapped repeat may go to the app: yes when this editor saw the key go down, and
-     * yes in an editor that came after the DOWN (the held key starts repeating into the new
-     * field, as an unremapped key does); no when the IME consumed the DOWN in this editor.
+     * A new press. Returns the key code the IME sent down for an earlier press of this key and
+     * never released (that press lost its UP), [NONE] otherwise: the caller owes the app its UP.
      */
-    fun mayDeliverRepeat(key: Long): Boolean {
-        val entry = entries.get(key) ?: return true
-        return entry.seenEditor == editor || entry.downEditor != editor
+    fun onInitialDown(key: Long): Int {
+        val entry = entries.get(key)
+        if (entry == null) {
+            entries.put(key, Entry(generation))
+            return NONE
+        }
+        val unfinished = if (entry.seenGeneration == generation && entry.sentByIme) entry.seenKeyCode else NONE
+        entry.downGeneration = generation
+        entry.forget()
+        return unfinished
     }
 
-    /** Ends the press. True when the current editor's app saw this key go down. */
-    fun onUp(key: Long): Boolean {
+    /** The IME sent a DOWN (initial or repeat) of this key as [keyCode] through the connection. */
+    fun onSentByIme(key: Long, keyCode: Int) {
+        val entry = entryFor(key)
+        entry.seenGeneration = generation
+        entry.seenKeyCode = keyCode
+        entry.sentByIme = true
+    }
+
+    /**
+     * The IME left a DOWN of this key to the system, which delivers the raw [keyCode]. Does not
+     * take over a press the IME already sent to this connection.
+     */
+    fun onDeliveredBySystem(key: Long, keyCode: Int) {
+        val entry = entryFor(key)
+        if (entry.seenGeneration == generation) return
+        entry.seenGeneration = generation
+        entry.seenKeyCode = keyCode
+        entry.sentByIme = false
+    }
+
+    /** The key code the current connection's app saw go down for this key, [NONE] when none. */
+    fun deliveredKeyCode(key: Long): Int {
+        val entry = entries.get(key) ?: return NONE
+        return if (entry.seenGeneration == generation) entry.seenKeyCode else NONE
+    }
+
+    /** True when the IME itself sent this key's DOWN to the current connection. */
+    fun isSentByIme(key: Long): Boolean {
         val entry = entries.get(key) ?: return false
-        val seen = entry.seenEditor == editor
-        entry.seenEditor = NOT_SEEN
-        return seen
+        return entry.seenGeneration == generation && entry.sentByIme
+    }
+
+    /**
+     * Whether a remapped repeat may be the first this connection sees of the key: yes for a key
+     * that went down before this connection (it starts repeating into the new field, as an
+     * unremapped key does), no when the DOWN was consumed or swallowed in this one.
+     */
+    fun mayStartWithRepeat(key: Long): Boolean {
+        val entry = entries.get(key) ?: return true
+        return entry.downGeneration != generation
+    }
+
+    /** Ends the press: nothing is owed for this key any more. */
+    fun onUp(key: Long) {
+        entries.get(key)?.forget()
     }
 
     fun clear() {
@@ -70,7 +121,11 @@ internal class KeyDeliveryLedger {
         }
     }
 
-    private companion object {
-        const val NOT_SEEN = -1
+    private fun entryFor(key: Long): Entry =
+        entries.get(key) ?: Entry(generation).also { entries.put(key, it) }
+
+    companion object {
+        /** No key: a raw key code can be 0 (an unknown key), so 0 is not free. */
+        const val NONE = -1
     }
 }
