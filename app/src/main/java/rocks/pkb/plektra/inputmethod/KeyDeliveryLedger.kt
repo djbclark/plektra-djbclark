@@ -60,7 +60,7 @@ internal class KeyDeliveryLedger<S : Any> {
      * as the connection it went through is the current one; a key the system delivered, until
      * its press ends.
      */
-    private fun appHolds(entry: Entry<S>): Boolean = entry.bySystem || entry.seenGeneration == generation
+    private fun appHolds(entry: Entry<S>): Boolean = entry.seenGeneration == generation
 
     /**
      * Another input connection may have taken over: what the IME sent through the previous one
