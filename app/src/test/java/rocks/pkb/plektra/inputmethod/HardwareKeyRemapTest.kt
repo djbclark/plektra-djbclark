@@ -389,6 +389,24 @@ class HardwareKeyRemapTest {
     }
 
     @Test
+    fun metaStateAfterRelease_dropsAModifierKeysOwnBits_andLeavesOtherKeysAlone() {
+        val rightShift = KeyEvent.META_SHIFT_RIGHT_ON or KeyEvent.META_SHIFT_ON
+        val leftShift = KeyEvent.META_SHIFT_LEFT_ON or KeyEvent.META_SHIFT_ON
+        val ctrl = KeyEvent.META_CTRL_LEFT_ON or KeyEvent.META_CTRL_ON
+
+        assertEquals(0, HardwareKeyRemapper.metaStateAfterRelease(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShift))
+        assertEquals(ctrl, HardwareKeyRemapper.metaStateAfterRelease(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShift or ctrl))
+        // The Shift of the other side is still down: the generic bit stays.
+        assertEquals(
+            leftShift,
+            HardwareKeyRemapper.metaStateAfterRelease(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShift or leftShift)
+        )
+        assertEquals(0, HardwareKeyRemapper.metaStateAfterRelease(KeyEvent.KEYCODE_SYM, KeyEvent.META_SYM_ON))
+        // Not a modifier key: the meta state it went down with is the one it goes up with.
+        assertEquals(rightShift, HardwareKeyRemapper.metaStateAfterRelease(KeyEvent.KEYCODE_ENTER, rightShift))
+    }
+
+    @Test
     fun heldTargets_areTheRemappedKeysThatAreDownAndStillAct() {
         fun heldTargets() = ArrayList<Int>().also { targets -> remapper.forEachHeldTarget { targets.add(it) } }
         val enter = down(KeyEvent.KEYCODE_ENTER)

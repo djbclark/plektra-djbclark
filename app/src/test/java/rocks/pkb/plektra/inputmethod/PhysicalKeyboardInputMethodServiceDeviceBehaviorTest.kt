@@ -1727,16 +1727,21 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
     private fun plainTextField() = focusNewField(RecordingInputConnection(), InputType.TYPE_CLASS_TEXT)
 
     /** A field without an editor (a terminal): the IME leaves Enter, Tab and Shift to the app. */
-    private fun keyEventField(): RecordingInputConnection {
+    private fun keyEventField(
+        connection: RecordingInputConnection = RecordingInputConnection()
+    ): RecordingInputConnection {
         SettingsManager.setPowerShortcutsEnabled(RuntimeEnvironment.getApplication(), false)
-        val connection = RecordingInputConnection()
         focusNewField(connection, EditorInfo.TYPE_NULL, "com.example.remote")
         return connection
     }
 
-    /** The framework starts input again in the same editor: the IME gets another connection. */
-    private fun restartInputWithNewConnection(): RecordingInputConnection {
-        val connection = RecordingInputConnection()
+    /**
+     * The framework starts input again without finishing it (the client already had an editor):
+     * the IME gets another connection, for the same view or for another one.
+     */
+    private fun restartInputWithNewConnection(
+        connection: RecordingInputConnection = RecordingInputConnection()
+    ): RecordingInputConnection {
         recorder = connection
         inputConnection = connection.asProxy()
         setField(service, "mInputConnection", inputConnection)
@@ -1794,8 +1799,10 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
             repeatCount = repeatCount
         )
 
-    private fun sentKeys(connection: RecordingInputConnection): List<String> =
-        connection.sentKeyEvents.map {
+    private fun sentKeys(connection: RecordingInputConnection): List<String> = keys(connection.sentKeyEvents)
+
+    private fun keys(events: List<KeyEvent>): List<String> =
+        events.map {
             val action = if (it.action == KeyEvent.ACTION_DOWN) "down" else "up"
             val key = when (it.keyCode) {
                 KeyEvent.KEYCODE_ENTER -> "ENTER"
@@ -2134,7 +2141,10 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
             listOf("ENTER down repeat=1 shift=false", "ENTER up repeat=0 shift=false"),
             sentKeys(second)
         )
-        assertEquals(3, first.sentKeyEvents.size)
+        // The field it left got its release, as a cancelled press, and nothing after it.
+        assertEquals(4, first.sentKeyEvents.size)
+        assertEquals("ENTER up repeat=0 shift=false", sentKeys(first)[3])
+        assertTrue(first.sentKeyEvents[3].isCanceled)
 
         // Released in a field that never saw it go down: the UP goes nowhere.
         val again = tick()
@@ -2143,40 +2153,138 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
         val third = keyEventField()
         assertTrue(service.onKeyUp(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_UP, again, tick())))
         assertTrue(sentKeys(third).toString(), third.sentKeyEvents.isEmpty())
-        assertEquals(3, second.sentKeyEvents.size)
+        assertEquals(4, second.sentKeyEvents.size)
+        assertTrue(second.sentKeyEvents[3].isCanceled)
     }
 
     @Test
-    fun swapOn_keyReleasedAfterARestartWithANewConnection_sendsNoUpIntoIt() {
+    fun swapOn_keyHeldOverARestartIntoAnotherView_endsWhereItWentDown_andSendsNoUpIntoTheNewOne() {
         enableShiftEnterSwap()
-        val first = keyEventField()
+        val firstView = mutableListOf<KeyEvent>()
+        val secondView = mutableListOf<KeyEvent>()
+        val thirdView = mutableListOf<KeyEvent>()
+        keyEventField(RecordingInputConnection(firstView))
 
-        // Right Shift as Enter.
+        // Right Shift as Enter. Focus moves inside the window: a restarting start, another view.
         val shift = tick()
         assertTrue(service.onKeyDown(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_DOWN, shift, shift)))
-        val second = restartInputWithNewConnection()
+        restartInputWithNewConnection(RecordingInputConnection(secondView))
+        assertEquals(
+            listOf("ENTER down repeat=0 shift=false", "ENTER up repeat=0 shift=false"),
+            keys(firstView)
+        )
+        assertFalse(firstView[0].isCanceled)
+        assertTrue(firstView[1].isCanceled)
         assertTrue(service.onKeyUp(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_UP, shift, tick())))
-        assertEquals(listOf("ENTER down repeat=0 shift=false"), sentKeys(first))
-        assertTrue(sentKeys(second).toString(), second.sentKeyEvents.isEmpty())
+        assertEquals(2, firstView.size)
+        assertTrue(keys(secondView).toString(), secondView.isEmpty())
 
         // Enter as Shift.
         val enter = tick()
         assertTrue(service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, enter, enter)))
-        assertEquals(listOf("SHIFT_RIGHT down repeat=0 shift=true"), sentKeys(second))
-        val third = restartInputWithNewConnection()
+        restartInputWithNewConnection(RecordingInputConnection(thirdView))
+        assertEquals(
+            listOf("SHIFT_RIGHT down repeat=0 shift=true", "SHIFT_RIGHT up repeat=0 shift=false"),
+            keys(secondView)
+        )
+        assertTrue(secondView[1].isCanceled)
         assertTrue(service.onKeyUp(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_UP, enter, tick())))
-        assertEquals(1, second.sentKeyEvents.size)
-        assertTrue(sentKeys(third).toString(), third.sentKeyEvents.isEmpty())
+        assertEquals(2, secondView.size)
+        assertTrue(keys(thirdView).toString(), thirdView.isEmpty())
     }
 
     @Test
-    fun swapOn_keyRepeatingAfterARestartWithANewConnection_isAPairedPressThere() {
+    fun swapOn_keyHeldOverARestartOfTheSameView_endsThereAsCancelled_once() {
         enableShiftEnterSwap()
-        val first = keyEventField()
+        // One view, a connection per start: each sends its key events to that view.
+        val view = mutableListOf<KeyEvent>()
+        keyEventField(RecordingInputConnection(view))
 
+        // Right Shift as Enter, released before it repeats.
         val shift = tick()
         assertTrue(service.onKeyDown(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_DOWN, shift, shift)))
-        val second = restartInputWithNewConnection()
+        tick()
+        val second = restartInputWithNewConnection(RecordingInputConnection(view))
+        assertEquals(listOf("ENTER down repeat=0 shift=false", "ENTER up repeat=0 shift=false"), keys(view))
+        // The release is the DOWN's own: its key, down time, device and scan code, cancelled.
+        val release = view[1]
+        assertTrue(release.isCanceled)
+        assertEquals(shift, release.downTime)
+        assertEquals(FakeKeyboards.BUILT_IN, release.deviceId)
+        assertEquals(54, release.scanCode)
+        assertEquals(InputDevice.SOURCE_KEYBOARD, release.source)
+        // It went through the connection that took the DOWN, not through the new one.
+        assertTrue(sentKeys(second).toString(), second.sentKeyEvents.isEmpty())
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_UP, shift, tick())))
+        assertEquals("the view sees one release", 2, view.size)
+
+        // Enter as Shift, held on: its repeat brings it back to the view, and its UP ends that.
+        view.clear()
+        val enter = tick()
+        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, enter, enter)))
+        restartInputWithNewConnection(RecordingInputConnection(view))
+        assertTrue(
+            service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, enter, tick(), repeatCount = 1))
+        )
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_UP, enter, tick())))
+        assertEquals(
+            listOf(
+                "SHIFT_RIGHT down repeat=0 shift=true",
+                "SHIFT_RIGHT up repeat=0 shift=false",
+                "SHIFT_RIGHT down repeat=1 shift=true",
+                "SHIFT_RIGHT up repeat=0 shift=false"
+            ),
+            keys(view)
+        )
+        assertEquals(listOf(false, true, false, false), view.map { it.isCanceled })
+        assertEquals(listOf(enter, enter, enter, enter), view.map { it.downTime })
+        assertEquals(listOf(28, 28, 28, 28), view.map { it.scanCode })
+    }
+
+    @Test
+    fun swapOn_releaseThePreviousConnectionDoesNotTake_isNotRetriedInTheNewOne_andTheKeyStaysHeld() {
+        enableShiftEnterSwap()
+        val view = mutableListOf<KeyEvent>()
+        val first = keyEventField(RecordingInputConnection(view))
+
+        // Enter as Shift goes down; the view starts input again and its old connection refuses.
+        val enter = tick()
+        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, enter, enter)))
+        first.sendKeyEventResult = false
+        val second = restartInputWithNewConnection(RecordingInputConnection(view))
+        // One attempt, through the connection that took the DOWN.
+        assertEquals(
+            listOf("SHIFT_RIGHT down repeat=0 shift=true", "SHIFT_RIGHT up repeat=0 shift=false"),
+            sentKeys(first)
+        )
+        assertEquals(listOf("SHIFT_RIGHT down repeat=0 shift=true"), keys(view))
+        assertTrue(sentKeys(second).toString(), second.sentKeyEvents.isEmpty())
+
+        // The key is still held and still a Shift: a Tab arrives shifted.
+        val tab = tick()
+        assertTrue(
+            service.onKeyDown(KeyEvent.KEYCODE_TAB, scanKey(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_TAB, 15, tab, tab))
+        )
+        assertTrue(
+            service.onKeyUp(KeyEvent.KEYCODE_TAB, scanKey(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_TAB, 15, tab, tab + 20L))
+        )
+        assertEquals(listOf("TAB down repeat=0 shift=true", "TAB up repeat=0 shift=true"), sentKeys(second))
+
+        // Its UP goes nowhere: the new connection saw no DOWN, the old one is not tried again.
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_UP, enter, tick())))
+        assertEquals(2, first.sentKeyEvents.size)
+        assertEquals(2, second.sentKeyEvents.size)
+
+        // The same when the old connection takes the release and the app drops it, as the
+        // framework does for a connection the app has replaced: the IME cannot tell, and the
+        // view keeps the press until the key comes back to it.
+        view.clear()
+        val shift = tick()
+        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_DOWN, shift, shift)))
+        second.replacedByTheApp = true
+        val third = restartInputWithNewConnection(RecordingInputConnection(view))
+        assertEquals(listOf("ENTER down repeat=0 shift=false"), keys(view))
+        assertTrue(sentKeys(third).toString(), third.sentKeyEvents.isEmpty())
         assertTrue(
             service.onKeyDown(
                 KeyEvent.KEYCODE_SHIFT_RIGHT,
@@ -2184,24 +2292,15 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
             )
         )
         assertTrue(service.onKeyUp(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_UP, shift, tick())))
-        assertEquals(listOf("ENTER down repeat=0 shift=false"), sentKeys(first))
         assertEquals(
-            listOf("ENTER down repeat=1 shift=false", "ENTER up repeat=0 shift=false"),
-            sentKeys(second)
+            listOf(
+                "ENTER down repeat=0 shift=false",
+                "ENTER down repeat=1 shift=false",
+                "ENTER up repeat=0 shift=false"
+            ),
+            keys(view)
         )
-
-        val enter = tick()
-        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, enter, enter)))
-        val third = restartInputWithNewConnection()
-        assertTrue(
-            service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, enter, tick(), repeatCount = 1))
-        )
-        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_UP, enter, tick())))
-        assertEquals(3, second.sentKeyEvents.size)
-        assertEquals(
-            listOf("SHIFT_RIGHT down repeat=1 shift=true", "SHIFT_RIGHT up repeat=0 shift=false"),
-            sentKeys(third)
-        )
+        assertFalse(view[2].isCanceled)
     }
 
     @Test
@@ -2361,6 +2460,57 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
     }
 
     @Test
+    fun swapOn_upTheImeConsumes_endsTheRawShiftTheSystemDeliveredInPlaceOfEnter() {
+        enableShiftEnterSwap()
+        val connection = keyEventField()
+
+        // Right Shift as Enter cannot be sent: the system delivers the raw Shift DOWN.
+        connection.sendKeyEventResult = false
+        val down = tick()
+        assertFalse(service.onKeyDown(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_DOWN, down, down)))
+        connection.sentKeyEvents.clear()
+
+        // The handler takes the UP for itself, as an Enter (the tail of an Alt+Enter): the app
+        // would be left holding the Shift. It gets that Shift's UP, cancelled.
+        connection.sendKeyEventResult = true
+        setField(service, "consumeAltEnterUntilKeyUp", true)
+        val up = tick()
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_UP, down, up)))
+        assertFalse(getField<Boolean>(service, "consumeAltEnterUntilKeyUp"))
+        assertEquals(listOf("SHIFT_RIGHT up repeat=0 shift=false"), sentKeys(connection))
+        val release = connection.sentKeyEvents.single()
+        assertTrue(release.isCanceled)
+        assertEquals(down, release.downTime)
+        assertEquals(up, release.eventTime)
+        assertEquals(FakeKeyboards.BUILT_IN, release.deviceId)
+        assertEquals(54, release.scanCode)
+
+        // The connection still takes no key events at the UP: the system delivers the raw UP,
+        // as it delivered the DOWN.
+        connection.sentKeyEvents.clear()
+        connection.sendKeyEventResult = false
+        val again = tick()
+        assertFalse(service.onKeyDown(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_DOWN, again, again)))
+        setField(service, "consumeAltEnterUntilKeyUp", true)
+        assertFalse(service.onKeyUp(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_UP, again, tick())))
+        assertFalse(getField<Boolean>(service, "consumeAltEnterUntilKeyUp"))
+    }
+
+    @Test
+    fun upTheImeConsumes_ofAKeyNoRemapTouched_staysConsumed() {
+        // The same keyboard and field without the swap: Enter is Enter, the system delivers it.
+        useTitan2EliteBuiltInKeyboard()
+        val connection = keyEventField()
+        val down = tick()
+        assertFalse(service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, down, down)))
+
+        setField(service, "consumeAltEnterUntilKeyUp", true)
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_UP, down, tick())))
+        assertFalse(getField<Boolean>(service, "consumeAltEnterUntilKeyUp"))
+        assertTrue(sentKeys(connection).toString(), connection.sentKeyEvents.isEmpty())
+    }
+
+    @Test
     fun swapOn_keyTheAppHolds_isReleasedAsCancelled_whenItsOwnUpIsLost() {
         enableShiftEnterSwap()
         val connection = keyEventField()
@@ -2383,6 +2533,7 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
         assertEquals(listOf(false, true, false, false), connection.sentKeyEvents.map { it.isCanceled })
         assertEquals(FakeKeyboards.BUILT_IN, connection.sentKeyEvents[1].deviceId)
         assertEquals(28, connection.sentKeyEvents[1].scanCode)
+        assertEquals("the lost press's own down time", first, connection.sentKeyEvents[1].downTime)
 
         // Physical right Shift went down as Enter; a later key no longer carries its Shift bit.
         connection.sentKeyEvents.clear()
@@ -2675,6 +2826,106 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
     private fun visibilityController(): KeyboardVisibilityController =
         getField(service, "keyboardVisibilityController")
 
+    /** The Enter key (scan 28) of the Titan 2 Elite acts as [target], in a plain text field. */
+    private fun remapEnterTo(target: Int) {
+        useTitan2EliteBuiltInKeyboard()
+        val context = RuntimeEnvironment.getApplication()
+        SettingsManager.setAutoCapitalizeFirstLetter(context, false)
+        SettingsManager.setAutoCapitalizeAfterPeriod(context, false)
+        assertTrue(
+            SettingsManager.setHardwareKeyRemapRules(
+                context,
+                "titan2elite_qwerty",
+                listOf(KeyRemapRule(KeySource.key(KeyEvent.KEYCODE_ENTER), target))
+            )
+        )
+        useLayout("qwerty")
+        plainTextField()
+    }
+
+    /** Pressed and physically pressed, as the IME keeps it for Ctrl or Alt. */
+    private fun heldAs(target: Int): Pair<Boolean, Boolean> = modifierController().let {
+        if (target == KeyEvent.KEYCODE_CTRL_LEFT) {
+            it.ctrlPressed to it.ctrlPhysicallyPressed
+        } else {
+            it.altPressed to it.altPhysicallyPressed
+        }
+    }
+
+    /** One-shot or latch, as a tap or a double tap of Ctrl or Alt leaves it. */
+    private fun armed(target: Int): Boolean = modifierController().let {
+        if (target == KeyEvent.KEYCODE_CTRL_LEFT) {
+            it.ctrlOneShot || it.ctrlLatchActive
+        } else {
+            it.altOneShot || it.altLatchActive
+        }
+    }
+
+    private fun heldRemappedModifierStaysPressedThroughEditorChanges(target: Int) {
+        remapEnterTo(target)
+        assertEquals("a", typeA())
+        val down = tick()
+        service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, down, down))
+        assertEquals(true to true, heldAs(target))
+
+        service.onStartInput(editorInfo, true)
+        assertEquals("after a restarting start", true to true, heldAs(target))
+
+        // A new editor resets the modifiers; the key is still down as this one, and no tap.
+        service.onFinishInput()
+        plainTextField()
+        assertEquals("in the next field", true to true, heldAs(target))
+        assertFalse("in the next field", armed(target))
+
+        service.onFinishInputView(false)
+        service.onWindowHidden()
+        assertEquals("with the keyboard hidden", true to true, heldAs(target))
+        assertFalse("with the keyboard hidden", armed(target))
+
+        // Its repeat is no new press and its release no tap: nothing is left pressed or armed.
+        service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, down, tick(), repeatCount = 1))
+        assertFalse("after a repeat", armed(target))
+        service.onKeyUp(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_UP, down, tick()))
+        assertEquals(false to false, heldAs(target))
+        assertFalse("after the release", armed(target))
+        assertEquals("a", typeA())
+        assertTrue(recorder.editorActions.isEmpty())
+    }
+
+    private fun heldRemappedModifierIsNotLeftPressedWithoutAnEditor(target: Int) {
+        remapEnterTo(target)
+        val down = tick()
+        service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, down, down))
+
+        // Focus moves to a view that reads keys itself, where the IME releases no modifiers.
+        service.onFinishInput()
+        keyEventField()
+        assertEquals(true to true, heldAs(target))
+        service.onKeyUp(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_UP, down, tick()))
+        assertEquals(false to false, heldAs(target))
+
+        service.onFinishInput()
+        plainTextField()
+        assertFalse(armed(target))
+        assertEquals("a", typeA())
+    }
+
+    @Test
+    fun keyRemappedToCtrl_heldAcrossEditorChanges_staysPressed_andItsReleaseIsNoTap() =
+        heldRemappedModifierStaysPressedThroughEditorChanges(KeyEvent.KEYCODE_CTRL_LEFT)
+
+    @Test
+    fun keyRemappedToAlt_heldAcrossEditorChanges_staysPressed_andItsReleaseIsNoTap() =
+        heldRemappedModifierStaysPressedThroughEditorChanges(KeyEvent.KEYCODE_ALT_LEFT)
+
+    @Test
+    fun keyRemappedToCtrl_heldIntoAFieldWithoutAnEditor_isNotLeftPressedThere() =
+        heldRemappedModifierIsNotLeftPressedWithoutAnEditor(KeyEvent.KEYCODE_CTRL_LEFT)
+
+    @Test
+    fun keyRemappedToAlt_heldIntoAFieldWithoutAnEditor_isNotLeftPressedThere() =
+        heldRemappedModifierIsNotLeftPressedWithoutAnEditor(KeyEvent.KEYCODE_ALT_LEFT)
+
     private fun symLayout(): rocks.pkb.plektra.core.SymLayoutController =
         getField(service, "symLayoutController")
 
@@ -2771,7 +3022,16 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
         assertEquals(listOf("£"), recorder.committedTexts)
     }
 
-    private class RecordingInputConnection {
+    /**
+     * [view] stands for the view this connection's key events reach, when a test needs two
+     * connections that lead to one view: it gets the events the connection passed on.
+     */
+    private class RecordingInputConnection(val view: MutableList<KeyEvent>? = null) {
+        /**
+         * The app has replaced this connection: the IME can still send into it, the framework
+         * on the app's side drops what arrives (and the IME is told nothing).
+         */
+        var replacedByTheApp = false
         var commitAttempts = 0
         var commitResult = true
         var textBeforeCursor: String = ""
@@ -2810,7 +3070,10 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
                     }
                     "sendKeyEvent" -> {
                         val event = args?.getOrNull(0) as? KeyEvent
-                        if (event != null) sentKeyEvents += event
+                        if (event != null) {
+                            sentKeyEvents += event
+                            if (sendKeyEventResult && !replacedByTheApp) view?.add(event)
+                        }
                         sendKeyEventResult
                     }
                     "performEditorAction" -> {
