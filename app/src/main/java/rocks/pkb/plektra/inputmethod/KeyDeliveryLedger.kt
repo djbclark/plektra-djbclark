@@ -190,10 +190,7 @@ internal class KeyDeliveryLedger<S : Any> {
      * whatever connection comes next ([isDeliveredBeforeThisConnection]).
      */
     fun onClientGone() {
-        for (i in entries.size() - 1 downTo 0) {
-            if (!entries.valueAt(i).bySystem) entries.removeAt(i)
-        }
-        generation++
+        entries.clear()
     }
 
     fun clearDevice(deviceId: Int) {
