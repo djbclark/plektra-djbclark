@@ -103,6 +103,21 @@ class HardwareKeyRemapTest {
     }
 
     @Test
+    fun scanCodeRule_matchesTheRawKey_whenDeviceNormalizationRewroteTheEvent() {
+        val ctrlAsTab = rules(KeyRemapRule(KeySource.scan(SCAN_SHIFT_RIGHT), KeyEvent.KEYCODE_TAB))
+        // A Q25's Ctrl key: right Shift with scan code 54 as it arrives, Ctrl with 251 after
+        // device normalization.
+        val raw = down(KeyEvent.KEYCODE_SHIFT_RIGHT, shiftRightMeta, SCAN_SHIFT_RIGHT)
+        val normalized = down(KeyEvent.KEYCODE_CTRL_LEFT, ctrlLeftMeta, scanCode = 251)
+        val key = HardwareKeyRemapper.physicalKeyId(raw.keyCode, raw)
+
+        assertEquals(KeyEvent.KEYCODE_TAB, remapper.peekKeyCode(normalized.keyCode, normalized, ctrlAsTab, key))
+        val pressed = remapper.remap(normalized.keyCode, normalized, ctrlAsTab, key)
+        assertEquals(KeyEvent.KEYCODE_TAB, pressed.keyCode)
+        assertEquals(0, pressed.event.metaState)
+    }
+
+    @Test
     fun twoKeysThatSendOneKeyCode_areTwoKeys() {
         val scanOnly = rules(KeyRemapRule(KeySource.scan(SCAN_SHIFT_RIGHT), KeyEvent.KEYCODE_ENTER))
         val other = down(KeyEvent.KEYCODE_SHIFT_RIGHT, shiftRightMeta, scanCode = 100)

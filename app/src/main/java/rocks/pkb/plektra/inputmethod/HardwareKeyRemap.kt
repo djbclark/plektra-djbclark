@@ -74,9 +74,10 @@ import android.view.KeyEvent
 enum class KeyMatch { KEY, SCAN }
 
 /**
- * The physical key a rule remaps. [KeyMatch.SCAN] matches [scanCode]; [KeyMatch.KEY] matches
- * [keyCode], the key code after device normalization. Both codes are stored where known, so a
- * rule captured from a key press can be shown by name and switched between the two.
+ * The physical key a rule remaps. [KeyMatch.SCAN] matches [scanCode], the scan code of the raw
+ * event (device normalization may rewrite the event's own); [KeyMatch.KEY] matches [keyCode], the
+ * key code after device normalization. Both codes are stored where known, so a rule captured
+ * from a key press can be shown by name and switched between the two.
  */
 data class KeySource(val match: KeyMatch, val keyCode: Int, val scanCode: Int = 0) {
     companion object {
@@ -271,7 +272,7 @@ class HardwareKeyRemapper(private val onHoldCancelled: ((targetKeyCode: Int) -> 
         if (initialDown) {
             // A hold still there lost its UP: this press starts over with today's rules.
             if (heldIndex >= 0) cancelled(held.removeAt(heldIndex))
-            targetKeyCode = rules.targetFor(keyCode, event.scanCode)
+            targetKeyCode = rules.targetFor(keyCode, scanCodeOf(key))
             val sourceBits = modifierBits(keyCode)
             if (targetKeyCode != keyCode || sourceBits != null) {
                 val ownMeta = (sourceBits?.sideMeta ?: 0) and event.metaState
@@ -315,7 +316,7 @@ class HardwareKeyRemapper(private val onHoldCancelled: ((targetKeyCode: Int) -> 
         key: Long = physicalKeyId(keyCode, event)
     ): Int {
         if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-            return rules.targetFor(keyCode, event.scanCode)
+            return rules.targetFor(keyCode, scanCodeOf(key))
         }
         val heldIndex = indexOf(held, key)
         if (heldIndex >= 0) return held[heldIndex].targetKeyCode
@@ -472,6 +473,10 @@ class HardwareKeyRemapper(private val onHoldCancelled: ((targetKeyCode: Int) -> 
 
         /** The device id inside a [physicalKeyId]. */
         fun deviceIdOf(physicalKeyId: Long): Int = (physicalKeyId shr 32).toInt()
+
+        /** The scan code inside a [physicalKeyId]: the raw event's, 0 when it had none. */
+        private fun scanCodeOf(physicalKeyId: Long): Int =
+            if ((physicalKeyId and SCAN_CODE_FLAG) != 0L) (physicalKeyId and 0x7FFFFFFFL).toInt() else 0
 
         private val MODIFIERS = arrayOf(
             ModifierBits(KeyEvent.META_SHIFT_LEFT_ON, KeyEvent.META_SHIFT_ON, KeyEvent.META_SHIFT_RIGHT_ON),
