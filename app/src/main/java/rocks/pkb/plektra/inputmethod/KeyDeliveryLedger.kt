@@ -114,7 +114,7 @@ internal class KeyDeliveryLedger<S : Any> {
         }
         val unfinished = if (entry.seenGeneration == generation) entry.sent else null
         entry.downGeneration = generation
-        entry.forget()
+        if (!entry.bySystem) entry.forget()
         return unfinished
     }
 
