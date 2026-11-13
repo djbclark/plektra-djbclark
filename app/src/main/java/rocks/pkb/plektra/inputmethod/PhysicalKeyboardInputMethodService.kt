@@ -4966,7 +4966,8 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
     ) {
         keyDeliveries.onConnectionChanged { sent ->
             val intoThisStart = restarting && sent.mayEndInARestartFor(info)
-            sendCancelledUpToApp(sent, if (intoThisStart) connection ?: sent.via else sent.via)
+            sendCancelledUpToApp(sent)
+            if (intoThisStart && connection != null) sendCancelledUpToApp(sent, connection)
         }
     }
 
