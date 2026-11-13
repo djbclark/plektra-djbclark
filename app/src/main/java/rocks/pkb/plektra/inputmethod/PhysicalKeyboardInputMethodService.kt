@@ -3344,6 +3344,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             preserveNavMode = preserveNavMode,
             onNavModeCancelled = { navModeController.cancelNotification() }
         )
+        restoreHeldRemappedModifiers()
         
         symLayoutController.reset()
         alternateCharacterManager.resetTransientState()
@@ -4917,6 +4918,59 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             sendCancelledUpToApp(physicalKey, keyDeliveries.deliveredKeyCode(physicalKey))
             keyDeliveries.onUp(physicalKey)
         }
+        clearPressedStateOfRemappedModifier(targetKeyCode)
+    }
+
+    private fun isPressedStateOfModifierSet(keyCode: Int): Boolean = when (keyCode) {
+        KEYCODE_SYM -> symPhysicallyPressed || symTogglePendingOnKeyUp
+        KeyEvent.KEYCODE_SHIFT_LEFT, KeyEvent.KEYCODE_SHIFT_RIGHT -> shiftPressed || shiftPhysicallyPressed
+        KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.KEYCODE_CTRL_RIGHT -> ctrlPressed || ctrlPhysicallyPressed
+        KeyEvent.KEYCODE_ALT_LEFT, KeyEvent.KEYCODE_ALT_RIGHT -> altPressed || altPhysicallyPressed
+        else -> false
+    }
+
+    /**
+     * [resetModifierStates] has just cleared the pressed state of every modifier, with the tap,
+     * one-shot and latch state: right for a new editor, wrong for a remapped key that is still
+     * held and still acts as its modifier there (the meta state the remapper rebuilds says so,
+     * and for Sym nothing else does). The held part is set again from the remapper's holds, as a
+     * key that is down and has already been used, so its release is no tap: it toggles no Sym
+     * page, arms no one-shot and counts for no double tap.
+     */
+    private fun restoreHeldRemappedModifiers() {
+        hardwareKeyRemapper.forEachHeldTarget { targetKeyCode ->
+            when (targetKeyCode) {
+                KEYCODE_SYM -> {
+                    symPhysicallyPressed = true
+                    symTogglePendingOnKeyUp = true
+                    symChordUsedSinceKeyDown = true
+                }
+                KeyEvent.KEYCODE_SHIFT_LEFT, KeyEvent.KEYCODE_SHIFT_RIGHT -> {
+                    shiftPressed = true
+                    shiftPhysicallyPressed = true
+                    otherKeyInteractedDuringHold = true
+                }
+                KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.KEYCODE_CTRL_RIGHT -> {
+                    ctrlPressed = true
+                    ctrlPhysicallyPressed = true
+                    otherKeyInteractedDuringHold = true
+                }
+                KeyEvent.KEYCODE_ALT_LEFT, KeyEvent.KEYCODE_ALT_RIGHT -> {
+                    altPressed = true
+                    altPhysicallyPressed = true
+                    otherKeyInteractedDuringHold = true
+                }
+            }
+        }
+    }
+
+    /**
+     * Ends the IME's pressed state of the modifier a remapped key acted as. For a hold that ended
+     * without an UP, and after an UP on a path that does not release modifiers (a field without
+     * an editor), where a key that went down, or was restored, in a text field would stay
+     * pressed.
+     */
+    private fun clearPressedStateOfRemappedModifier(targetKeyCode: Int) {
         when (targetKeyCode) {
             KEYCODE_SYM -> {
                 symTogglePendingOnKeyUp = false
@@ -6055,8 +6109,17 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
 
     override fun onKeyUp(keyCode_: Int, event_: KeyEvent?): Boolean {
         val physicalKey = HardwareKeyRemapper.physicalKeyId(keyCode_, event_)
+        // What the key is held as, before the handler releases it.
+        val heldAs = hardwareKeyRemapper.heldTargetOf(physicalKey)
         val dispatch = KeyRemapDispatch()
         val handled = onKeyUpImpl(keyCode_, event_, dispatch)
+        // The key is up, whichever path its UP took: the modifier it acted as is not pressed any
+        // more. The text-field path has seen to that already; a field without an editor, or an
+        // UP consumed before the modifier handling, has not.
+        if (isPressedStateOfModifierSet(heldAs)) {
+            clearPressedStateOfRemappedModifier(heldAs)
+            updateStatusBarText()
+        }
         // What this connection's app saw go down for the key, and by which route.
         val delivered = keyDeliveries.deliveredKeyCode(physicalKey)
         val sentByIme = keyDeliveries.isSentByIme(physicalKey)

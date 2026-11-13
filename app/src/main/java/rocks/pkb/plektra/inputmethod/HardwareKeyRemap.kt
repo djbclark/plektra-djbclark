@@ -69,6 +69,13 @@ import android.view.KeyEvent
  * released and its UP never arrived. A source that is not a modifier (Enter as Shift) has no such
  * signal; its lost UP is repaired by pressing the key again.
  *
+ * An owner with pressed state of its own (the IME service: Shift, Ctrl, Alt and Sym pressed
+ * flags, with tap, one-shot and latch state beside them) resets that state on an editor change,
+ * where a hold goes on. The two are kept apart: what is held is read from the holds
+ * ([HardwareKeyRemapper.forEachHeldTarget]) and set again after such a reset, as a key that is
+ * down and has been used, so that its release is a plain release (no tap, no one-shot, no
+ * latch); the tap and latch state stays reset.
+ *
  * What the app sees
  * -----------------
  * The remapper only transforms events. An owner that passes remapped keys on (the IME service,
@@ -358,6 +365,24 @@ class HardwareKeyRemapper(
             i--
         }
         return cutOff
+    }
+
+    /**
+     * Calls [action] with the target key code of each remapped key that is held and still acts
+     * (no tombstone). The holds are the one record of held remapped keys that outlives an editor
+     * change, so an owner whose own pressed state is reset there takes it from here again.
+     */
+    fun forEachHeldTarget(action: (targetKeyCode: Int) -> Unit) {
+        for (i in held.indices) if (held[i].remapped) action(held[i].targetKeyCode)
+    }
+
+    /**
+     * The key code [key] is held as, [KeyEvent.KEYCODE_UNKNOWN] when it is not a held remapped
+     * key that still acts.
+     */
+    fun heldTargetOf(key: Long): Int {
+        val index = indexOf(held, key)
+        return if (index >= 0 && held[index].remapped) held[index].targetKeyCode else KeyEvent.KEYCODE_UNKNOWN
     }
 
     /** Forgets the keys of one keyboard (disconnected or reconfigured). True when one was held. */

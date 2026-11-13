@@ -1989,6 +1989,50 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
     }
 
     @Test
+    fun swapOn_heldEnterRepeatingInTheNextEditor_armsNoOneShotShift() {
+        enableSwapInPlainTextField()
+        val down = tick()
+        service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, down, down))
+        assertEquals("A", typeA())
+
+        // The new editor resets the modifiers; the key is still down as Shift.
+        service.onFinishInput()
+        plainTextField()
+        assertTrue(modifierController().shiftPressed)
+        assertTrue(modifierController().shiftPhysicallyPressed)
+
+        // Its repeat is no new press and its release no tap: nothing is left armed.
+        service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, down, tick(), repeatCount = 1))
+        assertFalse(modifierController().shiftOneShot)
+        service.onKeyUp(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_UP, down, tick()))
+        assertFalse(modifierController().shiftOneShot)
+        assertFalse(modifierController().shiftPressed)
+        assertFalse(modifierController().shiftPhysicallyPressed)
+        assertEquals("a", typeA())
+    }
+
+    @Test
+    fun swapOn_heldEnterReleasedInAFieldWithoutAnEditor_leavesNoShiftPressed() {
+        enableSwapInPlainTextField()
+        val down = tick()
+        service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, down, down))
+        assertEquals("A", typeA())
+
+        // Focus moves to a view that reads keys itself, where the IME releases no modifiers.
+        service.onFinishInput()
+        keyEventField()
+        assertTrue(modifierController().shiftPressed)
+        service.onKeyUp(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_UP, down, tick()))
+        assertFalse(modifierController().shiftPressed)
+        assertFalse(modifierController().shiftPhysicallyPressed)
+
+        service.onFinishInput()
+        plainTextField()
+        assertFalse(modifierController().shiftOneShot)
+        assertEquals("a", typeA())
+    }
+
+    @Test
     fun swapOn_heldEnterEndsWhereTheClientUnbinds_andTheRestOfThePressIsSwallowed() {
         enableSwapInPlainTextField()
         val down = tick()
@@ -2471,6 +2515,97 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
         assertEquals(symActive, symLayout().isSymActive())
         assertFalse(getField<Boolean>(service, "symPhysicallyPressed"))
         assertFalse(modifierController().altPressed)
+    }
+
+    /** The right Alt key (scan 100) of the Titan 2 Elite acts as Sym, in a plain text field. */
+    private fun remapRightAltToSym() {
+        useTitan2EliteBuiltInKeyboard()
+        val context = RuntimeEnvironment.getApplication()
+        SettingsManager.setAutoCapitalizeFirstLetter(context, false)
+        SettingsManager.setAutoCapitalizeAfterPeriod(context, false)
+        assertTrue(
+            SettingsManager.setHardwareKeyRemapRules(
+                context,
+                "titan2elite_qwerty",
+                listOf(KeyRemapRule(KeySource.key(KeyEvent.KEYCODE_ALT_RIGHT), KeyEvent.KEYCODE_SYM))
+            )
+        )
+        useLayout("qwerty")
+        plainTextField()
+    }
+
+    private val rightAltMeta = KeyEvent.META_ALT_RIGHT_ON or KeyEvent.META_ALT_ON
+
+    private fun rightAltKey(action: Int, downTime: Long, eventTime: Long) = scanKey(
+        action, KeyEvent.KEYCODE_ALT_RIGHT, 100, downTime, eventTime,
+        metaState = if (action == KeyEvent.ACTION_UP) 0 else rightAltMeta
+    )
+
+    @Test
+    fun keyRemappedToSym_heldAcrossEditorChanges_keepsTypingSymbols_andItsReleaseIsNoTap() {
+        remapRightAltToSym()
+        assertEquals("a", typeA())
+
+        val down = tick()
+        service.onKeyDown(KeyEvent.KEYCODE_ALT_RIGHT, rightAltKey(KeyEvent.ACTION_DOWN, down, down))
+        val symbol = typeA(rightAltMeta)
+        assertTrue("held Sym types a symbol, got '$symbol'", symbol.isNotEmpty() && !symbol.equals("a", ignoreCase = true))
+
+        service.onStartInput(editorInfo, true)
+        assertEquals("after a restarting start", symbol, typeA(rightAltMeta))
+
+        service.onFinishInput()
+        plainTextField()
+        assertTrue(getField<Boolean>(service, "symPhysicallyPressed"))
+        assertEquals("in the next field", symbol, typeA(rightAltMeta))
+
+        service.onFinishInputView(false)
+        service.onWindowHidden()
+        assertTrue(getField<Boolean>(service, "symPhysicallyPressed"))
+        assertEquals("with the keyboard hidden", symbol, typeA(rightAltMeta))
+
+        assertFalse(symLayout().isSymActive())
+        service.onKeyUp(KeyEvent.KEYCODE_ALT_RIGHT, rightAltKey(KeyEvent.ACTION_UP, down, tick()))
+        assertFalse(symLayout().isSymActive())
+        assertFalse(getField<Boolean>(service, "symPhysicallyPressed"))
+        assertFalse(getField<Boolean>(service, "symTogglePendingOnKeyUp"))
+        assertFalse(modifierController().altPressed)
+        assertEquals("a", typeA())
+    }
+
+    @Test
+    fun keyRemappedToSym_heldIntoANewEditorAndReleasedUnused_opensNoSymPage() {
+        remapRightAltToSym()
+
+        // Without the editor change this press would be a Sym tap.
+        val down = tick()
+        service.onKeyDown(KeyEvent.KEYCODE_ALT_RIGHT, rightAltKey(KeyEvent.ACTION_DOWN, down, down))
+        service.onFinishInput()
+        plainTextField()
+        assertTrue(getField<Boolean>(service, "symPhysicallyPressed"))
+        service.onKeyUp(KeyEvent.KEYCODE_ALT_RIGHT, rightAltKey(KeyEvent.ACTION_UP, down, tick()))
+        assertFalse(symLayout().isSymActive())
+        assertFalse(getField<Boolean>(service, "symPhysicallyPressed"))
+
+        // A tap in the new editor is one.
+        val tap = tick()
+        service.onKeyDown(KeyEvent.KEYCODE_ALT_RIGHT, rightAltKey(KeyEvent.ACTION_DOWN, tap, tap))
+        service.onKeyUp(KeyEvent.KEYCODE_ALT_RIGHT, rightAltKey(KeyEvent.ACTION_UP, tap, tap + 40L))
+        assertTrue(symLayout().isSymActive())
+    }
+
+    @Test
+    fun keyRemappedToSym_heldIntoAFieldWithoutAnEditor_isNotLeftPressedThere() {
+        remapRightAltToSym()
+        val down = tick()
+        service.onKeyDown(KeyEvent.KEYCODE_ALT_RIGHT, rightAltKey(KeyEvent.ACTION_DOWN, down, down))
+        service.onFinishInput()
+        keyEventField()
+        assertTrue(getField<Boolean>(service, "symPhysicallyPressed"))
+
+        service.onKeyUp(KeyEvent.KEYCODE_ALT_RIGHT, rightAltKey(KeyEvent.ACTION_UP, down, tick()))
+        assertFalse(getField<Boolean>(service, "symPhysicallyPressed"))
+        assertFalse(getField<Boolean>(service, "symTogglePendingOnKeyUp"))
     }
 
     @Test

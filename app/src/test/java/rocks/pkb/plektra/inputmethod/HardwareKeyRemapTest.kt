@@ -389,6 +389,36 @@ class HardwareKeyRemapTest {
     }
 
     @Test
+    fun heldTargets_areTheRemappedKeysThatAreDownAndStillAct() {
+        fun heldTargets() = ArrayList<Int>().also { targets -> remapper.forEachHeldTarget { targets.add(it) } }
+        val enter = down(KeyEvent.KEYCODE_ENTER)
+        val enterKey = HardwareKeyRemapper.physicalKeyId(enter.keyCode, enter)
+        assertTrue(heldTargets().isEmpty())
+        assertEquals(KeyEvent.KEYCODE_UNKNOWN, remapper.heldTargetOf(enterKey))
+
+        remap(enter, swap)
+        // An unremapped modifier is tracked too, but it is not a remapped key.
+        val leftShift = down(KeyEvent.KEYCODE_SHIFT_LEFT, KeyEvent.META_SHIFT_LEFT_ON or KeyEvent.META_SHIFT_ON)
+        remap(leftShift, swap)
+        assertEquals(listOf(KeyEvent.KEYCODE_SHIFT_RIGHT), heldTargets())
+        assertEquals(KeyEvent.KEYCODE_SHIFT_RIGHT, remapper.heldTargetOf(enterKey))
+        assertEquals(
+            KeyEvent.KEYCODE_UNKNOWN,
+            remapper.heldTargetOf(HardwareKeyRemapper.physicalKeyId(leftShift.keyCode, leftShift))
+        )
+
+        // A tombstone is still down but no longer acts.
+        remapper.reset()
+        assertTrue(heldTargets().isEmpty())
+        assertEquals(KeyEvent.KEYCODE_UNKNOWN, remapper.heldTargetOf(enterKey))
+
+        remap(down(KeyEvent.KEYCODE_ENTER), swap)
+        assertEquals(listOf(KeyEvent.KEYCODE_SHIFT_RIGHT), heldTargets())
+        remap(up(KeyEvent.KEYCODE_ENTER, KeyEvent.META_SHIFT_LEFT_ON or KeyEvent.META_SHIFT_ON), swap)
+        assertTrue(heldTargets().isEmpty())
+    }
+
+    @Test
     fun physicalKeyId_isDeviceAndScanCode_orKeyCodeWithoutOne() {
         val key = HardwareKeyRemapper.physicalKeyId(KeyEvent.KEYCODE_SHIFT_RIGHT, down(KeyEvent.KEYCODE_SHIFT_RIGHT, 0, SCAN_SHIFT_RIGHT, deviceId = 4))
 
