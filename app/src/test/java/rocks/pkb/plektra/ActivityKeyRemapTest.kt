@@ -145,6 +145,43 @@ class ActivityKeyRemapTest {
     }
 
     @Test
+    fun keyTheImeAlreadyRemappedAndSent_isNotNamedByItsScanCodeAgain() {
+        // A Q25 names its letter keys by position (scan code). The IME made the A key (scan
+        // code 30) a B and sent it on: normalizing that event again would turn it back into A.
+        DeviceSpecific.setBuildFingerprintForTests(
+            brand = "zinwa",
+            manufacturer = "zinwa",
+            model = "Q25",
+            device = "Q25",
+            product = "q25"
+        )
+        assertTrue(
+            SettingsManager.setHardwareKeyRemapRules(
+                context,
+                "q25",
+                listOf(KeyRemapRule(KeySource.key(KeyEvent.KEYCODE_A), KeyEvent.KEYCODE_B))
+            )
+        )
+
+        val sent = key(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_B, 30, flags = 0)
+        val down = shown(sent)
+        assertEquals(KeyEvent.KEYCODE_B, down.keyCode)
+        assertSame(sent, down.event)
+        assertFalse(down.stale)
+        val sentUp = key(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_B, 30, flags = 0)
+        assertSame(sentUp, shown(sentUp).event)
+
+        // The same key from the system is normalized and remapped here: a B as well.
+        val raw = shown(key(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, 30))
+        assertEquals(KeyEvent.KEYCODE_B, raw.keyCode)
+        assertEquals(KeyEvent.KEYCODE_B, raw.event?.keyCode)
+        // And the position still names a system key that arrives with another key code.
+        shown(key(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_A, 30))
+        val byPosition = shown(key(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_Q, 48))
+        assertEquals(KeyEvent.KEYCODE_B, byPosition.keyCode)
+    }
+
+    @Test
     fun eventWithoutADevice_onScreenKey_andAnotherKeyboard_areNotRemapped() {
         val events = listOf(
             KeyEvent(clock, clock, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0, 0),
