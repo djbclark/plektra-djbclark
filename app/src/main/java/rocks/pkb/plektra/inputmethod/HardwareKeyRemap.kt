@@ -88,9 +88,23 @@ import android.view.KeyEvent
  * the IME a new connection object on each start and no way to tell whether it reaches the view
  * the previous one did ("restarting" means the client already had an editor, which need not be
  * the same view). The choice is between an UP that may land in a view that never saw the DOWN
- * and an UP that is withheld from one that did. The second is taken: a key held across a start
- * gets its UP only after a repeat has brought it to the new connection, so a key released
- * between a restart and its next repeat leaves the view with a press it saw begin and not end.
+ * and an UP that is withheld from one that did. The second is taken, and softened as far as the
+ * framework allows: where a connection ends (a start, or a finish), each key the IME sent down
+ * through it is first released through it as a cancelled press (FLAG_CANCELED, with the DOWN's
+ * own down time, device and scan code), and then forgotten. The key itself stays held and
+ * reaches the next connection with its next repeat; its UP goes there only after that.
+ *
+ * The limit of that release: it is an attempt, and the IME is not told whether it arrived. On
+ * the app's side the framework stops a connection the moment the app makes another one, before
+ * the IME hears of the start, and drops what is sent through it afterwards. So the release
+ * arrives where the connection outlived the start (one the IME or the system made over the
+ * connection the app already had), and not where the app replaced it, whether for another view
+ * or for the same one (InputMethodManager.restartInput, which a TextView calls after setText).
+ * There the view keeps a press it saw begin and not end, until the key's next repeat brings it
+ * back or it is pressed again. The release is not retried through the new connection: a key event goes to whatever
+ * view has focus in the connection's window, not to the view the connection was made for, and
+ * nothing the IME can observe (package, field id) proves that two connections lead to one view;
+ * a retry would be the UP without a DOWN this rule exists to prevent.
  */
 
 /** How a [KeySource] names its physical key. */
@@ -554,5 +568,17 @@ class HardwareKeyRemapper(
          * remap's output as a modifier.
          */
         fun isModifierKeyCode(keyCode: Int): Boolean = modifierBits(keyCode) != null
+
+        /**
+         * [metaState] as it reads once the key [keyCode] is up: for a modifier key without its
+         * own bit, and without the generic bit unless the key of the other side still holds it;
+         * unchanged for any other key. For an UP built from a key's DOWN.
+         */
+        fun metaStateAfterRelease(keyCode: Int, metaState: Int): Int {
+            val bits = modifierBits(keyCode) ?: return metaState
+            val withoutSide = metaState and bits.sideMeta.inv()
+            if ((withoutSide and bits.oppositeSideMeta) != 0) return withoutSide
+            return withoutSide and bits.genericMeta.inv()
+        }
     }
 }

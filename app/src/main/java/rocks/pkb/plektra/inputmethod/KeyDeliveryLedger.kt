@@ -19,57 +19,75 @@ import android.util.LongSparseArray
  *
  * What was delivered counts for one input connection only ([onConnectionChanged]): a key held
  * into the next connection starts there with a repeat, and its UP goes nowhere unless that
- * connection saw it go down. The entries themselves live as long as the held keys of
- * [HardwareKeyRemapper]: until [clear] where the client unbinds, or [clearDevice].
+ * connection saw it go down. Where a connection ends, the keys the IME sent down through it are
+ * handed back to the caller to be released through it, as far as it still takes them. The
+ * entries themselves live as long as the held keys of [HardwareKeyRemapper]: until [clear]
+ * where the client unbinds, or [clearDevice].
+ *
+ * [S] is the caller's record of a DOWN it sent: what it needs to send that key's UP later (the
+ * event, and the connection that took it).
  */
-internal class KeyDeliveryLedger {
-    private class Entry(var downGeneration: Int) {
+internal class KeyDeliveryLedger<S : Any> {
+    private class Entry<S>(var downGeneration: Int) {
         var seenGeneration = NONE
         var seenKeyCode = NONE
-        var sentByIme = false
+        var sent: S? = null
 
         fun forget() {
             seenGeneration = NONE
             seenKeyCode = NONE
-            sentByIme = false
+            sent = null
         }
     }
 
     // One entry per key ever pressed, reused: bounded by the keys of the connected keyboards.
-    private val entries = LongSparseArray<Entry>()
+    private val entries = LongSparseArray<Entry<S>>()
     private var generation = 0
 
     /**
      * Another input connection may have taken over: what the previous one saw no longer counts.
-     * Called where the connection can change, whether or not it did (its identity is not
-     * observable from the IME).
+     * Called where the connection can change, whether or not it did (the IME gets a new
+     * connection object on every start and cannot tell where it leads). Each key the IME sent
+     * down through the previous connection and has not released goes to [release] first, once:
+     * afterwards nothing is owed for it, whether or not the release arrived.
      */
-    fun onConnectionChanged() {
+    fun onConnectionChanged(release: (sent: S) -> Unit) {
+        for (i in 0 until entries.size()) {
+            val entry = entries.valueAt(i)
+            val sent = entry.sent
+            // The record goes either way: one of an older connection must not keep it alive.
+            entry.sent = null
+            if (sent != null && entry.seenGeneration == generation) release(sent)
+        }
         generation++
     }
 
     /**
-     * A new press. Returns the key code the IME sent down for an earlier press of this key and
-     * never released (that press lost its UP), [NONE] otherwise: the caller owes the app its UP.
+     * A new press. Returns the record of the DOWN the IME sent for an earlier press of this key
+     * and never released (that press lost its UP), null otherwise: the caller owes the app its
+     * UP.
      */
-    fun onInitialDown(key: Long): Int {
+    fun onInitialDown(key: Long): S? {
         val entry = entries.get(key)
         if (entry == null) {
             entries.put(key, Entry(generation))
-            return NONE
+            return null
         }
-        val unfinished = if (entry.seenGeneration == generation && entry.sentByIme) entry.seenKeyCode else NONE
+        val unfinished = if (entry.seenGeneration == generation) entry.sent else null
         entry.downGeneration = generation
         entry.forget()
         return unfinished
     }
 
-    /** The IME sent a DOWN (initial or repeat) of this key as [keyCode] through the connection. */
-    fun onSentByIme(key: Long, keyCode: Int) {
+    /**
+     * The IME sent a DOWN (initial or repeat) of this key as [keyCode] through the connection;
+     * [sent] is what it takes to release it.
+     */
+    fun onSentByIme(key: Long, keyCode: Int, sent: S) {
         val entry = entryFor(key)
         entry.seenGeneration = generation
         entry.seenKeyCode = keyCode
-        entry.sentByIme = true
+        entry.sent = sent
     }
 
     /**
@@ -81,7 +99,7 @@ internal class KeyDeliveryLedger {
         if (entry.seenGeneration == generation) return
         entry.seenGeneration = generation
         entry.seenKeyCode = keyCode
-        entry.sentByIme = false
+        entry.sent = null
     }
 
     /** The key code the current connection's app saw go down for this key, [NONE] when none. */
@@ -90,10 +108,10 @@ internal class KeyDeliveryLedger {
         return if (entry.seenGeneration == generation) entry.seenKeyCode else NONE
     }
 
-    /** True when the IME itself sent this key's DOWN to the current connection. */
-    fun isSentByIme(key: Long): Boolean {
-        val entry = entries.get(key) ?: return false
-        return entry.seenGeneration == generation && entry.sentByIme
+    /** The record of the DOWN the IME itself sent to the current connection, null when none. */
+    fun sentByIme(key: Long): S? {
+        val entry = entries.get(key) ?: return null
+        return if (entry.seenGeneration == generation) entry.sent else null
     }
 
     /**
@@ -121,8 +139,8 @@ internal class KeyDeliveryLedger {
         }
     }
 
-    private fun entryFor(key: Long): Entry =
-        entries.get(key) ?: Entry(generation).also { entries.put(key, it) }
+    private fun entryFor(key: Long): Entry<S> =
+        entries.get(key) ?: Entry<S>(generation).also { entries.put(key, it) }
 
     companion object {
         /** No key: a raw key code can be 0 (an unknown key), so 0 is not free. */
