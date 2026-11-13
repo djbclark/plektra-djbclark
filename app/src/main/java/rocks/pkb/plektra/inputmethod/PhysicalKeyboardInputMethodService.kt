@@ -3888,7 +3888,8 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         pendingKeyboardSurfaceTransition?.let(uiHandler::removeCallbacks)
         pendingKeyboardSurfaceTransition = null
         isInputViewActive = false
-        // The client is gone and with it the rest of its key events: held remapped keys end here.
+        // The client is gone and with it the rest of its key events: held remapped keys end here
+        // (a raw key the system delivered in place of one stays the system's to release).
         if (resetHardwareKeyRemap()) updateStatusBarText()
         if (::keyboardVisibilityController.isInitialized) keyboardVisibilityController.onInputUnbound()
         inputStarted = false
@@ -4838,7 +4839,8 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
                     HardwareKeyRemapper.physicalKeyId(keyCode, event)
                 )
                 // A key cut off mid-hold that is still down: its repeats and its UP belong to
-                // no remap and no app, so they end here instead of arriving as raw events.
+                // no remap, so they end here and the handler sees none of them. Where the app
+                // holds the raw key from the system, [onKeyUp] still leaves it that key's UP.
                 if (remap.isStale) {
                     return ClicksPowerButtonEventMapper.Result(keyCode, event, consume = true)
                 }
@@ -5013,11 +5015,13 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
     /**
      * Ends the held remapped keys where the key events end (the client unbinds, the service is
      * destroyed): each becomes a tombstone that swallows the rest of its press. True when a key
-     * was cut off. The deliveries are forgotten first: the client they went to is gone, so
-     * nothing is sent after it.
+     * was cut off. What the IME sent is forgotten first: the client it went to is gone, so
+     * nothing is sent after it. What the system delivered is kept: the app still holds that
+     * key, and when the client binds again under it, its UP reaches the IME after all and is
+     * the system's to deliver, the UP of a tombstone included ([onKeyUp]).
      */
     private fun resetHardwareKeyRemap(): Boolean {
-        keyDeliveries.clear()
+        keyDeliveries.onClientGone()
         return hardwareKeyRemapper.reset()
     }
 
@@ -6282,7 +6286,8 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
                 // remap touched stays as the handler left it.
                 // Held since before this connection, the raw key is left to the system at once:
                 // this connection saw nothing of the press, so no UP of the IME's making goes
-                // into it.
+                // into it. The same after an unbind, where what consumed the UP is the
+                // tombstone of the remapped key: the app holds the raw one all the same.
                 if (deliveredBeforeThisConnection) return false
                 val cancelled = KeyEvent.changeFlags(event_, event_.flags or KeyEvent.FLAG_CANCELED)
                 if (currentInputConnection?.sendKeyEvent(cancelled) != true) return false
