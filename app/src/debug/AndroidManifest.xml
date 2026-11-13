@@ -3,6 +3,9 @@
     <application>
         <activity android:name=".TypographyPreviewActivity" android:exported="true"
             android:permission="android.permission.DUMP" android:theme="@style/Theme.Plektra" />
+        <!-- Fork-only key probe (see KeyProbeActivity); shell start only, via the DUMP permission. -->
+        <activity android:name=".KeyProbeActivity" android:exported="true"
+            android:permission="android.permission.DUMP" android:theme="@style/Theme.Plektra" />
         <receiver android:name=".SpeechSetupReceiver" android:exported="true"
             android:permission="android.permission.DUMP" />
         <receiver android:name=".ShowcaseReceiver" android:exported="true"
