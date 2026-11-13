@@ -2826,6 +2826,106 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
     private fun visibilityController(): KeyboardVisibilityController =
         getField(service, "keyboardVisibilityController")
 
+    /** The Enter key (scan 28) of the Titan 2 Elite acts as [target], in a plain text field. */
+    private fun remapEnterTo(target: Int) {
+        useTitan2EliteBuiltInKeyboard()
+        val context = RuntimeEnvironment.getApplication()
+        SettingsManager.setAutoCapitalizeFirstLetter(context, false)
+        SettingsManager.setAutoCapitalizeAfterPeriod(context, false)
+        assertTrue(
+            SettingsManager.setHardwareKeyRemapRules(
+                context,
+                "titan2elite_qwerty",
+                listOf(KeyRemapRule(KeySource.key(KeyEvent.KEYCODE_ENTER), target))
+            )
+        )
+        useLayout("qwerty")
+        plainTextField()
+    }
+
+    /** Pressed and physically pressed, as the IME keeps it for Ctrl or Alt. */
+    private fun heldAs(target: Int): Pair<Boolean, Boolean> = modifierController().let {
+        if (target == KeyEvent.KEYCODE_CTRL_LEFT) {
+            it.ctrlPressed to it.ctrlPhysicallyPressed
+        } else {
+            it.altPressed to it.altPhysicallyPressed
+        }
+    }
+
+    /** One-shot or latch, as a tap or a double tap of Ctrl or Alt leaves it. */
+    private fun armed(target: Int): Boolean = modifierController().let {
+        if (target == KeyEvent.KEYCODE_CTRL_LEFT) {
+            it.ctrlOneShot || it.ctrlLatchActive
+        } else {
+            it.altOneShot || it.altLatchActive
+        }
+    }
+
+    private fun heldRemappedModifierStaysPressedThroughEditorChanges(target: Int) {
+        remapEnterTo(target)
+        assertEquals("a", typeA())
+        val down = tick()
+        service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, down, down))
+        assertEquals(true to true, heldAs(target))
+
+        service.onStartInput(editorInfo, true)
+        assertEquals("after a restarting start", true to true, heldAs(target))
+
+        // A new editor resets the modifiers; the key is still down as this one, and no tap.
+        service.onFinishInput()
+        plainTextField()
+        assertEquals("in the next field", true to true, heldAs(target))
+        assertFalse("in the next field", armed(target))
+
+        service.onFinishInputView(false)
+        service.onWindowHidden()
+        assertEquals("with the keyboard hidden", true to true, heldAs(target))
+        assertFalse("with the keyboard hidden", armed(target))
+
+        // Its repeat is no new press and its release no tap: nothing is left pressed or armed.
+        service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, down, tick(), repeatCount = 1))
+        assertFalse("after a repeat", armed(target))
+        service.onKeyUp(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_UP, down, tick()))
+        assertEquals(false to false, heldAs(target))
+        assertFalse("after the release", armed(target))
+        assertEquals("a", typeA())
+        assertTrue(recorder.editorActions.isEmpty())
+    }
+
+    private fun heldRemappedModifierIsNotLeftPressedWithoutAnEditor(target: Int) {
+        remapEnterTo(target)
+        val down = tick()
+        service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, down, down))
+
+        // Focus moves to a view that reads keys itself, where the IME releases no modifiers.
+        service.onFinishInput()
+        keyEventField()
+        assertEquals(true to true, heldAs(target))
+        service.onKeyUp(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_UP, down, tick()))
+        assertEquals(false to false, heldAs(target))
+
+        service.onFinishInput()
+        plainTextField()
+        assertFalse(armed(target))
+        assertEquals("a", typeA())
+    }
+
+    @Test
+    fun keyRemappedToCtrl_heldAcrossEditorChanges_staysPressed_andItsReleaseIsNoTap() =
+        heldRemappedModifierStaysPressedThroughEditorChanges(KeyEvent.KEYCODE_CTRL_LEFT)
+
+    @Test
+    fun keyRemappedToAlt_heldAcrossEditorChanges_staysPressed_andItsReleaseIsNoTap() =
+        heldRemappedModifierStaysPressedThroughEditorChanges(KeyEvent.KEYCODE_ALT_LEFT)
+
+    @Test
+    fun keyRemappedToCtrl_heldIntoAFieldWithoutAnEditor_isNotLeftPressedThere() =
+        heldRemappedModifierIsNotLeftPressedWithoutAnEditor(KeyEvent.KEYCODE_CTRL_LEFT)
+
+    @Test
+    fun keyRemappedToAlt_heldIntoAFieldWithoutAnEditor_isNotLeftPressedThere() =
+        heldRemappedModifierIsNotLeftPressedWithoutAnEditor(KeyEvent.KEYCODE_ALT_LEFT)
+
     private fun symLayout(): rocks.pkb.plektra.core.SymLayoutController =
         getField(service, "symLayoutController")
 
