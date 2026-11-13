@@ -4968,6 +4968,16 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             val intoThisStart = restarting && sent.mayEndInARestartFor(info)
             sendCancelledUpToApp(sent, if (intoThisStart) connection ?: sent.via else sent.via)
         }
+        if (restarting && connection != null) {
+            hardwareKeyRemapper.forEachHeldTarget { target ->
+                if (HardwareKeyRemapper.isModifierKeyCode(target)) {
+                    val now = SystemClock.uptimeMillis()
+                    connection.sendKeyEvent(
+                        KeyEvent(now, now, KeyEvent.ACTION_UP, target, 0, 0, -1, 0, KeyEvent.FLAG_CANCELED)
+                    )
+                }
+            }
+        }
     }
 
     /**
