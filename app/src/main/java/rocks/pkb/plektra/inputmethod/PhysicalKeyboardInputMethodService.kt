@@ -5300,7 +5300,8 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             if (!initialDown && !keyDeliveries.mayStartWithRepeat(physicalKey)) return true
         } else if (keyCodeRemapped) {
             // The app holds the raw key (the remapped one could not be sent when it went down):
-            // the press stays the raw key, also when the remapped one could be sent by now.
+            // the press stays the raw key, also when the remapped one could be sent by now, in
+            // this connection or in the one of a later start.
             return false
         }
         return when (passRemappedKeyToApp(remap, event_, dispatch.metaStateBefore, physicalKey)) {
@@ -6204,10 +6205,13 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             clearPressedStateOfRemappedModifier(heldAs)
             updateStatusBarText()
         }
-        // What this connection's app saw go down for the key, and by which route.
+        // What the app holds for the key, and by which route it went down: sent by the IME to
+        // this connection, or delivered by the system, which may have been before this
+        // connection (the system's delivery does not end with one).
         val delivered = keyDeliveries.deliveredKeyCode(physicalKey)
         val sentByIme = keyDeliveries.sentByIme(physicalKey) != null
         val insteadOfRemapped = keyDeliveries.isDeliveredInsteadOfRemapped(physicalKey)
+        val deliveredBeforeThisConnection = keyDeliveries.isDeliveredBeforeThisConnection(physicalKey)
         keyDeliveries.onUp(physicalKey)
         if (event_ == null) return handled
         val remap = dispatch.result
@@ -6236,17 +6240,22 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
                 // the app. Its press ends as a cancelled one; when the connection still takes
                 // no key events, the system delivers the UP as it delivered the DOWN. A key no
                 // remap touched stays as the handler left it.
+                // Held since before this connection, the raw key is left to the system at once:
+                // this connection saw nothing of the press, so no UP of the IME's making goes
+                // into it.
+                if (deliveredBeforeThisConnection) return false
                 val cancelled = KeyEvent.changeFlags(event_, event_.flags or KeyEvent.FLAG_CANCELED)
                 if (currentInputConnection?.sendKeyEvent(cancelled) != true) return false
             }
             return true
         }
         if (remap == null) return false
-        // The app never saw this key go down through this connection (the handler consumed the
-        // DOWN, the remap swallowed it, or the key is held over from another field), so a
-        // remapped UP would be an orphan.
+        // The app holds nothing for this key (the handler consumed the DOWN, the remap swallowed
+        // it, or the IME sent it into the connection of another field), so a remapped UP would
+        // be an orphan.
         if (delivered == KeyDeliveryLedger.NONE) return true
-        // The app holds the raw key: the system delivers its UP.
+        // The app holds the raw key, since this connection or an earlier one: the system
+        // delivers its UP.
         if (remap.change == KeyRemapResult.Change.KEY) return false
         return when (passRemappedKeyToApp(remap, event_, dispatch.metaStateBefore, physicalKey)) {
             RemapDelivery.INJECTED, RemapDelivery.SWALLOWED -> true
