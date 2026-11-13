@@ -2131,6 +2131,52 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
     }
 
     @Test
+    fun userKeyRemap_seesTheKeyAfterDeviceNormalization() {
+        // The Q25's Ctrl key sends the right Shift key code, and device normalization makes it
+        // Ctrl: the user's rules apply to that Ctrl, not to the key code that arrived.
+        DeviceSpecific.setBuildFingerprintForTests(
+            brand = "zinwa",
+            manufacturer = "zinwa",
+            model = "Q25",
+            device = "Q25",
+            product = "q25"
+        )
+        setField(service, "physicalKeyboardProfileOverride", "auto")
+        FakeKeyboards.register()
+        assertTrue(
+            SettingsManager.setHardwareKeyRemapRules(
+                RuntimeEnvironment.getApplication(),
+                "q25",
+                listOf(
+                    KeyRemapRule(KeySource.key(KeyEvent.KEYCODE_SHIFT_RIGHT), KeyEvent.KEYCODE_ENTER),
+                    KeyRemapRule(KeySource.key(KeyEvent.KEYCODE_CTRL_LEFT), KeyEvent.KEYCODE_TAB)
+                )
+            )
+        )
+        val connection = keyEventField()
+        val down = tick()
+        assertTrue(
+            service.onKeyDown(
+                KeyEvent.KEYCODE_SHIFT_RIGHT,
+                scanKey(
+                    KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SHIFT_RIGHT, 54, down, down,
+                    KeyEvent.META_SHIFT_RIGHT_ON
+                )
+            )
+        )
+        assertTrue(
+            service.onKeyUp(
+                KeyEvent.KEYCODE_SHIFT_RIGHT,
+                scanKey(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SHIFT_RIGHT, 54, down, tick())
+            )
+        )
+        assertEquals(
+            listOf("TAB down repeat=0 shift=false", "TAB up repeat=0 shift=false"),
+            sentKeys(connection)
+        )
+    }
+
+    @Test
     fun keyRemappedToSym_actsAsSym_andAnUnbindLeavesNoPressedStateBehind() {
         useTitan2BuiltInKeyboard()
         val context = RuntimeEnvironment.getApplication()

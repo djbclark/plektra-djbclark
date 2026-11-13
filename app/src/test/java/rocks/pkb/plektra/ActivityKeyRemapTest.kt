@@ -16,6 +16,8 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import rocks.pkb.plektra.inputmethod.DeviceSpecific
 import rocks.pkb.plektra.inputmethod.FakeKeyboards
+import rocks.pkb.plektra.inputmethod.KeyRemapRule
+import rocks.pkb.plektra.inputmethod.KeySource
 
 /**
  * The key test screen's view of the keys: on a Titan 2 with "Swap right Shift and Enter" on.
@@ -74,6 +76,36 @@ class ActivityKeyRemapTest {
         shown(key(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_A, 30, metaState))
         assertEquals(KeyEvent.KEYCODE_A, a.keyCode)
         return requireNotNull(a.event).isShiftPressed
+    }
+
+    @Test
+    fun rulesSeeTheKeyAfterDeviceNormalization() {
+        // The Q25's Ctrl key sends the right Shift key code, and device normalization makes it
+        // Ctrl: the user's rules apply to that Ctrl, not to the key code that arrived.
+        DeviceSpecific.setBuildFingerprintForTests(
+            brand = "zinwa",
+            manufacturer = "zinwa",
+            model = "Q25",
+            device = "Q25",
+            product = "q25"
+        )
+        assertTrue(
+            SettingsManager.setHardwareKeyRemapRules(
+                context,
+                "q25",
+                listOf(
+                    KeyRemapRule(KeySource.key(KeyEvent.KEYCODE_SHIFT_RIGHT), KeyEvent.KEYCODE_ENTER),
+                    KeyRemapRule(KeySource.key(KeyEvent.KEYCODE_CTRL_LEFT), KeyEvent.KEYCODE_TAB)
+                )
+            )
+        )
+
+        val ctrl = shown(key(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SHIFT_RIGHT, 54, KeyEvent.META_SHIFT_RIGHT_ON))
+
+        assertEquals(KeyEvent.KEYCODE_TAB, ctrl.keyCode)
+        assertEquals(KeyEvent.KEYCODE_TAB, ctrl.event?.keyCode)
+        assertFalse(requireNotNull(ctrl.event).isCtrlPressed)
+        assertFalse(requireNotNull(ctrl.event).isShiftPressed)
     }
 
     @Test
