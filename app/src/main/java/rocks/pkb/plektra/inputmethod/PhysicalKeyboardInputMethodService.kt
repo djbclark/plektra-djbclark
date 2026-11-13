@@ -384,10 +384,18 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
          * the same package and the same field id. See "What the app sees" in HardwareKeyRemap.kt
          * for why these keys only, and for what equal ids do not prove.
          */
-        fun mayEndInARestartFor(editor: EditorInfo?): Boolean = editor != null &&
-            isShiftCtrlOrAlt(down.keyCode) &&
-            packageName.isNotEmpty() && packageName == editor.packageName &&
-            fieldId > 0 && fieldId == editor.fieldId
+        fun mayEndInARestartFor(editor: EditorInfo?): Boolean = whatKeepsItOutOfARestartFor(editor) == null
+
+        /** The first condition of [mayEndInARestartFor] that fails, in words; null when none does. */
+        fun whatKeepsItOutOfARestartFor(editor: EditorInfo?): String? = when {
+            editor == null -> "no editor"
+            !isShiftCtrlOrAlt(down.keyCode) -> "not Shift, Ctrl or Alt"
+            packageName.isEmpty() -> "no package when it went down"
+            packageName != editor.packageName -> "another package"
+            fieldId <= 0 -> "no field id when it went down"
+            fieldId != editor.fieldId -> "another field id"
+            else -> null
+        }
 
         private fun isShiftCtrlOrAlt(keyCode: Int): Boolean = when (keyCode) {
             KeyEvent.KEYCODE_SHIFT_LEFT, KeyEvent.KEYCODE_SHIFT_RIGHT,
@@ -398,6 +406,18 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
     }
     /** What the app saw go down for each key, so that its press goes on and ends as that key. */
     private val keyDeliveries = KeyDeliveryLedger<SentKey>()
+
+    /**
+     * Debug builds only: what became of the keys the IME sent an app where an input connection
+     * began or ended, to read beside the app's own log in a device test. Key codes, package
+     * names, field ids and the identity of connection objects; never text.
+     */
+    private inline fun traceKeyDelivery(message: () -> String) {
+        if (BuildConfig.DEBUG) Log.d(TAG, "keyDelivery: " + message())
+    }
+
+    private fun nameOf(connection: InputConnection?): String =
+        if (connection == null) "none" else "#" + Integer.toHexString(System.identityHashCode(connection))
     private lateinit var screenTrackpadController: ScreenTrackpadController
     /**
      * True between onStartInput and onFinishInput/onUnbindInput. InputMethodService keeps the
@@ -3899,6 +3919,10 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         // field. The held keys themselves go on (see the design note in HardwareKeyRemap.kt).
         // The framework has installed this start's connection and editor by now, also before
         // super.onStartInput: currentInputConnection is the new one.
+        traceKeyDelivery {
+            "onStartInput restarting=$restarting package=${info?.packageName} fieldId=${info?.fieldId} " +
+                "connection=${nameOf(currentInputConnection)}"
+        }
         endKeyDeliveriesOfThisConnection(restarting, info, currentInputConnection)
         super.onStartInput(info, restarting)
         inputStarted = true
@@ -4091,6 +4115,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
     override fun onFinishInput() {
         cancelSpeechRecognition()
         ++speechEditorSession
+        traceKeyDelivery { "onFinishInput connection=${nameOf(currentInputConnection)}" }
         endKeyDeliveriesOfThisConnection()
         disableSmoothCaretExperiment()
         pendingKeyboardSurfaceTransition?.let(uiHandler::removeCallbacks)
@@ -4903,11 +4928,12 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             if (rawEvent.action == KeyEvent.ACTION_DOWN) {
                 // The editor is read now, while it is the one this connection was made for.
                 val editor = if (inputStarted) currentInputEditorInfo else null
-                keyDeliveries.onSentByIme(
-                    physicalKey,
-                    event.keyCode,
-                    SentKey(event, connection, editor?.packageName.orEmpty(), editor?.fieldId ?: 0)
-                )
+                val sent = SentKey(event, connection, editor?.packageName.orEmpty(), editor?.fieldId ?: 0)
+                keyDeliveries.onSentByIme(physicalKey, event.keyCode, sent)
+                traceKeyDelivery {
+                    "sent DOWN keyCode=${event.keyCode} repeat=${event.repeatCount} through ${nameOf(connection)} " +
+                        "package=${sent.packageName} fieldId=${sent.fieldId}"
+                }
             }
             return RemapDelivery.INJECTED
         }
@@ -4936,7 +4962,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
      */
     private fun sendCancelledUpToApp(sent: SentKey, via: InputConnection = sent.via) {
         val down = sent.down
-        via.sendKeyEvent(
+        val taken = via.sendKeyEvent(
             KeyEvent(
                 down.downTime, SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, down.keyCode, 0,
                 HardwareKeyRemapper.metaStateAfterRelease(down.keyCode, down.metaState),
@@ -4945,6 +4971,11 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
                 down.source
             )
         )
+        // "taken" is the connection's answer, not proof that the app got the event.
+        traceKeyDelivery {
+            "cancelled UP keyCode=${down.keyCode} downTime=${down.downTime} through ${nameOf(via)} " +
+                "(went down through ${nameOf(sent.via)}) taken=$taken"
+        }
     }
 
     /**
@@ -4966,6 +4997,15 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
     ) {
         keyDeliveries.onConnectionChanged { sent ->
             val intoThisStart = restarting && sent.mayEndInARestartFor(info)
+            traceKeyDelivery {
+                val keptOut = when {
+                    !restarting -> "not a restarting start"
+                    connection == null -> "the start has no connection"
+                    else -> sent.whatKeepsItOutOfARestartFor(info)
+                }
+                "release of keyCode=${sent.down.keyCode} that went down in package=${sent.packageName} " +
+                    "fieldId=${sent.fieldId}: route=" + if (keptOut == null) "new" else "old ($keptOut)"
+            }
             sendCancelledUpToApp(sent, if (intoThisStart) connection ?: sent.via else sent.via)
         }
     }

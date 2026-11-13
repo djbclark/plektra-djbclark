@@ -2651,6 +2651,72 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
     }
 
     @Test
+    fun debugBuild_logsTheRouteOfEachRelease_andWhatKeptItOutOfTheNewConnection() {
+        fun keyDeliveryLog(): List<String> =
+            org.robolectric.shadows.ShadowLog.getLogsForTag("PlektraInputMethod")
+                .map { it.msg }
+                .filter { it.startsWith("keyDelivery: ") }
+        val shift = KeyEvent.KEYCODE_SHIFT_RIGHT
+        enableShiftEnterSwap()
+        val view = mutableListOf<KeyEvent>()
+        keyEventField(RecordingInputConnection(view), fieldId = viewId)
+        org.robolectric.shadows.ShadowLog.clear()
+
+        // An eligible restart: the ids of the DOWN, the start as the IME got it, the route.
+        val down = tick()
+        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, down, down)))
+        restartInputWithNewConnection(RecordingInputConnection(view))
+        var log = keyDeliveryLog()
+        assertEquals(log.toString(), 4, log.size)
+        assertTrue(log[0], log[0].startsWith("keyDelivery: sent DOWN keyCode=$shift repeat=0 through #"))
+        assertTrue(log[0], log[0].endsWith(" package=com.example.remote fieldId=$viewId"))
+        assertTrue(
+            log[1],
+            log[1].startsWith("keyDelivery: onStartInput restarting=true package=com.example.remote fieldId=$viewId ")
+        )
+        assertEquals(
+            "keyDelivery: release of keyCode=$shift that went down in package=com.example.remote " +
+                "fieldId=$viewId: route=new",
+            log[2]
+        )
+        assertTrue(log[3], log[3].startsWith("keyDelivery: cancelled UP keyCode=$shift downTime=$down through #"))
+        assertTrue(log[3], log[3].endsWith(" taken=true"))
+        // The connection named in the start is the one the release went through, and not the
+        // one the key went down through.
+        val newConnection = log[1].substringAfter("connection=")
+        val oldConnection = log[0].substringAfter("through ").substringBefore(" ")
+        assertTrue(log[3], log[3].contains("through $newConnection (went down through $oldConnection)"))
+        assertFalse(newConnection == oldConnection)
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_UP, down, tick())))
+
+        // Kept out: the reason is the condition that failed.
+        org.robolectric.shadows.ShadowLog.clear()
+        val again = tick()
+        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, again, again)))
+        restartInputWithNewConnection(RecordingInputConnection(view), fieldId = viewId + 1)
+        log = keyDeliveryLog()
+        assertEquals(log.toString(), 4, log.size)
+        assertEquals(
+            "keyDelivery: release of keyCode=$shift that went down in package=com.example.remote " +
+                "fieldId=$viewId: route=old (another field id)",
+            log[2]
+        )
+        val wentDownThrough = log[0].substringAfter("through ").substringBefore(" ")
+        assertTrue(log[3], log[3].contains("through $wentDownThrough (went down through $wentDownThrough)"))
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_UP, again, tick())))
+
+        // A finish redirects nothing, and says so.
+        org.robolectric.shadows.ShadowLog.clear()
+        val third = tick()
+        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, third, third)))
+        service.onFinishInput()
+        log = keyDeliveryLog()
+        assertEquals(log.toString(), 4, log.size)
+        assertTrue(log[1], log[1].startsWith("keyDelivery: onFinishInput connection=#"))
+        assertTrue(log[2], log[2].endsWith(": route=old (not a restarting start)"))
+    }
+
+    @Test
     fun heldShift_restartWhoseConnectionTakesNoKeys_isTriedThereOnce_andNotInTheOldOne() {
         enableShiftEnterSwap()
         val view = mutableListOf<KeyEvent>()
