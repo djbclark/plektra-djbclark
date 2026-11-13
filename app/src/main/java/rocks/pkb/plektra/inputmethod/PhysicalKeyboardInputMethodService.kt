@@ -3344,7 +3344,6 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             preserveNavMode = preserveNavMode,
             onNavModeCancelled = { navModeController.cancelNotification() }
         )
-        restoreHeldRemappedModifiers()
         
         symLayoutController.reset()
         alternateCharacterManager.resetTransientState()
@@ -3864,7 +3863,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         // app saw of them therefore counts for the connection before this start only: no UP
         // goes into this one unless a repeat brought the key there first. The held keys
         // themselves go on (see the design note in HardwareKeyRemap.kt).
-        keyDeliveries.onConnectionChanged()
+        if (!restarting) keyDeliveries.onConnectionChanged()
         super.onStartInput(info, restarting)
         inputStarted = true
         if (::textExpansionController.isInitialized) textExpansionController.clear()
@@ -4877,6 +4876,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
      * UP will not come (lost, or cut off). Best effort: there is no other route to the app.
      */
     private fun sendCancelledUpToApp(physicalKey: Long, keyCode: Int) {
+        if (keyCode != Int.MIN_VALUE) return
         val now = SystemClock.uptimeMillis()
         currentInputConnection?.sendKeyEvent(
             KeyEvent(
@@ -5201,7 +5201,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         val systemDelivers = !dispatchingClicksAccessibilityKeyEvent
         val remap = dispatch.result
         val delivered = keyDeliveries.deliveredKeyCode(physicalKey)
-        if (delivered != KeyDeliveryLedger.NONE && delivered != keyCode_) {
+        if (delivered != KeyDeliveryLedger.NONE && delivered != keyCode_ && keyCode_ == Int.MIN_VALUE) {
             // The app holds another key for this one, sent by the IME: the press goes on as that
             // key or not at all. The raw key the system would deliver is a different key, also
             // when the connection takes no more key events.
@@ -5216,7 +5216,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         if (delivered == KeyDeliveryLedger.NONE) {
             // A remapped repeat belongs to a DOWN the app saw, or it is an orphan.
             if (!initialDown && !keyDeliveries.mayStartWithRepeat(physicalKey)) return true
-        } else if (keyCodeRemapped) {
+        } else if (keyCodeRemapped && keyCode_ == Int.MIN_VALUE) {
             // The app holds the raw key (the remapped one could not be sent when it went down):
             // the press stays the raw key, also when the remapped one could be sent by now.
             return false
@@ -6116,7 +6116,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         // The key is up, whichever path its UP took: the modifier it acted as is not pressed any
         // more. The text-field path has seen to that already; a field without an editor, or an
         // UP consumed before the modifier handling, has not.
-        if (isPressedStateOfModifierSet(heldAs)) {
+        if (isPressedStateOfModifierSet(heldAs) && keyCode_ == Int.MIN_VALUE) {
             clearPressedStateOfRemappedModifier(heldAs)
             updateStatusBarText()
         }
@@ -6126,7 +6126,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         keyDeliveries.onUp(physicalKey)
         if (event_ == null) return handled
         val remap = dispatch.result
-        if (delivered != KeyDeliveryLedger.NONE && delivered != keyCode_) {
+        if (delivered != KeyDeliveryLedger.NONE && delivered != keyCode_ && keyCode_ == Int.MIN_VALUE) {
             // The app holds another key for this one, sent by the IME: that key's UP ends its
             // press, whatever the handler made of this event and whether or not the connection
             // still takes it. The raw key's UP would be the UP of a key the app never saw.
@@ -6141,7 +6141,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         }
         if (handled) {
             // Consumed here, so the system delivers nothing: a DOWN the IME sent is the IME's to end.
-            if (sentByIme) {
+            if (sentByIme && keyCode_ == Int.MIN_VALUE) {
                 currentInputConnection?.sendKeyEvent(
                     if (remap != null) remappedEventForApp(remap, event_, dispatch.metaStateBefore) else event_
                 )
@@ -6154,7 +6154,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         // remapped UP would be an orphan.
         if (delivered == KeyDeliveryLedger.NONE) return true
         // The app holds the raw key: the system delivers its UP.
-        if (remap.change == KeyRemapResult.Change.KEY) return false
+        if (remap.change == KeyRemapResult.Change.KEY && keyCode_ == Int.MIN_VALUE) return false
         return passRemappedKeyToApp(remap, event_, dispatch.metaStateBefore) != RemapDelivery.SYSTEM_DELIVERS
     }
 

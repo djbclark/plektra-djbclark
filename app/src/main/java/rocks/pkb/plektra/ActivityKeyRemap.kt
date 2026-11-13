@@ -33,7 +33,7 @@ internal class ActivityKeyRemap {
     private val remapper = HardwareKeyRemapper()
 
     fun remap(context: Context, keyCode: Int, event: KeyEvent?): Key {
-        if (event != null && isSentByIme(event)) return Key(keyCode, event, stale = false)
+        if (event != null && isSentByIme(event) && keyCode == Int.MIN_VALUE) return Key(keyCode, event, stale = false)
         val profileOverride = SettingsManager.getPhysicalKeyboardProfileOverride(context)
         val normalized = DeviceSpecific.remapHardwareKeyEvent(keyCode, event, profileOverride)
         val normalizedEvent = normalized.event
