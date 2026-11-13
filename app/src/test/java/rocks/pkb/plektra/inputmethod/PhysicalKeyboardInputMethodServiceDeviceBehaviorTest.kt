@@ -2549,6 +2549,108 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
         }
 
     @Test
+    fun heldShift_thatWentDownAfterAFinish_keepsTheOldRouteOfItsRelease_thoughTheEditorLeftBehindMatches() {
+        enableShiftEnterSwap()
+        val view = mutableListOf<KeyEvent>()
+        val first = keyEventField(RecordingInputConnection(view), fieldId = viewId)
+
+        // Input is finished. The framework leaves the EditorInfo of the finished input in
+        // place, and the client's connection: a key that goes down now is sent through it,
+        // into no editor.
+        service.onFinishInput()
+        assertEquals(viewId, service.currentInputEditorInfo.fieldId)
+        val down = tick()
+        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, down, down)))
+        assertEquals(listOf("SHIFT_RIGHT down repeat=0 shift=true"), sentKeys(first))
+        first.replacedByTheApp = true
+
+        // A restarting start for the package and field id the leftover names: it is not the
+        // editor the key went down in, for there was none.
+        val second = restartInputWithNewConnection(RecordingInputConnection(view))
+        assertEquals(
+            listOf("SHIFT_RIGHT down repeat=0 shift=true", "SHIFT_RIGHT up repeat=0 shift=false"),
+            sentKeys(first)
+        )
+        assertTrue(first.sentKeyEvents[1].isCanceled)
+        assertTrue(sentKeys(second).toString(), second.sentKeyEvents.isEmpty())
+        assertEquals(listOf("SHIFT_RIGHT down repeat=0 shift=true"), keys(view))
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_UP, down, tick())))
+        assertTrue(sentKeys(second).toString(), second.sentKeyEvents.isEmpty())
+    }
+
+    @Test
+    fun heldShift_isKnownByTheEditorItWentDownIn_whateverThatEditorInfoSaysLater() {
+        enableShiftEnterSwap()
+        val view = mutableListOf<KeyEvent>()
+        val first = keyEventField(RecordingInputConnection(view), fieldId = viewId)
+        val wentDownIn = editorInfo
+        val down = tick()
+        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, down, down)))
+        first.replacedByTheApp = true
+
+        // The EditorInfo object the ids were read from says something else afterwards. The
+        // restart is for the ids it had when the key went down: the release goes into it.
+        wentDownIn.packageName = "com.example.other"
+        wentDownIn.fieldId = viewId + 1
+        val second = restartInputWithNewConnection(
+            RecordingInputConnection(view), packageName = "com.example.remote", fieldId = viewId
+        )
+        assertEquals(listOf("SHIFT_RIGHT down repeat=0 shift=true"), sentKeys(first))
+        assertEquals(listOf("SHIFT_RIGHT up repeat=0 shift=false"), sentKeys(second))
+        assertTrue(second.sentKeyEvents.single().isCanceled)
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_UP, down, tick())))
+        assertEquals(1, second.sentKeyEvents.size)
+
+        // The other way round: ids the object takes on after the DOWN do not make a restart
+        // for those ids a restart of the editor the key went down in.
+        view.clear()
+        second.sentKeyEvents.clear()
+        val wentDownInNext = editorInfo
+        val again = tick()
+        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, again, again)))
+        second.replacedByTheApp = true
+        wentDownInNext.packageName = "com.example.other"
+        wentDownInNext.fieldId = viewId + 1
+        val third = restartInputWithNewConnection(
+            RecordingInputConnection(view), packageName = "com.example.other", fieldId = viewId + 1
+        )
+        assertEquals(
+            listOf("SHIFT_RIGHT down repeat=0 shift=true", "SHIFT_RIGHT up repeat=0 shift=false"),
+            sentKeys(second)
+        )
+        assertTrue(second.sentKeyEvents[1].isCanceled)
+        assertTrue(sentKeys(third).toString(), third.sentKeyEvents.isEmpty())
+        assertEquals(listOf("SHIFT_RIGHT down repeat=0 shift=true"), keys(view))
+    }
+
+    @Test
+    fun heldShift_finishedInput_isReleasedAtTheFinish_throughTheConnectionItWentDownThrough() {
+        enableShiftEnterSwap()
+        val view = mutableListOf<KeyEvent>()
+        val first = keyEventField(RecordingInputConnection(view), fieldId = viewId)
+        val down = tick()
+        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, down, down)))
+
+        // A finish replaces no connection: the release is sent there and then, not left for
+        // a start that may never come, and it arrives.
+        service.onFinishInput()
+        assertEquals(
+            listOf("SHIFT_RIGHT down repeat=0 shift=true", "SHIFT_RIGHT up repeat=0 shift=false"),
+            keys(view)
+        )
+        assertTrue(view[1].isCanceled)
+        assertEquals(down, view[1].downTime)
+        assertEquals(KeyEvent.KEYCODE_SHIFT_RIGHT, remapper().heldTargetOf(enterKeyId()))
+
+        // Nothing is owed after it: not at the key's UP, and not at a start.
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_UP, down, tick())))
+        val second = restartInputWithNewConnection(RecordingInputConnection(view), restarting = false)
+        assertEquals(2, first.sentKeyEvents.size)
+        assertEquals(2, view.size)
+        assertTrue(sentKeys(second).toString(), second.sentKeyEvents.isEmpty())
+    }
+
+    @Test
     fun heldShift_restartWhoseConnectionTakesNoKeys_isTriedThereOnce_andNotInTheOldOne() {
         enableShiftEnterSwap()
         val view = mutableListOf<KeyEvent>()
