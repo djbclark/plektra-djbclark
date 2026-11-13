@@ -193,7 +193,6 @@ internal class KeyDeliveryLedger<S : Any> {
         for (i in entries.size() - 1 downTo 0) {
             if (!entries.valueAt(i).bySystem) entries.removeAt(i)
         }
-        generation++
     }
 
     fun clearDevice(deviceId: Int) {
