@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# github-install-latest — install a Plektra djb release from GitHub on the phone.
+#
+#   scripts/github-install-latest          # newest djb-* release
+#   scripts/github-install-latest TAG
+#
+# Fork-only (ci/base). Mirrors scripts/djb-install-latest but uses gh + GitHub releases.
+set -euo pipefail
+
+repo=djbclark/plektra-djbclark
+pkg=rocks.pkb.plektra.djb
+
+if [ -n "${ANDROID_SERIAL:-}" ]; then
+  serial=$ANDROID_SERIAL
+else
+  candidates=()
+  for s in $(adb devices | gawk 'NR > 1 && $2 == "device" { print $1 }'); do
+    if adb -s "$s" shell pm list packages "$pkg" 2>/dev/null | tr -d '\r' | grep -qx "package:$pkg"; then
+      candidates+=("$s")
+    fi
+  done
+  if [ "${#candidates[@]}" -ne 1 ]; then
+    echo "github-install-latest: ${#candidates[@]} adb devices have $pkg (${candidates[*]:-none}); set ANDROID_SERIAL" >&2
+    exit 1
+  fi
+  serial=${candidates[0]}
+fi
+
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+
+if [ $# -gt 0 ]; then
+  timeout 120 gh release view "$1" -R "$repo" --json tagName,assets > "$work/release.json"
+else
+  # Newest release whose tag starts with djb-
+  timeout 120 gh release list -R "$repo" --limit 30 --json tagName,isLatest,createdAt > "$work/list.json"
+  tag=$(jq -r '[.[] | select(.tagName | startswith("djb-"))] | sort_by(.createdAt) | reverse | .[0].tagName // empty' "$work/list.json")
+  if [ -z "$tag" ]; then
+    echo "github-install-latest: no djb-* GitHub releases yet" >&2
+    exit 1
+  fi
+  timeout 120 gh release view "$tag" -R "$repo" --json tagName,assets > "$work/release.json"
+fi
+tag=$(jq -r .tagName "$work/release.json")
+apk=$(jq -r '[.assets[] | select(.name | endswith(".apk"))][0].name // empty' "$work/release.json")
+if [ -z "$apk" ]; then
+  echo "github-install-latest: release $tag has no .apk asset" >&2
+  exit 1
+fi
+timeout 600 gh release download "$tag" -R "$repo" -p "$apk" -p "$apk.sha256" -D "$work"
+(cd "$work" && gsha256sum -c "$apk.sha256")
+
+echo "installing $tag ($apk) on $serial"
+adb -s "$serial" install -r "$work/$apk"
+
+state="$HOME/.local/state/plektra-djb"
+mkdir -p "$state"
+printf '%s %s\n' "$tag" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$state/installed-$serial"
+adb -s "$serial" shell dumpsys package "$pkg" | grep -m1 -E 'lastUpdateTime' || true
