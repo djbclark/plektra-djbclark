@@ -31,7 +31,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -620,50 +619,7 @@ fun AdvancedSettingsScreen(
                             }
                         }
 
-                        // IME Test Screen (only in debug builds)
                         DebugShowcaseExportSetting()
-                        if (BuildConfig.DEBUG) {
-                            Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(64.dp)
-                                    .clickable { navigateTo(AdvancedDestination.ImeTest) }
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.TextFields,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = "IME Test Screen",
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Medium,
-                                            maxLines = 1
-                                        )
-                                        Text(
-                                            text = "Test all input field types and IME actions",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 1
-                                        )
-                                    }
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        }
 
                         // Show Tutorial
                         Surface(
@@ -762,13 +718,6 @@ fun AdvancedSettingsScreen(
                 }
             }
 
-            AdvancedDestination.ImeTest -> {
-                ImeTestScreen(
-                    modifier = modifier,
-                    onBack = { navigateBack() }
-                )
-            }
-
             AdvancedDestination.TrackpadGestures -> {
                 TrackpadGestureSettingsScreen(
                     modifier = modifier,
@@ -783,12 +732,10 @@ fun AdvancedSettingsScreen(
 /** Pages of the Advanced screen; [name] is the `settings.child.advanced` extra value. */
 private sealed class AdvancedDestination(val name: String) {
     object Main : AdvancedDestination(ADVANCED_DESTINATION_MAIN)
-    object ImeTest : AdvancedDestination(ADVANCED_DESTINATION_IME_TEST)
     object TrackpadGestures : AdvancedDestination(ADVANCED_DESTINATION_TRACKPAD_GESTURES)
 
     companion object {
         fun fromName(name: String): AdvancedDestination = when (name) {
-            ADVANCED_DESTINATION_IME_TEST -> ImeTest
             ADVANCED_DESTINATION_TRACKPAD_GESTURES -> TrackpadGestures
             else -> Main
         }

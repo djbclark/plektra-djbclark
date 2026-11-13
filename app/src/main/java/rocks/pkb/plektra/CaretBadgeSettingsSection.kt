@@ -40,9 +40,7 @@ import rocks.pkb.plektra.ui.color.ColorSwatch
 
 /**
  * The modifier badge beside the text cursor: an on/off switch (with the overlay-permission prompt
- * it needs) and the two colours it is drawn in. Sits under the modifier indicator picker on the
- * modifiers screen because it answers the same question - where the keyboard tells you what Shift
- * and Alt are doing.
+ * it needs) and optional colour overrides, under the other modifier indicators.
  */
 @Composable
 fun CaretBadgeSettingsSection() {
@@ -50,6 +48,7 @@ fun CaretBadgeSettingsSection() {
     var enabled by remember { mutableStateOf(SettingsManager.getCaretModifierBadgeEnabled(context)) }
     var armedColor by remember { mutableStateOf(SettingsManager.getCaretBadgeArmedColor(context)) }
     var lockedColor by remember { mutableStateOf(SettingsManager.getCaretBadgeLockedColor(context)) }
+    var customColors by remember { mutableStateOf(SettingsManager.getCaretBadgeCustomColors(context)) }
     var pickingColor by remember { mutableStateOf<String?>(null) }
 
     // The grant happens in system settings, so re-read it each time this screen comes back.
@@ -80,6 +79,18 @@ fun CaretBadgeSettingsSection() {
     )
 
     if (enabled) {
+        KeyboardBarCheckRow(
+            label = stringResource(R.string.caret_badge_custom_colors_title),
+            checked = customColors,
+            linkId = SettingLinkIds.MODIFIERS_CARET_BADGE_CUSTOM_COLORS,
+            description = stringResource(R.string.caret_badge_custom_colors_description)
+        ) {
+            customColors = it
+            SettingsManager.setCaretBadgeCustomColors(context, it)
+            if (!it) pickingColor = null
+        }
+    }
+    if (enabled && customColors) {
         CaretBadgeColorRow(
             title = stringResource(R.string.caret_badge_color_armed),
             description = stringResource(R.string.caret_badge_color_armed_description),
@@ -96,7 +107,7 @@ fun CaretBadgeSettingsSection() {
         )
     }
 
-    pickingColor?.let { which ->
+    pickingColor?.takeIf { enabled && customColors }?.let { which ->
         val armed = which == "armed"
         ColorPickerDialog(
             title = stringResource(

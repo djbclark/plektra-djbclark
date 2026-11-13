@@ -63,6 +63,7 @@ object SettingLinkIds {
     const val TEXT_INPUT_SMART_QUOTES = "text_input.smart_quotes"
     const val TEXT_INPUT_CLEAR_ALT_ON_SPACE = "text_input.clear_alt_on_space"
     const val TEXT_INPUT_AUTO_SHOW_KEYBOARD = "text_input.auto_show_keyboard"
+    const val TEXT_INPUT_AUTO_SHOW_RESPECT_APP_VISIBILITY = "text_input.auto_show_respect_app_visibility"
     const val TEXT_INPUT_EXPERIMENTAL_SMOOTH_CARET = "text_input.experimental_smooth_caret"
     const val TEXT_INPUT_ALT_CTRL_SPEECH_SHORTCUT = "text_input.alt_ctrl_speech_shortcut"
     const val TEXT_INPUT_SHIFT_BACKSPACE_DELETE = "text_input.shift_backspace_delete"
@@ -190,8 +191,9 @@ object SettingLinkIds {
     const val MODIFIERS_INDICATOR_MENU_BAR = "modifiers.indicator_menu_bar"
     const val MODIFIERS_INDICATOR_STATUS_BAR = "modifiers.indicator_status_bar"
 
-    // djb/caret-badge: modifier badge beside the text cursor (rendered on the modifiers screen)
+    // Modifier badge beside the text cursor (rendered on the modifiers screen)
     const val MODIFIERS_CARET_BADGE = "modifiers.caret_badge"
+    const val MODIFIERS_CARET_BADGE_CUSTOM_COLORS = "modifiers.caret_badge_custom_colors"
     const val MODIFIERS_CARET_BADGE_ARMED_COLOR = "modifiers.caret_badge_armed_color"
     const val MODIFIERS_CARET_BADGE_LOCKED_COLOR = "modifiers.caret_badge_locked_color"
 }
@@ -470,13 +472,21 @@ object SettingLinkRegistry {
             SettingLinkIds.TEXT_INPUT_CLEAR_ALT_ON_SPACE,
             R.string.clear_alt_on_space_title,
             R.string.clear_alt_on_space_description,
-            destination = SettingsDestination.TextInput
+            destination = SettingsDestination.Modifiers
         ),
         entry(
             SettingLinkIds.TEXT_INPUT_AUTO_SHOW_KEYBOARD,
             R.string.auto_show_keyboard_title,
             R.string.auto_show_keyboard_description,
             destination = SettingsDestination.TextInput
+        ),
+        SettingEntry(
+            id = SettingLinkIds.TEXT_INPUT_AUTO_SHOW_RESPECT_APP_VISIBILITY,
+            titleRes = R.string.auto_show_respect_app_visibility_title,
+            summaryRes = R.string.auto_show_respect_app_visibility_description,
+            route = SettingRoute(destination = SettingsDestination.TextInput),
+            unavailableFallbackId = SettingLinkIds.TEXT_INPUT_AUTO_SHOW_KEYBOARD,
+            availabilityCheck = { SettingsManager.getAutoShowKeyboard(it) }
         ),
         entry(
             SettingLinkIds.TEXT_INPUT_EXPERIMENTAL_SMOOTH_CARET,
@@ -1034,6 +1044,13 @@ object SettingLinkRegistry {
             destination = SettingsDestination.Customization,
             customizationDestination = SettingsActivity.CUSTOMIZATION_DESTINATION_STATUS_BAR_BUTTONS
         ),
+        entry(
+            "status_bar.hidden_apps",
+            R.string.keyboard_bar_hidden_apps_title,
+            R.string.keyboard_bar_hidden_apps_row_description,
+            destination = SettingsDestination.Customization,
+            customizationDestination = SettingsActivity.CUSTOMIZATION_DESTINATION_STATUS_BAR_BUTTONS
+        ),
         // Modifier indicator chips (rendered on the modifiers screen)
         entry(
             SettingLinkIds.MODIFIERS_INDICATOR_BOTTOM_STRIP,
@@ -1057,19 +1074,25 @@ object SettingLinkRegistry {
             SettingLinkIds.MODIFIERS_CARET_BADGE,
             R.string.caret_modifier_badge_title,
             R.string.caret_modifier_badge_description,
-            destination = SettingsDestination.Modifiers
+            destination = SettingsDestination.ModifierIndicators
+        ),
+        entry(
+            SettingLinkIds.MODIFIERS_CARET_BADGE_CUSTOM_COLORS,
+            R.string.caret_badge_custom_colors_title,
+            R.string.caret_badge_custom_colors_description,
+            destination = SettingsDestination.ModifierIndicators
         ),
         entry(
             SettingLinkIds.MODIFIERS_CARET_BADGE_ARMED_COLOR,
             R.string.caret_badge_color_armed,
             R.string.caret_badge_color_armed_description,
-            destination = SettingsDestination.Modifiers
+            destination = SettingsDestination.ModifierIndicators
         ),
         entry(
             SettingLinkIds.MODIFIERS_CARET_BADGE_LOCKED_COLOR,
             R.string.caret_badge_color_locked,
             R.string.caret_badge_color_locked_description,
-            destination = SettingsDestination.Modifiers
+            destination = SettingsDestination.ModifierIndicators
         )
     ) + customizationSettingEntries() + inputDeviceSettingEntries() + systemSettingEntries() +
         titan2EliteToolsSettingEntries()
@@ -1087,6 +1110,7 @@ object SettingLinkRegistry {
     internal val keywordsById: Map<String, Int> = mapOf(
         // djb/ring: notification ring keywords
         SettingLinkIds.TITAN2_ELITE_TOOLS_NOTIFICATION_RING to R.string.kw_titan2_elite_tools_notification_ring,
+        "status_bar.presentation" to R.string.kw_status_bar_presentation,
         SettingLinkIds.MAIN_KEYBOARDS_DEVICES to R.string.kw_main_keyboards_devices,
         SettingLinkIds.MAIN_MODIFIERS to R.string.kw_main_modifiers,
         SettingLinkIds.MAIN_CUSTOM_INPUT_STYLES to R.string.kw_main_custom_input_styles,
@@ -1152,8 +1176,7 @@ object SettingLinkRegistry {
         SettingLinkIds.MODIFIERS_INDICATOR_BOTTOM_STRIP to R.string.kw_indicator_bottom_strip,
         SettingLinkIds.MODIFIERS_INDICATOR_MENU_BAR to R.string.kw_indicator_menu_bar,
         SettingLinkIds.MODIFIERS_INDICATOR_STATUS_BAR to R.string.kw_indicator_status_bar,
-        SettingLinkIds.MODIFIERS_CARET_BADGE to R.string.kw_caret_modifier_badge,
-        "status_bar.presentation" to R.string.kw_status_bar_presentation
+        SettingLinkIds.MODIFIERS_CARET_BADGE to R.string.kw_caret_modifier_badge
     )
 
     fun byId(id: String): SettingEntry? = entriesById[

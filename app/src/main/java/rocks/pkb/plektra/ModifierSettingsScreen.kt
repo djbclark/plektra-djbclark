@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -61,6 +62,7 @@ fun ModifierSettingsScreen(
     var altBinding by remember { mutableStateOf(SettingsManager.getAltModifierBinding(context)) }
     var shiftTapLatches by remember { mutableStateOf(SettingsManager.getShiftTapLatches(context)) }
     var altTapLatches by remember { mutableStateOf(SettingsManager.getAltTapLatches(context)) }
+    var clearAltOnSpace by remember { mutableStateOf(SettingsManager.getClearAltOnSpace(context)) }
     var altLatchStaysOnSpace by remember { mutableStateOf(SettingsManager.getAltLatchStaysOnSpace(context)) }
     var ctrlTapLatches by remember { mutableStateOf(SettingsManager.getCtrlTapLatches(context)) }
     var ctrlLatchStaysOnSpace by remember { mutableStateOf(SettingsManager.getCtrlLatchStaysOnSpace(context)) }
@@ -196,7 +198,6 @@ fun ModifierSettingsScreen(
                 }
             )
 
-            CaretBadgeSettingsSection()
 
             SettingsSectionDivider(stringResource(R.string.modifiers_section_sym))
             ModifierNavigationRow(
@@ -240,6 +241,27 @@ fun ModifierSettingsScreen(
                 onClick = onOpenSymShortcuts
             )
 
+            ModifierSwitchRow(
+                title = stringResource(R.string.clear_alt_on_space_title),
+                description = stringResource(R.string.clear_alt_on_space_description),
+                checked = clearAltOnSpace,
+                linkId = SettingLinkIds.TEXT_INPUT_CLEAR_ALT_ON_SPACE
+            ) {
+                clearAltOnSpace = it
+                SettingsManager.setClearAltOnSpace(context, it)
+            }
+            ModifierSwitchRow(
+                title = stringResource(R.string.alt_latch_stays_on_space_title),
+                description = stringResource(R.string.alt_latch_stays_on_space_description),
+                checked = altLatchStaysOnSpace,
+                indent = true,
+                enabled = clearAltOnSpace,
+                linkId = SettingLinkIds.MODIFIERS_ALT_LATCH_STAYS_ON_SPACE
+            ) {
+                altLatchStaysOnSpace = it
+                SettingsManager.setAltLatchStaysOnSpace(context, it)
+            }
+
             SettingsSectionDivider(stringResource(R.string.modifiers_section_control))
             ModifierNavigationRow(
                 iconRes = R.drawable.navigation_24,
@@ -267,16 +289,6 @@ fun ModifierSettingsScreen(
             ) {
                 altTapLatches = it
                 SettingsManager.setAltTapLatches(context, it)
-            }
-            ModifierSwitchRow(
-                title = stringResource(R.string.alt_latch_stays_on_space_title),
-                description = stringResource(R.string.alt_latch_stays_on_space_description),
-                checked = altLatchStaysOnSpace,
-                indent = true,
-                linkId = SettingLinkIds.MODIFIERS_ALT_LATCH_STAYS_ON_SPACE
-            ) {
-                altLatchStaysOnSpace = it
-                SettingsManager.setAltLatchStaysOnSpace(context, it)
             }
             ModifierSwitchRow(
                 title = stringResource(R.string.ctrl_tap_latches_title),
@@ -456,12 +468,13 @@ private fun ModifierSwitchRow(
     description: String,
     checked: Boolean,
     indent: Boolean = false,
+    enabled: Boolean = true,
     linkId: String? = null,
     onCheckedChange: (Boolean) -> Unit
 ) {
-    Surface(modifier = Modifier.fillMaxWidth().height(64.dp).settingRow(linkId)) {
+    Surface(modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).settingRow(linkId)) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = if (indent) 52.dp else 16.dp, end = 16.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = if (indent) 52.dp else 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -469,10 +482,12 @@ private fun ModifierSwitchRow(
                 Icon(Icons.Filled.Keyboard, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
             }
             Column(modifier = Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium, maxLines = 1)
-                Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.38f))
+                Text(description, style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.38f))
             }
-            Switch(checked = checked, onCheckedChange = onCheckedChange)
+            Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
         }
     }
 }

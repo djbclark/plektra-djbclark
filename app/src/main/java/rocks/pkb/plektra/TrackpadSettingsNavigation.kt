@@ -73,12 +73,10 @@ internal fun trackpadGesturePageFor(childPage: String?, linkId: String?): Trackp
  * the Advanced main page.
  */
 internal fun advancedDestinationNameFor(childPage: String?, linkId: String?): String = when {
-    childPage == ADVANCED_DESTINATION_IME_TEST -> ADVANCED_DESTINATION_IME_TEST
     childPage == ADVANCED_DESTINATION_TRACKPAD_GESTURES -> ADVANCED_DESTINATION_TRACKPAD_GESTURES
     linkId in TRACKPAD_SETTING_LINK_IDS -> ADVANCED_DESTINATION_TRACKPAD_GESTURES
     else -> ADVANCED_DESTINATION_MAIN
 }
 
 internal const val ADVANCED_DESTINATION_MAIN = "Main"
-internal const val ADVANCED_DESTINATION_IME_TEST = "ImeTest"
 internal const val ADVANCED_DESTINATION_TRACKPAD_GESTURES = "TrackpadGestures"

@@ -26,6 +26,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -902,10 +904,10 @@ private fun UserDictWordDialog(
         text = {
             OutlinedTextField(
                 value = word,
+                keyboardOptions = LiteralEntryKeyboardOptions,
                 onValueChange = onWordChange,
-                label = { Text(title) },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().semantics { contentDescription = title },
                 trailingIcon = {
                     if (word.isNotBlank()) {
                         IconButton(onClick = { onWordChange("") }) {

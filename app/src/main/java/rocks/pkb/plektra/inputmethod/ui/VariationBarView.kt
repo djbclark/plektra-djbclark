@@ -3,6 +3,7 @@ package rocks.pkb.plektra.inputmethod.ui
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
+import rocks.pkb.plektra.KeyboardBarTypography
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
@@ -82,6 +83,7 @@ class VariationBarView(
     var onHamburgerMenuRequested: (() -> Unit)? = null
     var onMinimalUiToggleRequested: (() -> Unit)? = null
     var onSoftwareKeyboardModeToggleRequested: (() -> Unit)? = null
+    var onKeypadRequested: (() -> Unit)? = null
     
     /**
      * Sets the microphone button active state (red pulsing background) during speech recognition.
@@ -179,8 +181,8 @@ class VariationBarView(
                     borderWidthPx = dpToPx(1f)
                 )
             }
-            wrapper?.setBackgroundColor(value?.background ?: Color.TRANSPARENT)
-            container?.setBackgroundColor(value?.background ?: Color.TRANSPARENT)
+            wrapper?.setBackgroundColor(value?.let { if (it.textures.containsKey("background")) Color.TRANSPARENT else it.background } ?: Color.TRANSPARENT)
+            container?.setBackgroundColor(value?.let { if (it.textures.containsKey("background")) Color.TRANSPARENT else it.background } ?: Color.TRANSPARENT)
             emptyHintView?.setTextColor(colorWithAlpha(value?.textAndIcons ?: Color.WHITE, 120))
             swipeIndicator?.background = createSwipeIndicatorDrawable()
             applyHeight()
@@ -207,7 +209,7 @@ class VariationBarView(
                 variationsContainerHeight
             )
             visibility = View.GONE
-            setBackgroundColor(themeOverride?.background ?: Color.TRANSPARENT)
+            setBackgroundColor(themeOverride?.let { if (it.textures.containsKey("background")) Color.TRANSPARENT else it.background } ?: Color.TRANSPARENT)
             addOnLayoutChangeListener { view, left, _, right, _, oldLeft, _, oldRight, _ ->
                 if (right - left != oldRight - oldLeft && view.visibility == View.VISIBLE) {
                     view.post {
@@ -248,7 +250,7 @@ class VariationBarView(
                 variationsContainerHeight
             )
             visibility = View.GONE
-            setBackgroundColor(themeOverride?.background ?: Color.TRANSPARENT)
+            setBackgroundColor(themeOverride?.let { if (it.textures.containsKey("background")) Color.TRANSPARENT else it.background } ?: Color.TRANSPARENT)
             addView(container)
         }
 
@@ -507,10 +509,11 @@ class VariationBarView(
         val availableWidth = ((containerView.width.takeIf { it > 0 } ?: fallbackWidth) -
             containerView.paddingLeft - containerView.paddingRight).coerceAtLeast(1)
         val geometrySignature = listOf(
-            availableWidth, verticalPaddingPx(), roundedCorners,
+            availableWidth, verticalPaddingPx(), roundedCorners, KeyboardBarTypography.scale(context),
             SettingsManager.getDynamicVariationBarSlotCount(context),
             SettingsManager.getDynamicVariationBarResizeToContent(context),
-            SettingsManager.getStatusBarSlotsLeft(context), SettingsManager.getStatusBarSlotsRight(context)
+            SettingsManager.getStatusBarSlotsLeft(context), SettingsManager.getStatusBarSlotsRight(context),
+            buttonRegistry?.keypadAccessAvailable == true
         )
         val hasExistingRow = currentVariationsRow != null &&
             currentVariationsRow?.parent == containerView &&
@@ -660,6 +663,7 @@ class VariationBarView(
             onHamburgerMenuRequested = onHamburgerMenuRequested,
             onMinimalUiToggleRequested = onMinimalUiToggleRequested,
             onSoftwareKeyboardModeToggleRequested = onSoftwareKeyboardModeToggleRequested,
+            onKeypadRequested = onKeypadRequested,
             onOpenSettings = { openSettings() },
             onSymbolsPageRequested = onSymbolsPageRequested,
             onUndoRequested = onUndoRequested,
@@ -1122,11 +1126,7 @@ class VariationBarView(
 
         // Calculate text width needed
         val paint = Paint().apply {
-            textSize = TypedValue.applyDimension(
-                TypedValue.COMPLEX_UNIT_SP,
-                16f,
-                context.resources.displayMetrics
-            )
+            textSize = KeyboardBarTypography.preferredMaxPx(context, 6, 16).toFloat()
             typeface = android.graphics.Typeface.DEFAULT_BOLD
         }
         val textWidth = paint.measureText(variation).toInt()
@@ -1152,14 +1152,7 @@ class VariationBarView(
 
         return TextView(context).apply {
             text = variation
-            textSize = 16f
-            TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
-                this,
-                6,
-                16,
-                1,
-                TypedValue.COMPLEX_UNIT_SP
-            )
+            KeyboardBarTypography.applyAutoSize(this, 6, 16)
             setTextColor(themeOverride?.textAndIcons ?: Color.WHITE)
             setTypeface(null, android.graphics.Typeface.BOLD)
             gravity = Gravity.CENTER

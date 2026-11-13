@@ -1,26 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
+        <activity android:name=".TypographyPreviewActivity" android:exported="true"
+            android:permission="android.permission.DUMP" android:theme="@style/Theme.Plektra" />
         <receiver android:name=".SpeechSetupReceiver" android:exported="true"
             android:permission="android.permission.DUMP" />
         <receiver android:name=".ShowcaseReceiver" android:exported="true"
             android:permission="android.permission.DUMP" />
-        <activity android:name=".ShowcaseNotesActivity" android:exported="true"
-            android:configChanges="keyboard|keyboardHidden|navigation"
-            android:permission="android.permission.DUMP" android:launchMode="singleTop"
-            android:label="Notes" android:theme="@style/Theme.Plektra" />
         <receiver
             android:name=".KeyboardBarTestReceiver"
             android:exported="true"
             android:permission="android.permission.DUMP" />
-        <activity
-            android:name=".ImeContourTestActivity"
-            android:exported="true"
-            android:label="IME contour test"
-            android:theme="@style/Theme.Plektra" />
-        <!-- Debug-only entry point for the Markdown notes editor as a capture host. -->
+        <!-- Shell-only entry point for the real notes editor, which is not exported. -->
         <activity-alias
-            android:name=".ShowcaseNotesEditorAlias"
+            android:name=".NotesEditorAlias"
             android:exported="true"
             android:permission="android.permission.DUMP"
             android:targetActivity=".NotesActivity" />

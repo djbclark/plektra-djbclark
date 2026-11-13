@@ -150,9 +150,10 @@ object DeviceSpecific {
         remapper: HardwareKeyRemapper = hardwareKeyRemapper
     ): Int {
         val model = resolveKeyboardModel(event, physicalProfileOverride)
+        val positionNormalized = canonicalPositionKeyCode(model, keyCode, event)
         val normalizedKeyCode = when (model) {
-            KeyboardModel.Q25 -> q25NormalizedKeyCode(keyCode)
-            else -> canonicalPositionKeyCode(model, keyCode, event)
+            KeyboardModel.Q25 -> q25NormalizedKeyCode(positionNormalized)
+            else -> positionNormalized
         }
         val effectiveRemapIds = remapper.supportedIds(enabledRemapIds, model)
         return remapper.peekKeyCode(normalizedKeyCode, event, effectiveRemapIds)
@@ -171,7 +172,8 @@ object DeviceSpecific {
         event: KeyEvent?
     ): Int {
         val usesCanonicalAlphabeticPositions =
-            model == KeyboardModel.KEY2 || model == KeyboardModel.CLICKS_POWER
+            model == KeyboardModel.KEY2 || model == KeyboardModel.Q25 ||
+                model == KeyboardModel.CLICKS_POWER
         if (!usesCanonicalAlphabeticPositions) return keyCode
         return PhysicalKeyPositionNormalizer
             .canonicalAlphabeticKeyCode(event?.scanCode ?: -1)

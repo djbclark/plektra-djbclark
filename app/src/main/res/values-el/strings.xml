@@ -13,6 +13,7 @@
     <string name="input_method_name_ru">Русский</string>
     <string name="input_method_name_sr">Српски</string>
     <string name="input_method_name_uk">Українська</string>
+    <string name="input_method_name_ug">ئۇيغۇرچە</string>
 
     <!-- Settings Screen -->
     <string name="settings_title">Ρυθμίσεις</string>
@@ -76,8 +77,8 @@
     <string name="smart_quotes_title">Στυλ εισαγωγικών</string>
 
     <!-- Clear Alt on Space Section -->
-    <string name="clear_alt_on_space_title">Απελευθέρωση Alt με Space</string>
-    <string name="clear_alt_on_space_description">Τερματίζει Alt ή Alt-Lock όταν πατηθεί Space.</string>
+    <string name="clear_alt_on_space_title">Απελευθέρωση Alt με Space και Enter</string>
+    <string name="clear_alt_on_space_description">Απενεργοποιεί το Alt μίας χρήσης και το Alt-Lock, εκτός αν είναι ενεργή η παρακάτω επιλογή διατήρησης Alt-Lock.</string>
 
     <!-- Swipe to Delete Section -->
     <string name="swipe_to_delete_title">Ενεργοποίηση σάρωσης για διαγραφή</string>
@@ -103,6 +104,14 @@
     <!-- Auto Show Keyboard Section -->
     <string name="auto_show_keyboard_title">Αυτόματη εμφάνιση πληκτρολογίου</string>
     <string name="auto_show_keyboard_description">Εμφανίζει αυτόματα το πληκτρολόγιο οθόνης σε πεδία κειμένου.</string>
+    <string name="auto_show_respect_app_visibility_title">Τήρηση προεπιλογών εμφάνισης της εφαρμογής</string>
+    <string name="auto_show_respect_app_visibility_description">Το Android και η εφαρμογή αποφασίζουν αν το πληκτρολόγιο ανοίγει όταν εισέρχεστε σε ένα πεδίο. Το πάτημα στο πεδίο ή ενός πλήκτρου εξακολουθεί να το ανοίγει.</string>
+    <string name="hardware_keypad_auto_open_title">Αυτόματο άνοιγμα αριθμητικού πληκτρολογίου με φυσικό πληκτρολόγιο</string>
+    <string name="hardware_keypad_auto_open_description">Εμφανίζει το αριθμητικό ή τηλεφωνικό πληκτρολόγιο οθόνης σε πεδία PIN, αριθμών και τηλεφώνου. Διαφορετικά ανοίξτε το με το κουμπί αριθμητικού πληκτρολογίου στη γραμμή πληκτρολογίου.</string>
+    <string name="software_keyboard_emoji_page_in_cycle_title">Σελίδα emoji πλήκτρων στην εναλλαγή σελίδων</string>
+    <string name="software_keyboard_emoji_page_in_cycle_description">Συμπεριλαμβάνει τη σελίδα αντιστοίχισης emoji στην εναλλαγή σελίδων του πληκτρολογίου οθόνης. Ο επιλογέας emoji δεν επηρεάζεται.</string>
+    <string name="software_keyboard_accessibility_full_keyboard">Πλήρες πληκτρολόγιο</string>
+    <string name="software_keyboard_keypad_button_description">Άνοιγμα αριθμητικού πληκτρολογίου οθόνης</string>
 
     <!-- Alt+Ctrl Speech Recognition Shortcut Section -->
     <string name="alt_ctrl_speech_shortcut_title">Alt+Ctrl / BlackBerry Alt+0 για φωνητική εισαγωγή</string>
@@ -341,8 +350,8 @@
     <string name="shift_tap_latches_description">Πατήστε Shift μία φορά για κλείδωμα κεφαλαίων αντί για ένα μόνο κεφαλαίο.</string>
     <string name="alt_tap_latches_title">Ένα πάτημα κλειδώνει το Alt</string>
     <string name="alt_tap_latches_description">Πατήστε Alt μία φορά για να παραμείνει ενεργό το επίπεδο Device SYM μέχρι να ξαναπατηθεί Alt.</string>
-    <string name="alt_latch_stays_on_space_title">Διατήρηση κλειδωμένου Alt μετά το Space</string>
-    <string name="alt_latch_stays_on_space_description">Όταν το Alt είναι κλειδωμένο, το Space κρατά ενεργό το επίπεδο Device SYM αντί να τερματίζει το κλείδωμα.</string>
+    <string name="alt_latch_stays_on_space_title">Διατήρηση Alt-Lock</string>
+    <string name="alt_latch_stays_on_space_description">Τα Space και Enter απενεργοποιούν το Alt μίας χρήσης, αλλά διατηρούν ενεργό το Alt-Lock.</string>
     <string name="ctrl_tap_latches_title">Ένα πάτημα κλειδώνει το Ctrl</string>
     <string name="ctrl_tap_latches_description">Πατήστε Ctrl μία φορά για να παραμείνει ενεργό το Ctrl μέχρι να ξαναπατηθεί Ctrl.</string>
     <string name="ctrl_latch_stays_on_space_title">Διατήρηση κλειδωμένου Ctrl μετά το Ctrl+Space</string>
@@ -699,6 +708,12 @@
     <string name="quick_launcher_title">Plektra-QuickLauncher</string>
     <string name="quick_launcher_subtitle">Πληκτρολογήστε για αναζήτηση. Το Enter ανοίγει το πρώτο αποτέλεσμα.</string>
     <string name="quick_launcher_close">Κλείσιμο</string>
+    <string name="quick_launcher_no_entries_match">Καμία καταχώριση δεν ταιριάζει με “%1$s”.</string>
+    <string name="quick_launcher_add_favorite">Προσθήκη στα αγαπημένα</string>
+    <string name="quick_launcher_remove_favorite">Αφαίρεση από τα αγαπημένα</string>
+    <string name="quick_launcher_hide_entry">Απόκρυψη καταχώρισης</string>
+    <string name="quick_launcher_show_entry">Εμφάνιση καταχώρισης</string>
+    <string name="quick_launcher_edit_entry">Επεξεργασία καταχώρισης</string>
     <string name="quick_launcher_search_placeholder">Αρχίστε να πληκτρολογείτε...</string>
     <string name="quick_launcher_auto_start_single">Αυτόματη εκκίνηση όταν απομένει μόνο ένα αποτέλεσμα</string>
     <string name="quick_launcher_auto_start_single_title">Αυτόματο άνοιγμα μοναδικής αντιστοίχισης</string>
@@ -1480,6 +1495,13 @@ QWERTZ σε φυσικό QWERTY
     <string name="clipboard_clear_all">Εκκαθάριση όλων</string>
     <string name="clipboard_empty_state">Δεν υπάρχει ιστορικό πρόχειρου</string>
     <string name="clipboard_locked_state">Το ιστορικό του πρόχειρου δεν είναι διαθέσιμο όσο η συσκευή είναι κλειδωμένη.</string>
+    <string name="clipboard_loading_state">Φόρτωση ιστορικού πρόχειρου…</string>
+    <string name="clipboard_error_state">Δεν ήταν δυνατή η φόρτωση του ιστορικού πρόχειρου. Ανοίξτε το ξανά για νέα προσπάθεια.</string>
+    <string name="clipboard_save_failed">Δεν ήταν δυνατή η αποθήκευση του αντιγραμμένου κειμένου στο ιστορικό πρόχειρου.</string>
+    <string name="clipboard_pin_failed">Δεν ήταν δυνατό το καρφίτσωμα ή ξεκαρφίτσωμα της καταχώρισης.</string>
+    <string name="clipboard_delete_failed">Δεν ήταν δυνατή η διαγραφή της καταχώρισης.</string>
+    <string name="clipboard_clear_failed">Δεν ήταν δυνατή η εκκαθάριση του ιστορικού πρόχειρου.</string>
+    <string name="clipboard_system_clear_failed">Δεν ήταν δυνατή η εκκαθάριση του πρόχειρου συστήματος.</string>
     <string name="clipboard_pin">Καρφίτσωμα</string>
     <string name="clipboard_unpin">Ξεκαρφίτσωμα</string>
     <string name="clipboard_delete">Διαγραφή</string>
@@ -1754,4 +1776,42 @@ QWERTZ σε φυσικό QWERTY
     <string name="key_remap_section_title">Αντιστοίχιση πλήκτρων</string>
     <string name="key_remap_swap_shift_right_enter_title">Εναλλαγή δεξιού Shift και Enter</string>
     <string name="key_remap_swap_shift_right_enter_summary">Το δεξί πλήκτρο Shift πληκτρολογεί Enter και το πλήκτρο Enter λειτουργεί ως Shift.</string>
+    <string name="caret_modifier_badge_title">Εμφάνιση τροποποιητών στον δρομέα</string>
+    <string name="caret_modifier_badge_description">Τα Shift, Alt, Ctrl και Sym εμφανίζονται δίπλα στον δρομέα κειμένου όταν είναι ενεργά. Λειτουργεί μόνο σε εφαρμογές που αναφέρουν πού βρίσκεται ο δρομέας.</string>
+    <string name="caret_modifier_badge_needs_overlay">Το σχέδιο δίπλα στον δρομέα σημαίνει σχέδιο πάνω από την εφαρμογή στην οποία πληκτρολογείτε, οπότε το Android χρειάζεται πρώτα άδεια.</string>
+    <string name="caret_modifier_badge_grant_overlay">Να επιτρέπεται η εμφάνιση πάνω από άλλες εφαρμογές</string>
+    <string name="caret_badge_color_armed">Χρώμα για ένα πάτημα</string>
+    <string name="caret_badge_color_armed_description">Τα Shift, Alt ή Ctrl οπλισμένα μόνο για το επόμενο πλήκτρο</string>
+    <string name="caret_badge_color_locked">Χρώμα κλειδώματος</string>
+    <string name="caret_badge_color_locked_description">Caps lock, κλείδωμα Alt και κλείδωμα Ctrl, που μένουν ενεργά μέχρι να τα απενεργοποιήσετε</string>
+    <string name="caret_badge_color_pick">Ένας τροποποιητής που κρατιέται πατημένος εμφανίζεται σε αχνότερη απόχρωση αυτών των χρωμάτων.</string>
+    <string name="kw_caret_modifier_badge">δρομέας, κέρσορας, shift, alt, ctrl, sym, caps lock, επικάλυψη, σήμα, τροποποιητής, ένδειξη</string>
+    <string name="caret_badge_custom_colors_title">Χρήση προσαρμοσμένων χρωμάτων</string>
+    <string name="caret_badge_custom_colors_description">Αντικατάσταση των χρωμάτων του θέματος πληκτρολογίου.</string>
+    <string name="keyboard_bar_hidden_apps_title">Να μην εμφανίζεται ποτέ η γραμμή</string>
+    <string name="keyboard_bar_hidden_apps_row_description">Εφαρμογές όπου η γραμμή παραμένει κρυφή, ακόμη και με χειροκίνητο άνοιγμα</string>
+    <string name="keyboard_bar_hidden_apps_summary_none">Δεν επιλέχθηκαν εφαρμογές</string>
+    <plurals name="keyboard_bar_hidden_apps_summary">
+        <item quantity="one">%d εφαρμογή</item>
+        <item quantity="other">%d εφαρμογές</item>
+    </plurals>
+    <string name="keyboard_bar_hidden_apps_description">Στις εφαρμογές που επιλέγετε εδώ, το Plektra δεν εμφανίζει ποτέ τη γραμμή του ούτε το πληκτρολόγιο οθόνης: ανεξάρτητα από τις υπόλοιπες ρυθμίσεις ορατότητας, ακόμη και αν προσπαθήσετε να την ανοίξετε με πλήκτρο, συντόμευση ή το κουμπί πληκτρολογίου του συστήματος. Η πληκτρολόγηση με το φυσικό πληκτρολόγιο συνεχίζει να λειτουργεί, μαζί με τα επίπεδα SYM, τις συντομεύσεις, τους τροποποιητές και τους ακριβείς κωδικούς emoji ή αποσπασμάτων. Το πρόχειρο και η επιλογή emoji παραμένουν κλειστά σε αυτές τις εφαρμογές.</string>
+    <string name="keyboard_bar_hidden_apps_webapk_note">Εφαρμογή ιστού — εκτελείται μέσα στο %1$s, άρα η γραμμή είναι κρυφή κι εκεί</string>
+    <string name="emoji_category_unicode_symbols">Σύμβολα κειμένου</string>
+    <string name="emoji_category_kaomoji">Καομότζι</string>
+    <string name="emoji_style_title">Εμφάνιση emoji</string>
+    <string name="emoji_style_noto">Noto Color Emoji (ενσωματωμένη)</string>
+    <string name="emoji_style_system">Γραμματοσειρά συστήματος</string>
+    <string name="emoji_style_description">Το Plektra εισάγει τυπικά emoji Unicode· η εφαρμογή στην οποία γράφεις τα εμφανίζει με τη δική της γραμματοσειρά.</string>
+    <string name="emoji_skin_tone_title">Προεπιλεγμένος τόνος δέρματος</string>
+    <string name="emoji_pages_emoji_title">Ξεφύλλισμα σελίδας emoji με Q και P</string>
+    <string name="emoji_pages_symbols_title">Ξεφύλλισμα σελίδας συμβόλων με Q και P</string>
+    <string name="emoji_pages_description">Τα Q και P αλλάζουν σελίδα, Shift+Q και Shift+P μεταβαίνουν μεταξύ κατηγοριών, το A ανοίγει την αναζήτηση. Κράτησε πατημένο ένα emoji για τους τόνους δέρματος. Στους τόνους δέρματος, το P δείχνει περισσότερους· για ένα emoji της δικής σου αντιστοίχισης, το ✎ στο A ανοίγει την προσαρμογή του πλήκτρου.</string>
+    <string name="sym_paged_navigation_note">Με ενεργές τις σελίδες, τα Q (‹) και P (›) αλλάζουν σελίδα. Οι δικές σου αντιστοιχίσεις των Q και P παραμένουν αποθηκευμένες και επεξεργάζονται εδώ: με ανοιχτή τη σελίδα, κράτησε πατημένο το SYM και πάτησε Q ή P για να τις πληκτρολογήσεις· χωρίς τις σελίδες ισχύουν ξανά απευθείας.</string>
+    <string name="sym_navigation_key_content_description">Το %1$s αλλάζει σελίδα (%2$s). Η αντιστοίχισή σου: %3$s</string>
+    <string name="kaomoji_placement_title">Σελίδες καομότζι</string>
+    <string name="kaomoji_placement_symbols">Μετά τα σύμβολα</string>
+    <string name="kaomoji_placement_emoji">Μετά τα emoji</string>
+    <string name="kaomoji_placement_off">Ανενεργό</string>
+    <string name="emoji_picker_extras_title">Σύμβολα κειμένου και καομότζι στον επιλογέα emoji</string>
 </resources>

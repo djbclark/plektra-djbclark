@@ -52,9 +52,11 @@ class PlektraApplication : Application() {
             if (key == null || key in DirectBootKeyboardConfig.KEYS) config.refresh(source)
         }.also { preferences.registerOnSharedPreferenceChangeListener(it) }
         SettingsManager.initializeAltShiftLayoutSwitchDefault(this)
+        rocks.pkb.plektra.data.emoji.EmojiRendering.ensureInitialized(this)
         SettingsManager.enforceTitan2EliteRoundedCornersOnce(this)
         // Restore the vendor keyboard switch if a ring process ended while it was darkened.
         rocks.pkb.plektra.ring.RingBacklight.restoreLater(this)
+        SettingsManager.migrateCompactSoftwareKeyHeightOnce(this)
         AppPackageChangeMonitor.register(this)
         ClicksPowerKeyboardController.initialize(this)
         publishSoftwareKeyboardModeShortcut()

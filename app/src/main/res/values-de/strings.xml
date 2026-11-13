@@ -15,6 +15,7 @@
     <string name="input_method_name_pl">Polski</string>
     <string name="input_method_name_es">Español</string>
     <string name="input_method_name_uk">Українська</string>
+    <string name="input_method_name_ug">ئۇيغۇرچە</string>
     <string name="settings_title">Einstellungen</string>
     <string name="back">Zurück</string>
     <string name="settings_back_content_description">Zurück</string>
@@ -58,13 +59,21 @@
     <string name="auto_space_punctuation_choose_off">Aus</string>
     <string name="auto_space_punctuation_reset">Zurücksetzen</string>
     <string name="smart_quotes_title">Anführungszeichen-Stil</string>
-    <string name="clear_alt_on_space_title">Alt mit Leertaste lösen</string>
-    <string name="clear_alt_on_space_description">Beendet Alt oder Alt-Lock, wenn Space gedrückt wird.</string>
+    <string name="clear_alt_on_space_title">Alt mit Leertaste und Enter lösen</string>
+    <string name="clear_alt_on_space_description">Deaktiviert einmaliges und eingerastetes Alt, sofern „Alt eingerastet lassen“ unten ausgeschaltet ist.</string>
     <string name="swipe_to_delete_title">Wischen zum Löschen aktivieren</string>
     <string name="swipe_to_delete_description">Aktuell nur Titan 2.</string>
     <string name="swipe_incremental_threshold_title">Wischleisten-Empfindlichkeit</string>
     <string name="auto_show_keyboard_title">Tastatur automatisch anzeigen</string>
     <string name="auto_show_keyboard_description">Zeigt die Bildschirmtastatur automatisch in Textfeldern.</string>
+    <string name="auto_show_respect_app_visibility_title">Anzeigevorgaben der App beachten</string>
+    <string name="auto_show_respect_app_visibility_description">Android und die App entscheiden, ob die Tastatur beim Betreten eines Felds erscheint. Antippen des Felds oder ein Tastendruck öffnet sie weiterhin.</string>
+    <string name="hardware_keypad_auto_open_title">Ziffernblock bei Hardwaretastatur automatisch öffnen</string>
+    <string name="hardware_keypad_auto_open_description">Zeigt in PIN-, Zahlen- und Telefonfeldern den Ziffern- oder Telefonblock auf dem Bildschirm. Sonst öffnet ihn die Tastaturtaste in der Tastaturleiste.</string>
+    <string name="software_keyboard_emoji_page_in_cycle_title">Emoji-Belegung im Seitenwechsel</string>
+    <string name="software_keyboard_emoji_page_in_cycle_description">Nimmt die Emoji-Belegungsseite in den Seitenwechsel der Bildschirmtastatur auf. Die Emoji-Auswahl bleibt davon unberührt.</string>
+    <string name="software_keyboard_accessibility_full_keyboard">Volle Tastatur</string>
+    <string name="software_keyboard_keypad_button_description">Bildschirm-Ziffernblock öffnen</string>
     <string name="info_title">Informationen</string>
     <string name="info_description">Einstellungen werden automatisch gespeichert und sofort auf die Eingabemethode angewendet.</string>
     <string name="keyboard_title">Plektra Tastatur</string>
@@ -302,7 +311,7 @@
     <string name="quick_launcher_limit_results_description">Die vollständige alphabetische App-Liste wird nicht gerendert. Der Schnellstarter bleibt leer, bis du tippst, und zeigt dann nur die drei besten Treffer.</string>
     <string name="quick_launcher_text_field_shortcuts_title">SYM+Space in Textfeldern erlauben</string>
     <string name="quick_launcher_text_field_shortcuts_description">Wenn aktiv, kann der QuickLauncher auch geöffnet werden, während der Cursor in einem App-Textfeld steht.</string>
-    <string name="quick_launcher_text_field_shortcuts_hint">In Textfeldern muss SYM gehalten und dann Space gedrückt werden. Der SYM-Latch kann das nicht auslösen, weil Antippen von SYM die SYM-Seiten durchschaltet.</string>
+    <string name="quick_launcher_text_field_shortcuts_hint">In Textfeldern muss SYM gehalten und dann die Leertaste gedrückt werden. Eingerastetes SYM kann das nicht auslösen, weil Antippen von SYM die SYM-Seiten durchschaltet.</string>
     <string name="quick_launcher_alt_space_text_fields_title">Alt+Space in Textfeldern erlauben</string>
     <string name="quick_launcher_alt_space_text_fields_description">Öffnet den Quick Launcher mit Alt+Leertaste. Aktivieren schaltet Alt+Leertaste für die vorherige Eingabesprache aus.</string>
     <string name="quick_launcher_alt_shortcuts_outside_fields_title">Alt-Shortcuts außerhalb von Textfeldern</string>
@@ -872,7 +881,7 @@ Jede Taste kann als Keycode, Aktion, Native Ctrl oder Keine konfiguriert werden.
     <string name="tutorial_page_select_nightly_description">Wähle Plektra Nightly unter den Eingabemethoden aus. Im nächsten Schritt legst du fest, ob sie eine virtuelle Tastatur oder den Hardware-Tastaturmodus verwenden soll.</string>
     <string name="tutorial_select_nightly_button">Plektra Nightly auswählen</string>
     <string name="tutorial_page_led_title">Modifier-Anzeigen</string>
-    <string name="tutorial_page_led_description">Um Plektra optimal zu nutzen, stelle in den Systemeinstellungen die Fn-Taste auf Ctrl um. Plektra kann Modifier-Zustände im Bottom Strip, in der Menüleiste oder in der Plektra-Tastaturleiste anzeigen: One-Shot-Zustände nutzen die aktive Farbe, gelockte Zustände die Locked-Farbe.</string>
+    <string name="tutorial_page_led_description">Stelle in den Systemeinstellungen die Fn-Taste auf Ctrl um. Plektra kann Modifier-Zustände im Bottom Strip, in der Android-Statusleiste oder in der Plektra-Tastaturleiste anzeigen: Modifier für die nächste Taste nutzen die aktive Farbe, eingerastete Modifier die Farbe für eingerastete Zustände.</string>
     <string name="tutorial_page_nav_mode_title">Nav-Modus</string>
     <string name="tutorial_page_nav_mode_description">Der Nav-Modus lässt dich mit Kürzeln wie IJKL oder ESDF durch die Geräteoberfläche navigieren.\nSo aktivierst du ihn:\n• Drücke Ctrl zweimal schnell\n• Buchstabentasten werden zu Navigationstasten\n• Drücke Ctrl erneut, um zu beenden\nJede Zuordnung kann in den erweiterten Einstellungen angepasst werden.</string>
     <string name="tutorial_nav_mode_bullet_selection">Auswahlaktionen erweitern markierten Text nach links, rechts oder wortweise.</string>
@@ -939,6 +948,13 @@ Jede Taste kann als Keycode, Aktion, Native Ctrl oder Keine konfiguriert werden.
     <string name="clipboard_clear_all">Alle löschen</string>
     <string name="clipboard_empty_state">Kein Zwischenablageverlauf</string>
     <string name="clipboard_locked_state">Der Zwischenablageverlauf ist nicht verfügbar, solange das Gerät gesperrt ist.</string>
+    <string name="clipboard_loading_state">Zwischenablageverlauf wird geladen …</string>
+    <string name="clipboard_error_state">Der Zwischenablageverlauf konnte nicht geladen werden. Zum erneuten Versuch erneut öffnen.</string>
+    <string name="clipboard_save_failed">Der kopierte Text konnte nicht im Zwischenablageverlauf gespeichert werden.</string>
+    <string name="clipboard_pin_failed">Der Eintrag konnte nicht angeheftet oder gelöst werden.</string>
+    <string name="clipboard_delete_failed">Der Eintrag konnte nicht gelöscht werden.</string>
+    <string name="clipboard_clear_failed">Der Zwischenablageverlauf konnte nicht geleert werden.</string>
+    <string name="clipboard_system_clear_failed">Die System-Zwischenablage konnte nicht geleert werden.</string>
     <string name="clipboard_pin">Anheften</string>
     <string name="clipboard_unpin">Loslösen</string>
     <string name="clipboard_delete">Löschen</string>
@@ -1426,7 +1442,7 @@ Jede Taste kann als Keycode, Aktion, Native Ctrl oder Keine konfiguriert werden.
     <string name="keyboard_theme_preview_on_hold">Tastenvorschau nur beim Halten</string>
     <string name="keyboard_theme_character_picker">Zeichenwahl bei Langdruck</string>
     <string name="keyboard_theme_wizard_leds">LED-Farben</string>
-    <string name="keyboard_theme_wizard_leds_description">Wähle die Farben für inaktive, aktive und gesperrte Modifier-Anzeigen.</string>
+    <string name="keyboard_theme_wizard_leds_description">Wähle die Farben für inaktive, aktive und eingerastete Modifier-Anzeigen.</string>
 
     <!-- Unsichtbare Such-Keywords pro Einstellungseintrag; werden nie angezeigt,
          sondern nur von der Einstellungssuche genutzt. -->
@@ -1457,7 +1473,7 @@ Jede Taste kann als Keycode, Aktion, Native Ctrl oder Keine konfiguriert werden.
     <string name="kw_accessibility_suggestions_delay">Verzögerung, Vorschläge, Barrierefreiheit, Timeout</string>
     <string name="kw_keyboard_timing_long_press">Langdruck, lange Taste, Verzögerung, Timing, Schwellenwert</string>
     <string name="kw_advanced_swipe_threshold">Wischen, Auswahl, Schwellenwert, Cursor</string>
-    <string name="kw_modifiers_long_press_modifier">Langdruck, Modifier, Einmalaktivierung</string>
+    <string name="kw_modifiers_long_press_modifier">Langdruck, Modifier, nächste Taste</string>
     <string name="kw_modifiers_long_press_threshold">Langdruck, Verzögerung, Schwellenwert, Modifier</string>
     <string name="kw_modifier_indicators">LED, LEDs, Leuchten, Anzeigen, wo Modifier-Zustand erscheint</string>
     <string name="kw_custom_input_styles_layout_mode">Layoutmodus, pro App, Wechsel</string>
@@ -1471,7 +1487,7 @@ Jede Taste kann als Keycode, Aktion, Native Ctrl oder Keine konfiguriert werden.
     <string name="kw_theme_toggle_popup_tail">Schweif, Verbindung, Popup</string>
     <string name="kw_theme_toggle_preview_on_hold">Vorschau, Halten, Langdruck</string>
     <string name="kw_theme_toggle_character_picker">Zeichenwahl, Akzente, Alternativen, Symbole</string>
-    <string name="kw_theme_led_colors">LED, LEDs, inaktiv, aktiv, gesperrt, Modifier, Farben, Anzeigen</string>
+    <string name="kw_theme_led_colors">LED, LEDs, inaktiv, aktiv, eingerastet, Modifier, Farben, Anzeigen</string>
     <string name="kw_indicator_bottom_strip">LED, LEDs, Leuchten, Streifen, unten</string>
     <string name="kw_indicator_menu_bar">LED, Leuchten, Icon, Statusleiste, Anzeigen</string>
     <string name="kw_indicator_status_bar">LED, Leuchten, Symbole, Anzeigen, Plektra</string>
@@ -1482,6 +1498,15 @@ Jede Taste kann als Keycode, Aktion, Native Ctrl oder Keine konfiguriert werden.
     <string name="ring_title">Benachrichtigungsring</string><string name="ring_row_description">Leuchten um das Kameraloch bei ausgeschaltetem Bildschirm</string><string name="ring_intro">Bei einer neuen Benachrichtigung leuchtet ein Ring um das Kameraloch.</string><string name="ring_enable_title">Ring bei neuen Benachrichtigungen</string><string name="ring_enable_description">Nur Benachrichtigungen, die du wegwischen könntest.</string><string name="ring_access_title">Benachrichtigungszugriff</string><string name="ring_access_granted">Erteilt</string><string name="ring_access_missing">Nicht erteilt</string><string name="ring_fullscreen_title">Über dem Sperrbildschirm anzeigen</string><string name="ring_fullscreen_granted">Erlaubt</string><string name="ring_fullscreen_missing">Nicht erlaubt</string><string name="ring_post_title">Plektra-Benachrichtigungen</string><string name="ring_post_granted">Erlaubt</string><string name="ring_post_missing">Blockiert</string><string name="ring_grant_via_broker">Über die gekoppelte Einrichtung erteilen</string><string name="ring_grant_open_settings">Einstellungen öffnen</string><string name="ring_grant_pairing_hint">Kopple Wireless Debugging einmal über die Geräteeinrichtung.</string><string name="ring_duration_title">Bildschirm anlassen für</string><string name="ring_duration_description">Danach schaltet das Timeout des Telefons den Bildschirm aus.</string><string name="ring_duration_minutes">%1$d Min.</string><string name="ring_brightness_title">Ringhelligkeit</string><string name="ring_brightness_dim">Gedimmt</string><string name="ring_brightness_normal">Normal</string><string name="ring_brightness_bright">Hell</string><string name="ring_app_colors_title">App-Farben</string><string name="ring_app_colors_description">Gib einer App ihre eigene Ringfarbe.</string><string name="ring_app_colors_add">App hinzufügen</string><string name="ring_app_colors_remove">Entfernen</string><string name="ring_app_colors_pick">Wähle die Ringfarbe.</string><string name="ring_try">Ausprobieren</string><string name="ring_try_description">Zeigt den Ring mit Plektras Symbol.</string><string name="ring_icons_title">App-Symbole anzeigen</string><string name="ring_icons_description">Zeigt wartende App-Symbole.</string><string name="ring_adjust">Ring an die Linse anpassen</string><string name="ring_adjust_description">Passe Position, Größe und Dicke an.</string><string name="ring_adjust_hint">Ziehen · Pfeile · + und − · [ und ] · Enter speichert</string><string name="ring_adjust_smaller">−</string><string name="ring_adjust_larger">+</string><string name="ring_adjust_thinner">Dünner</string><string name="ring_adjust_thicker">Dicker</string><string name="ring_adjust_reset">Auto</string><string name="ring_adjust_done">Fertig</string><string name="ring_launcher_text">Bildschirm wird für eine Benachrichtigung eingeschaltet</string><string name="ring_channel_name">Benachrichtigungsring</string><string name="ring_channel_description">Wird nur zum Einschalten des Bildschirms genutzt.</string><string name="ring_default_color_title">Standardfarbe</string><string name="ring_default_color_description">Für Apps ohne eigene Farbe.</string><string name="ring_color_too_dark">Zu dunkel. Erhöhe die Helligkeit.</string>
     <string name="keyboard_bar_show_on_launcher">Leiste auf dem Launcher-Startbildschirm anzeigen</string>
     <string name="keyboard_bar_show_on_launcher_description">Leiste auch anzeigen, wenn Niagara auf dem Startbildschirm ein unsichtbares Eingabefeld verwendet.</string>
+    <string name="keyboard_bar_hidden_apps_title">Leiste niemals anzeigen</string>
+    <string name="keyboard_bar_hidden_apps_row_description">Apps, in denen die Leiste verborgen bleibt – auch beim manuellen Öffnen</string>
+    <string name="keyboard_bar_hidden_apps_summary_none">Keine Apps ausgewählt</string>
+    <plurals name="keyboard_bar_hidden_apps_summary">
+        <item quantity="one">%d App</item>
+        <item quantity="other">%d Apps</item>
+    </plurals>
+    <string name="keyboard_bar_hidden_apps_description">In den hier ausgewählten Apps zeigt Plektra weder die Leiste noch die Bildschirmtastatur an: unabhängig von den übrigen Sichtbarkeitseinstellungen und auch dann nicht, wenn du sie per Taste, Kürzel oder Tastatur-Schaltfläche des Systems öffnen willst. Die Hardware-Tastatur tippt weiter, einschließlich SYM-Ebenen, Kürzeln, Modifikatoren und exakter Emoji- oder Snippet-Codes. Zwischenablage und Emoji-Auswahl bleiben in diesen Apps geschlossen.</string>
+    <string name="keyboard_bar_hidden_apps_webapk_note">Web-App – läuft innerhalb von %1$s, daher bleibt die Leiste auch dort verborgen</string>
     <string name="keyboard_bar_suggestions">Vorschläge</string>
     <string name="keyboard_bar_actions">Varianten und Menü</string>
     <string name="keyboard_bar_slim_description">Der schnelle Umschalter wechselt zwischen deinem normalen und deinem Slim-Profil.</string>
@@ -1650,20 +1675,20 @@ Jede Taste kann als Keycode, Aktion, Native Ctrl oder Keine konfiguriert werden.
     <string name="device_setup_open_pairing">Drahtloses Debugging öffnen</string>
     <string name="device_setup_dnd_on">„Bitte nicht stören“ ist an und kann den Kopplungscode verbergen. Schalte es aus, bis du gekoppelt bist.</string>
     <string name="device_setup_needs_notifications">Erlaube zuerst Plektra-Benachrichtigungen – der Kopplungscode kommt als eine solche an.</string>
+    <string name="caret_modifier_badge_title">Modifier am Cursor anzeigen</string>
+    <string name="caret_modifier_badge_description">Shift, Alt, Ctrl und SYM erscheinen neben dem Textcursor, wenn sie aktiv sind. Funktioniert in Apps, die die Cursorposition melden.</string>
+    <string name="caret_modifier_badge_needs_overlay">Damit die Modifier neben dem Textcursor erscheinen, erlaube Plektra die Anzeige über anderen Apps.</string>
+    <string name="caret_modifier_badge_grant_overlay">Anzeige über anderen Apps erlauben</string>
+    <string name="caret_badge_color_armed">Farbe für die nächste Taste</string>
+    <string name="caret_badge_color_armed_description">Shift, Alt oder Ctrl ist für die nächste Taste aktiviert.</string>
+    <string name="caret_badge_color_locked">Farbe für eingerastete Modifier</string>
+    <string name="caret_badge_color_locked_description">Caps Lock, Alt und Ctrl bleiben aktiv, bis du sie ausschaltest.</string>
+    <string name="caret_badge_color_pick">Gehaltene Modifier erscheinen in einer abgeschwächten Variante dieser Farben.</string>
+    <string name="kw_caret_modifier_badge">Cursor, Caret, Shift, Alt, Ctrl, SYM, Caps Lock, Overlay, Badge, Modifier, Anzeige, nächste Taste, eingerastet, gehalten</string>
     <string name="app_raw_mode_title">Exaktes Tippen</string>
     <string name="app_raw_mode_row_description">Für Terminals, SSH und Code: Was du tippst, kommt an – nichts wird korrigiert oder großgeschrieben</string>
     <string name="app_raw_mode_description">In den hier ausgewählten Apps sendet Plektra jeden Tastendruck unverändert: keine Vorschläge, keine automatische Korrektur, kein Großbuchstabe am Zeilenanfang, kein Punkt durch doppeltes Leerzeichen. Gedacht für Terminals, SSH-Clients, Code-Editoren und alles andere, wo eine hilfreiche Korrektur aus einem Befehl einen Tippfehler macht – `ls -la` darf nie zu `Ls -la.` werden</string>
     <string name="app_raw_mode_webapk_note">Web-App – tippt innerhalb von %1$s, daher ist %1$s ebenfalls ausgeschlossen</string>
-    <!-- djb/caret-badge: modifier badge beside the text cursor -->
-    <string name="caret_modifier_badge_title">Modifier am Cursor anzeigen</string>
-    <string name="caret_modifier_badge_description">Shift, Alt, Ctrl und Sym erscheinen neben dem Textcursor, sobald sie aktiv sind. Funktioniert nur in Apps, die melden, wo der Cursor steht.</string>
-    <string name="caret_modifier_badge_needs_overlay">Neben dem Cursor zu zeichnen heißt, über die App zu zeichnen, in der du tippst – dafür braucht Android zuerst eine Berechtigung.</string>
-    <string name="caret_modifier_badge_grant_overlay">Zeichnen über Apps erlauben</string>
-    <string name="caret_badge_color_armed">Farbe für einmaliges Drücken</string>
-    <string name="caret_badge_color_armed_description">Shift, Alt oder Ctrl nur für die nächste Taste scharf</string>
-    <string name="caret_badge_color_locked">Farbe für gelockt</string>
-    <string name="caret_badge_color_locked_description">Caps Lock, Alt-Lock und Ctrl-Lock, die an bleiben, bis du sie ausschaltest</string>
-    <string name="caret_badge_color_pick">Ein gehaltener Modifier wird in einer abgeschwächten Version dieser Farben angezeigt.</string>
     <string name="screen_trackpad_title">Bildschirm-Trackpad</string>
     <string name="screen_trackpad_description">Halte eine Taste und wische irgendwo auf dem Bildschirm, um den Cursor zu bewegen</string>
     <string name="screen_trackpad_enabled_title">Bildschirm-Trackpad aktivieren</string>
@@ -1805,4 +1830,34 @@ Jede Taste kann als Keycode, Aktion, Native Ctrl oder Keine konfiguriert werden.
     <string name="key_remap_section_title">Tasten umbelegen</string>
     <string name="key_remap_swap_shift_right_enter_title">Rechte Shift- und Enter-Taste tauschen</string>
     <string name="key_remap_swap_shift_right_enter_summary">Die rechte Shift-Taste gibt Enter ein, die Enter-Taste wirkt als Shift.</string>
+    <string name="shift_tap_latches_title">Shift mit einem Tipp einrasten</string>
+    <string name="shift_tap_latches_description">Ein Tipp auf Shift aktiviert Caps Lock, statt Shift nur für die nächste Taste zu aktivieren.</string>
+    <string name="alt_tap_latches_title">Alt mit einem Tipp einrasten</string>
+    <string name="alt_tap_latches_description">Ein Tipp auf Alt lässt den Geräte-SYM-Layer aktiv, bis du erneut auf Alt tippst.</string>
+    <string name="ctrl_tap_latches_title">Ctrl mit einem Tipp einrasten</string>
+    <string name="ctrl_tap_latches_description">Ein Tipp auf Ctrl lässt Ctrl aktiv, bis du erneut auf Ctrl tippst.</string>
+    <string name="keyboard_theme_led_inactive">LED: inaktiv</string>
+    <string name="keyboard_theme_led_active">LED: aktiv</string>
+    <string name="keyboard_theme_led_locked">LED: eingerastet</string>
+    <string name="caret_badge_custom_colors_title">Eigene Farben verwenden</string>
+    <string name="caret_badge_custom_colors_description">Farben des Keyboard-Themes ersetzen.</string>
+    <string name="alt_latch_stays_on_space_title">Alt eingerastet lassen</string>
+    <string name="alt_latch_stays_on_space_description">Leertaste und Enter deaktivieren einmaliges Alt, lassen eingerastetes Alt aber aktiv.</string>
+    <string name="emoji_category_unicode_symbols">Textsymbole</string>
+    <string name="emoji_category_kaomoji">Kaomoji</string>
+    <string name="emoji_style_title">Emoji-Darstellung</string>
+    <string name="emoji_style_noto">Noto Color Emoji (integriert)</string>
+    <string name="emoji_style_system">Systemschrift</string>
+    <string name="emoji_style_description">Plektra fügt Unicode-Standard-Emoji ein; die App, in der du schreibst, zeigt sie mit ihrer eigenen Schrift an.</string>
+    <string name="emoji_skin_tone_title">Standard-Hautton</string>
+    <string name="emoji_pages_emoji_title">Emoji-Seite mit Q und P blättern</string>
+    <string name="emoji_pages_symbols_title">Symbolseite mit Q und P blättern</string>
+    <string name="emoji_pages_description">Q und P blättern, Umschalt+Q und Umschalt+P springen zwischen Kategorien, A öffnet die Suche. Halte ein Emoji für seine Hauttöne. Bei den Hauttönen blättert P zu weiteren; bei einem Emoji deiner eigenen Belegung öffnet ✎ auf A die Anpassung der Taste.</string>
+    <string name="sym_paged_navigation_note">Mit eingeschalteten Seiten blättern Q (‹) und P (›). Deine eigenen Belegungen von Q und P bleiben gespeichert und lassen sich hier bearbeiten: Bei geöffneter Seite tippst du sie mit gehaltener SYM-Taste und Q oder P; ohne Seiten gelten sie wieder direkt.</string>
+    <string name="sym_navigation_key_content_description">%1$s blättert (%2$s). Deine Belegung: %3$s</string>
+    <string name="kaomoji_placement_title">Kaomoji-Seiten</string>
+    <string name="kaomoji_placement_symbols">Nach den Symbolen</string>
+    <string name="kaomoji_placement_emoji">Nach den Emoji</string>
+    <string name="kaomoji_placement_off">Aus</string>
+    <string name="emoji_picker_extras_title">Textsymbole und Kaomoji im Emoji-Picker</string>
 </resources>

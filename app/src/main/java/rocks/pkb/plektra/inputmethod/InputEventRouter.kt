@@ -300,6 +300,26 @@ class InputEventRouter(
         val onShiftOneShotToggledOff: () -> Unit = {}
     )
 
+    fun handleAltModifierKeyDown(
+        keyCode: Int,
+        event: KeyEvent?,
+        modifiers: ModifierStateController,
+        symLayout: SymLayoutController,
+        updateStatusBar: () -> Unit,
+        startSpeechRecognition: () -> Unit
+    ) {
+        if (event?.isCtrlPressed == true && !modifiers.altPressed &&
+            SettingsManager.getAltCtrlSpeechShortcutEnabled(context)) {
+            startSpeechRecognition()
+            return
+        }
+        if (symLayout.isSymActive() && symLayout.closeSymPage()) updateStatusBar()
+        if (!modifiers.altPressed) {
+            val result = modifiers.handleAltKeyDown(keyCode, ModifierKeyHandler.eventTimeOrUptime(event))
+            if (result.shouldUpdateStatusBar) updateStatusBar()
+        }
+    }
+
     fun routeEditableFieldKeyDown(
         keyCode: Int,
         event: KeyEvent?,
@@ -366,29 +386,10 @@ class InputEventRouter(
         }
 
         if (keyCode == KeyEvent.KEYCODE_ALT_LEFT || keyCode == KeyEvent.KEYCODE_ALT_RIGHT) {
-            // Check if Ctrl is physically pressed (not latch) - if so, trigger speech recognition (if enabled)
-            // Only trigger if both keys are physically pressed simultaneously, not if one is in latch
-            if (event?.isCtrlPressed == true && 
-                !params.altPressed &&
-                SettingsManager.getAltCtrlSpeechShortcutEnabled(context)) {
-                callbacks.startSpeechRecognition()
-                return EditableFieldRoutingResult.Consume
-            }
-            
-            if (controllers.symLayoutController.isSymActive()) {
-                if (controllers.symLayoutController.closeSymPage()) {
-                    callbacks.updateStatusBar()
-                }
-            }
-            if (!params.altPressed) {
-                val result = controllers.modifierStateController.handleAltKeyDown(
-                    keyCode,
-                    now = ModifierKeyHandler.eventTimeOrUptime(event)
-                )
-                if (result.shouldUpdateStatusBar) {
-                    callbacks.updateStatusBar()
-                }
-            }
+            handleAltModifierKeyDown(
+                keyCode, event, controllers.modifierStateController, controllers.symLayoutController,
+                callbacks.updateStatusBar, callbacks.startSpeechRecognition
+            )
             return EditableFieldRoutingResult.Consume
         }
 
@@ -748,6 +749,28 @@ class InputEventRouter(
             }
         }
 
+        // Layouts can put punctuation on letter keys (e.g. Greek Q → ;) and
+        // letters on punctuation keys (e.g. Uyghur / → ئ). Neither may fall
+        // through to the system's Latin keymap or the alphabetic-only path.
+        // This runs after multi-tap and long-press handling so those keep
+        // working for such keys.
+        val mappedText = mapping?.let {
+            LayoutMappingRepository.resolveText(it, resolvedUppercase)
+        }
+        if (
+            mapping?.isRealMultiTap == false && !mappedText.isNullOrEmpty() &&
+            (!callbacks.isAlphabeticKey(keyCode) || !mappedText.first().isLetter())
+        ) {
+            if (shiftOneShotActive) callbacks.disableShiftOneShot()
+            if (!callbacks.handleBoundaryText(mappedText, ic)) {
+                commitTextWithTracking(ic, mappedText)
+            }
+            Handler(Looper.getMainLooper()).postDelayed({
+                callbacks.updateStatusBar()
+            }, params.cursorUpdateDelayMs)
+            return EditableFieldRoutingResult.Consume
+        }
+
         val isAlphabeticKey = callbacks.isAlphabeticKey(keyCode)
         if (isAlphabeticKey && LayoutMappingRepository.isMapped(keyCode)) {
             val char = LayoutMappingRepository.getCharacterStringWithModifiers(
@@ -854,11 +877,16 @@ class InputEventRouter(
         inputContextState: rocks.pkb.plektra.core.InputContextState?,
         enableShiftOneShot: (() -> Boolean)?,
         editorInfo: EditorInfo? = null,
+        typedText: String? = null,
         updateStatusBar: () -> Unit
     ): Boolean {
         val isEnterKey = keyCode == KeyEvent.KEYCODE_ENTER
         val isSpaceKey = keyCode == KeyEvent.KEYCODE_SPACE
-        val typedCharRaw = event?.unicodeChar?.takeIf { it != 0 }?.toChar()
+        // [typedText] is the layout's output for the key with modifiers applied; the
+        // system keymap only knows the Latin legend (Uyghur D → د, not d).
+        val keyText = typedText
+            ?: event?.unicodeChar?.takeIf { it != 0 }?.toChar()?.toString().orEmpty()
+        val typedCharRaw = keyText.singleOrNull()
         val typedChar = when (typedCharRaw) {
             '’', '‘', 'ʼ' -> '\''
             else -> typedCharRaw
@@ -942,8 +970,7 @@ class InputEventRouter(
             return true
         }
 
-        val smartReplacementTextForPipeline =
-            if (isSpaceKey) " " else event?.unicodeChar?.takeIf { it != 0 }?.toChar()?.toString().orEmpty()
+        val smartReplacementTextForPipeline = if (isSpaceKey) " " else keyText
         if (
             textInputController.handlePendingMidWordQuoteToApostrophe(
                 typedText = smartReplacementTextForPipeline,
@@ -1083,6 +1110,7 @@ class InputEventRouter(
                 isAutoCorrectEnabled,
                 commitBoundary = true,
                 onStatusBarUpdate = updateStatusBar,
+                boundaryCharOverride = typedChar.takeIf { isPunctuation },
                 isKnownWord = { word -> suggestionController?.isKnownWordInActiveDictionaries(word) == true }
             )
         ) {
@@ -1101,13 +1129,19 @@ class InputEventRouter(
 
         // Handle suggestions on boundary keys/punctuation (if suggestions enabled)
         if (!shouldDisableSuggestions && inputConnection != null && (isBoundaryKey || isPunctuation) && suggestionController != null) {
-            return suggestionController?.onBoundaryKey(keyCode, event, inputConnection)?.committed == true
+            return suggestionController?.onBoundaryKey(
+                keyCode,
+                event,
+                inputConnection,
+                boundaryCharOverride = typedChar.takeIf { isPunctuation }
+            )?.committed == true
         }
 
         autoCorrectionManager.handleAcceptOrResetOnOtherKeys(
             keyCode,
             event,
-            isAutoCorrectEnabled
+            isAutoCorrectEnabled,
+            typedText = keyText
         )
         return false
     }
@@ -1258,9 +1292,16 @@ class InputEventRouter(
         alternateCharacterManager: AlternateCharacterManager,
         altMappingsOverride: Map<Int, String>? = null,
         updateStatusBar: () -> Unit,
+        textOutput: ((String) -> Boolean)? = null,
         callSuperWithKey: (Int, KeyEvent?) -> Boolean
     ): Boolean {
         val ic = inputConnection ?: return false
+
+        if (textOutput != null) {
+            val text = if (keyCode == KeyEvent.KEYCODE_SPACE) " " else
+                alternateCharacterManager.resolveAltText(keyCode, altMappingsOverride) ?: return false
+            return textOutput(text).also { if (it) updateStatusBar() }
+        }
 
         // Consume Alt+Space to avoid Android's symbol picker and just insert a space.
         if (keyCode == KeyEvent.KEYCODE_SPACE) {
@@ -1269,7 +1310,7 @@ class InputEventRouter(
             return true
         }
 
-        val altBindingValue = (altMappingsOverride ?: alternateCharacterManager.getAltModifierMappings())[keyCode]
+        val altBindingValue = alternateCharacterManager.resolveAltText(keyCode, altMappingsOverride)
         val mappedDpad = deviceLayerDpadKeyCode(altBindingValue)
         if (mappedDpad != null) {
             sendModifiedKeyEvent(ic, mappedDpad, ctrl = false, shift = false)

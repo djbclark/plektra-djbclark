@@ -42,7 +42,6 @@ class TrackpadSettingsNavigationTest {
         assertTrue(SettingLinkIds.SCREEN_TRACKPAD_TERMINAL_APPS in TRACKPAD_SETTING_LINK_IDS)
         assertEquals(ADVANCED_DESTINATION_MAIN, advancedDestinationNameFor(null, SettingLinkIds.ADVANCED_TRACKPAD_GESTURES))
         assertEquals(ADVANCED_DESTINATION_MAIN, advancedDestinationNameFor(null, null))
-        assertEquals(ADVANCED_DESTINATION_IME_TEST, advancedDestinationNameFor(ADVANCED_DESTINATION_IME_TEST, SettingLinkIds.SCREEN_TRACKPAD_ENABLED))
     }
 
     @Test

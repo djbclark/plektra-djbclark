@@ -11,6 +11,7 @@
     <string name="input_method_name_pt">Português</string>
     <string name="input_method_name_ru">Русский</string>
     <string name="input_method_name_uk">Українська</string>
+    <string name="input_method_name_ug">ئۇيغۇرچە</string>
     <string name="settings_title">Налаштування</string>
     <string name="back">Назад</string>
     <string name="settings_back_content_description">Назад</string>
@@ -25,12 +26,20 @@
     <string name="auto_capitalize_after_period_description">Автоматично робить наступну літеру великою після крапки з пробілом (кінець речення).</string>
     <string name="double_space_to_period_title">Подвійний пробіл → крапка</string>
     <string name="double_space_to_period_description">Подвійне натискання пробілу вставляє крапку з пробілом. Наступна літера буде великою.</string>
-    <string name="clear_alt_on_space_title">Скасувати Alt на пробіл</string>
-    <string name="clear_alt_on_space_description">Автоматично вимикає Alt при натисканні пробілу.</string>
+    <string name="clear_alt_on_space_title">Скидати Alt пробілом і Enter</string>
+    <string name="clear_alt_on_space_description">Скидає одноразовий Alt і Alt-Lock, якщо нижче не ввімкнено «Зберігати Alt-Lock».</string>
     <string name="swipe_to_delete_title">Свайп для видалення</string>
     <string name="swipe_incremental_threshold_title">Чутливість свайпу</string>
     <string name="swipe_incremental_threshold_description">Відстань для переміщення курсора на одну позицію. Менші числа прискорюють курсор.</string>
     <string name="auto_show_keyboard_title">Автопоказ клавіатури</string>
+    <string name="auto_show_respect_app_visibility_title">Враховувати налаштування відображення застосунку</string>
+    <string name="auto_show_respect_app_visibility_description">Android і застосунок вирішують, чи відкривається клавіатура під час входу в поле. Дотик до поля або натискання клавіші й надалі відкриває її.</string>
+    <string name="hardware_keypad_auto_open_title">Автоматично відкривати цифрову клавіатуру з фізичною клавіатурою</string>
+    <string name="hardware_keypad_auto_open_description">Показує екранну цифрову або телефонну клавіатуру в полях PIN, чисел і телефонів. Інакше відкрийте її кнопкою цифрової клавіатури на панелі клавіатури.</string>
+    <string name="software_keyboard_emoji_page_in_cycle_title">Шар емодзі в перемиканні сторінок</string>
+    <string name="software_keyboard_emoji_page_in_cycle_description">Додає сторінку емодзі на клавішах до перемикання сторінок екранної клавіатури. Вибір емодзі не змінюється.</string>
+    <string name="software_keyboard_accessibility_full_keyboard">Повна клавіатура</string>
+    <string name="software_keyboard_keypad_button_description">Відкрити екранну цифрову клавіатуру</string>
     <string name="alt_ctrl_speech_shortcut_title">Розпізнавання мовлення Alt+Ctrl / BlackBerry Alt+0</string>
     <string name="alt_ctrl_speech_shortcut_description">Увімкнути комбінацію Alt+Ctrl / BlackBerry Alt+0 для запуску розпізнавання мовлення</string>
     <string name="static_variation_bar_mode_title">Статична панель варіацій</string>
@@ -450,6 +459,13 @@
     <string name="clipboard_clear_all">Очистити все</string>
     <string name="clipboard_empty_state">Немає історії буфера обміну</string>
     <string name="clipboard_locked_state">Історія буфера обміну недоступна, поки пристрій заблоковано.</string>
+    <string name="clipboard_loading_state">Завантаження історії буфера обміну…</string>
+    <string name="clipboard_error_state">Не вдалося завантажити історію буфера обміну. Відкрийте її знову, щоб повторити спробу.</string>
+    <string name="clipboard_save_failed">Не вдалося зберегти скопійований текст в історії буфера обміну.</string>
+    <string name="clipboard_pin_failed">Не вдалося закріпити або відкріпити запис.</string>
+    <string name="clipboard_delete_failed">Не вдалося видалити запис.</string>
+    <string name="clipboard_clear_failed">Не вдалося очистити історію буфера обміну.</string>
+    <string name="clipboard_system_clear_failed">Не вдалося очистити системний буфер обміну.</string>
     <string name="clipboard_pin">Закріпити</string>
     <string name="clipboard_unpin">Відкріпити</string>
     <string name="clipboard_delete">Видалити</string>
@@ -950,11 +966,6 @@ Ctrl-ярлики застосунків із урахуванням розкл�
     <string name="device_setup_open_pairing">Відкрити Бездротове налагодження</string>
     <string name="device_setup_dnd_on">Увімкнено режим «Не турбувати», який може приховати код сполучення. Вимкніть його, поки не сполучитеся.</string>
     <string name="device_setup_needs_notifications">Спершу дозвольте сповіщення Plektra — код сполучення надходить як сповіщення.</string>
-    <string name="app_raw_mode_title">Точне введення</string>
-    <string name="app_raw_mode_row_description">Для терміналів, SSH і коду: що ввели, те й потрапляє в поле, без виправлень і великих літер</string>
-    <string name="app_raw_mode_description">У вибраних тут застосунках Plektra надсилає кожне натискання як є: без пропозицій, без автокорекції, без великої літери на початку рядка, без крапки від подвійного пробілу. Призначено для терміналів, SSH-клієнтів, редакторів коду й усього іншого, де корисне виправлення перетворює команду на помилку — `ls -la` ніколи не має ставати `Ls -la.`</string>
-    <string name="app_raw_mode_webapk_note">Вебзастосунок — вводить усередині %1$s, тож %1$s також виключено</string>
-    <!-- djb/caret-badge: modifier badge beside the text cursor -->
     <string name="caret_modifier_badge_title">Показувати модифікатори біля курсора</string>
     <string name="caret_modifier_badge_description">Shift, Alt, Ctrl і Sym з\'являються поруч із текстовим курсором, коли вони увімкнені. Працює лише в застосунках, які повідомляють, де курсор.</string>
     <string name="caret_modifier_badge_needs_overlay">Малювання біля курсора означає малювання поверх застосунку, в якому ви друкуєте, тож Android спершу потребує дозволу.</string>
@@ -964,6 +975,11 @@ Ctrl-ярлики застосунків із урахуванням розкл�
     <string name="caret_badge_color_locked">Колір фіксації</string>
     <string name="caret_badge_color_locked_description">Caps Lock, фіксація Alt і Ctrl, які залишаються увімкненими, поки ви їх не вимкнете</string>
     <string name="caret_badge_color_pick">Утримуваний модифікатор показується блідішою версією цих кольорів.</string>
+    <string name="kw_caret_modifier_badge">курсор, каретка, shift, alt, ctrl, sym, caps lock, оверлей, значок, модифікатор, індикатор</string>
+    <string name="app_raw_mode_title">Точне введення</string>
+    <string name="app_raw_mode_row_description">Для терміналів, SSH і коду: що ввели, те й потрапляє в поле, без виправлень і великих літер</string>
+    <string name="app_raw_mode_description">У вибраних тут застосунках Plektra надсилає кожне натискання як є: без пропозицій, без автокорекції, без великої літери на початку рядка, без крапки від подвійного пробілу. Призначено для терміналів, SSH-клієнтів, редакторів коду й усього іншого, де корисне виправлення перетворює команду на помилку — `ls -la` ніколи не має ставати `Ls -la.`</string>
+    <string name="app_raw_mode_webapk_note">Вебзастосунок — вводить усередині %1$s, тож %1$s також виключено</string>
     <!-- djb/screen-trackpad: screen trackpad strings -->
     <string name="screen_trackpad_title">Екранний трекпад</string>
     <string name="screen_trackpad_description">Утримуйте клавішу й проводьте будь-де по екрану, щоб переміщати курсор</string>
@@ -1112,4 +1128,36 @@ Ctrl-ярлики застосунків із урахуванням розкл�
     <string name="key_remap_section_title">Перепризначення клавіш</string>
     <string name="key_remap_swap_shift_right_enter_title">Поміняти місцями правий Shift і Enter</string>
     <string name="key_remap_swap_shift_right_enter_summary">Права клавіша Shift вводить Enter, а клавіша Enter працює як Shift.</string>
+    <string name="caret_badge_custom_colors_title">Використовувати власні кольори</string>
+    <string name="caret_badge_custom_colors_description">Замінити кольори теми клавіатури.</string>
+    <string name="alt_latch_stays_on_space_title">Зберігати Alt-Lock</string>
+    <string name="alt_latch_stays_on_space_description">Пробіл і Enter скидають одноразовий Alt, але залишають Alt-Lock активним.</string>
+    <string name="keyboard_bar_hidden_apps_title">Ніколи не показувати панель</string>
+    <string name="keyboard_bar_hidden_apps_row_description">Застосунки, у яких панель лишається прихованою, навіть під час ручного відкриття</string>
+    <string name="keyboard_bar_hidden_apps_summary_none">Застосунки не вибрано</string>
+    <plurals name="keyboard_bar_hidden_apps_summary">
+        <item quantity="one">%d застосунок</item>
+        <item quantity="few">%d застосунки</item>
+        <item quantity="many">%d застосунків</item>
+        <item quantity="other">%d застосунку</item>
+    </plurals>
+    <string name="keyboard_bar_hidden_apps_description">У вибраних тут застосунках Plektra ніколи не показує панель і екранну клавіатуру: незалежно від інших налаштувань видимості й навіть тоді, коли ви намагаєтеся відкрити її клавішею, комбінацією клавіш або системною кнопкою клавіатури. Введення з фізичної клавіатури працює далі, зокрема шари SYM, комбінації клавіш, модифікатори й точні коди емодзі або фрагментів. Буфер обміну й вибір емодзі в цих застосунках лишаються закритими.</string>
+    <string name="keyboard_bar_hidden_apps_webapk_note">Вебзастосунок — працює всередині %1$s, тож панель прихована й там</string>
+    <string name="emoji_category_unicode_symbols">Текстові символи</string>
+    <string name="emoji_category_kaomoji">Каомодзі</string>
+    <string name="emoji_style_title">Вигляд емодзі</string>
+    <string name="emoji_style_noto">Noto Color Emoji (вбудований)</string>
+    <string name="emoji_style_system">Системний шрифт</string>
+    <string name="emoji_style_description">Plektra вставляє стандартні емодзі Unicode; застосунок, у якому ви пишете, показує їх власним шрифтом.</string>
+    <string name="emoji_skin_tone_title">Тон шкіри за замовчуванням</string>
+    <string name="emoji_pages_emoji_title">Гортати сторінку емодзі клавішами Q і P</string>
+    <string name="emoji_pages_symbols_title">Гортати сторінку символів клавішами Q і P</string>
+    <string name="emoji_pages_description">Q і P гортають сторінки, Shift+Q і Shift+P переходять між категоріями, A відкриває пошук. Утримуйте емодзі, щоб вибрати тон шкіри. Серед тонів шкіри P гортає далі; для емодзі з вашої власної розкладки ✎ на A відкриває налаштування клавіші.</string>
+    <string name="sym_paged_navigation_note">Коли сторінки ввімкнено, Q (‹) і P (›) гортають їх. Ваші власні призначення Q і P зберігаються, і їх можна змінити тут: при відкритій сторінці утримуйте SYM і натисніть Q або P, щоб ввести їх; без сторінок вони знову працюють напряму.</string>
+    <string name="sym_navigation_key_content_description">%1$s гортає сторінки (%2$s). Ваше призначення: %3$s</string>
+    <string name="kaomoji_placement_title">Сторінки каомодзі</string>
+    <string name="kaomoji_placement_symbols">Після символів</string>
+    <string name="kaomoji_placement_emoji">Після емодзі</string>
+    <string name="kaomoji_placement_off">Вимк.</string>
+    <string name="emoji_picker_extras_title">Текстові символи й каомодзі у виборі емодзі</string>
 </resources>

@@ -76,7 +76,7 @@ class CaretBadgeItemsTest {
             caretBadgeItemsFor(snapshot(ctrlLatch = true, ctrlFromNavMode = true)).isEmpty()
         )
         assertEquals(
-            listOf(Item(Shape.TEXT, "CTRL", locked = true, faint = false)),
+            listOf(Item(Shape.CONTROL, null, locked = true, faint = false)),
             caretBadgeItemsFor(snapshot(ctrlLatch = true))
         )
     }
@@ -84,7 +84,7 @@ class CaretBadgeItemsTest {
     @Test
     fun navModeCtrl_doesNotHideAPressOnTopOfIt() {
         assertEquals(
-            listOf(Item(Shape.TEXT, "CTRL", locked = false, faint = true)),
+            listOf(Item(Shape.CONTROL, null, locked = false, faint = true)),
             caretBadgeItemsFor(snapshot(ctrlLatch = true, ctrlFromNavMode = true, ctrlHeld = true))
         )
     }
@@ -95,7 +95,7 @@ class CaretBadgeItemsTest {
             listOf(
                 Item(Shape.ARROW, null, locked = false, faint = false),
                 Item(Shape.ALT, null, locked = false, faint = false),
-                Item(Shape.TEXT, "CTRL", locked = false, faint = false),
+                Item(Shape.CONTROL, null, locked = false, faint = false),
                 Item(Shape.TEXT, "SYM", locked = false, faint = false)
             ),
             caretBadgeItemsFor(

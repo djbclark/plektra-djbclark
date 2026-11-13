@@ -14,6 +14,7 @@ import rocks.pkb.plektra.data.layout.LayoutMappingRepository
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -22,6 +23,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.android.controller.ServiceController
 import java.lang.reflect.Field
 import java.lang.reflect.Proxy
 
@@ -30,6 +32,7 @@ import java.lang.reflect.Proxy
 class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
 
     private lateinit var service: PhysicalKeyboardInputMethodService
+    private lateinit var serviceController: ServiceController<PhysicalKeyboardInputMethodService>
     private lateinit var recorder: RecordingInputConnection
     private lateinit var inputConnection: InputConnection
     private lateinit var editorInfo: EditorInfo
@@ -55,9 +58,8 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
         )
         SettingsManager.setAppEnterBehaviorOverrides(context, emptyList())
 
-        service = Robolectric.buildService(PhysicalKeyboardInputMethodService::class.java)
-            .create()
-            .get()
+        serviceController = Robolectric.buildService(PhysicalKeyboardInputMethodService::class.java).create()
+        service = serviceController.get()
 
         recorder = RecordingInputConnection()
         inputConnection = recorder.asProxy()
@@ -72,6 +74,15 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
         setField(service, "mInputEditorInfo", editorInfo)
         setField(service, "isInputViewActive", true)
         setField(service, "inputContextState", InputContextState.fromEditorInfo(editorInfo))
+    }
+
+    @After
+    fun tearDown() {
+        try {
+            if (::serviceController.isInitialized) serviceController.destroy()
+        } finally {
+            DeviceSpecific.clearTestOverrides()
+        }
     }
 
     @Test
@@ -155,6 +166,70 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
         assertFalse(modifier.ctrlPhysicallyPressed)
         assertFalse(modifier.ctrlOneShot)
         assertFalse(modifier.ctrlLatchActive)
+    }
+
+    /** The emoji picker's search open for typing, as the software keyboard's picker page has it. */
+    private fun openEmojiPickerSearch(): rocks.pkb.plektra.inputmethod.ui.EmojiPickerView {
+        val context = RuntimeEnvironment.getApplication()
+        val sym: rocks.pkb.plektra.core.SymLayoutController = getField(service, "symLayoutController")
+        if (sym.currentSymPage() != 4) sym.openEmojiPickerPage()
+        val bars: CandidatesBarController = getField(service, "candidatesBarController")
+        val picker = rocks.pkb.plektra.inputmethod.ui.EmojiPickerView(context)
+        setField(getField<StatusBarController>(bars, "inputStatusBar"), "emojiPickerView", picker)
+        picker.showSearch()
+        assertTrue(bars.isEmojiPickerSearchInputActive())
+        val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
+        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("emoji", "🐱"))
+        return picker
+    }
+
+    private fun searchText(picker: rocks.pkb.plektra.inputmethod.ui.EmojiPickerView): String =
+        getField<android.widget.EditText>(picker, "searchField").text.toString()
+
+    private fun pressKey(keyCode: Int, start: Long, metaState: Int = 0) {
+        service.onKeyDown(keyCode, keyEvent(KeyEvent.ACTION_DOWN, keyCode, start, start, metaState))
+        service.onKeyUp(keyCode, keyEvent(KeyEvent.ACTION_UP, keyCode, start, start + 30L, metaState))
+    }
+
+    @Test
+    fun hardwareCtrlVIntoTheEmojiSearchPastesAndLeavesCtrlOff() {
+        val ctrlMeta = KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON
+        for ((round, holdMs) in listOf(150L, 420L).withIndex()) {
+            val picker = openEmojiPickerSearch()
+            val t0 = 6_000L + round * 1_000L
+            service.onKeyDown(KeyEvent.KEYCODE_CTRL_LEFT, keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_CTRL_LEFT, t0, t0, ctrlMeta))
+            pressKey(KeyEvent.KEYCODE_V, t0 + 60L, ctrlMeta)
+            service.onKeyUp(KeyEvent.KEYCODE_CTRL_LEFT, keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_CTRL_LEFT, t0, t0 + holdMs))
+
+            assertEquals("held ${holdMs}ms", "🐱", searchText(picker))
+            val modifier = modifierController()
+            assertFalse("held ${holdMs}ms", modifier.ctrlOneShot)
+            assertFalse(modifier.ctrlLatchActive)
+            assertFalse(modifier.ctrlPressed)
+            assertFalse(modifier.ctrlPhysicallyPressed)
+            // The next key types its letter into the search, without Ctrl
+            pressKey(KeyEvent.KEYCODE_A, t0 + 600L)
+            assertEquals("🐱a", searchText(picker))
+            assertEquals(emptyList<String>(), recorder.committedTexts)
+        }
+    }
+
+    @Test
+    fun ctrlVIntoTheEmojiSearchUsesUpACtrlOneShotButKeepsALatchedCtrl() {
+        val picker = openEmojiPickerSearch()
+        val modifier = modifierController()
+        modifier.ctrlOneShot = true
+        pressKey(KeyEvent.KEYCODE_V, 7_000L)
+        assertEquals("🐱", searchText(picker))
+        assertFalse(modifier.ctrlOneShot)
+        pressKey(KeyEvent.KEYCODE_A, 7_100L)
+        assertEquals("🐱a", searchText(picker))
+
+        // A latched Ctrl stays latched: the user wants several shortcuts
+        modifier.ctrlLatchActive = true
+        pressKey(KeyEvent.KEYCODE_V, 7_200L)
+        assertEquals("🐱a🐱", searchText(picker))
+        assertTrue(modifier.ctrlLatchActive)
     }
 
     @Test
@@ -301,6 +376,61 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
     }
 
     @Test
+    fun appEnter_beeperWithoutOverride_usesEditorAction() {
+        focusNewField(RecordingInputConnection(),
+            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE, "com.beeper.android")
+        service.onKeyDown(KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 2_750L, 2_750L))
+        assertEquals(listOf(EditorInfo.IME_ACTION_SEND), recorder.editorActions)
+        assertFalse(recorder.committedTexts.contains("\n"))
+    }
+
+    @Test
+    fun appEnter_beeperShiftEnter_insertsNewlineInsteadOfSending() {
+        focusNewField(RecordingInputConnection(),
+            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE, "com.beeper.android")
+        service.onKeyDown(KeyEvent.KEYCODE_SHIFT_LEFT,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SHIFT_LEFT, 2_740L, 2_740L))
+        service.onKeyDown(KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 2_750L, 2_750L, KeyEvent.META_SHIFT_ON))
+        assertTrue(recorder.editorActions.isEmpty())
+        assertTrue(recorder.committedTexts.contains("\n"))
+    }
+
+    @Test
+    fun appEnter_beeperNativeOverride_preservesNativeEnterAfterUpdate() {
+        SettingsManager.setAppEnterBehaviorOverride(RuntimeEnvironment.getApplication(),
+            "com.beeper.android", SettingsManager.ENTER_BEHAVIOR_APP_DEFAULT)
+        focusNewField(RecordingInputConnection(),
+            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE, "com.beeper.android")
+        service.onKeyDown(KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 2_750L, 2_750L))
+        assertTrue(recorder.editorActions.isEmpty())
+    }
+
+    @Test
+    fun appEnter_beeperExplicitNewline_winsOverSendPreset() {
+        SettingsManager.setAppEnterBehaviorOverride(RuntimeEnvironment.getApplication(),
+            "com.beeper.android", SettingsManager.ENTER_BEHAVIOR_ENTER_NEWLINE)
+        focusNewField(RecordingInputConnection(),
+            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE, "com.beeper.android")
+        service.onKeyDown(KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 2_750L, 2_750L))
+        assertTrue(recorder.editorActions.isEmpty())
+        assertTrue(recorder.committedTexts.contains("\n"))
+    }
+
+    @Test
+    fun appEnter_beeperDisabled_doesNotSend() {
+        SettingsManager.setAppEnterBehaviorEnabled(RuntimeEnvironment.getApplication(), false)
+        focusNewField(RecordingInputConnection(),
+            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE, "com.beeper.android")
+        service.onKeyDown(KeyEvent.KEYCODE_ENTER,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 2_750L, 2_750L))
+        assertTrue(recorder.editorActions.isEmpty())
+    }
+
+    @Test
     fun appEnter_facebookMessengerManualEditorStrategy_usesEditorAction() {
         configureAppEnterOverride(
             packageName = "com.facebook.orca",
@@ -439,6 +569,383 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
     }
 
     @Test
+    fun uyghurLayout_neverAutomaticallySelectsExtraLettersButManualShiftWorks() {
+        SettingsManager.setKeyboardLayoutAutoByLocale(service, false)
+        SettingsManager.setKeyboardLayout(service, "uyghur")
+        LayoutMappingRepository.loadLayout(service.assets, "uyghur", service)
+        editorInfo.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
+
+        service.onStartInput(editorInfo, false)
+        assertFalse(modifierController().shiftOneShot)
+        assertFalse(LayoutMappingRepository.supportsAutoCapitalization)
+        tapShift(3_000L)
+        assertTrue(modifierController().shiftOneShot)
+
+        editorInfo.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+        service.onStartInput(editorInfo, false)
+        assertFalse(modifierController().capsLockEnabled)
+
+        LayoutMappingRepository.loadLayout(service.assets, "qwerty", service)
+        assertTrue(LayoutMappingRepository.supportsAutoCapitalization)
+    }
+
+    @Test
+    fun switchingToUyghur_clearsPendingCapitalizationFromEnglish() {
+        service.onStartInput(editorInfo, false)
+        assertTrue(modifierController().shiftOneShot)
+        switchSubtype("ug:uyghur")
+        assertFalse(modifierController().shiftOneShot)
+        assertEquals("د", LayoutMappingRepository.getLowercase(KeyEvent.KEYCODE_D))
+    }
+
+    @Test
+    fun switchingToUyghur_suspendsFieldCapsLockAndRestoresItOnLatin() {
+        SettingsManager.setKeyboardLayoutAutoByLocale(service, false)
+        SettingsManager.setKeyboardLayout(service, "qwerty")
+        SettingsManager.setAutoCorrectEnabled(service, false)
+        LayoutMappingRepository.loadLayout(service.assets, "qwerty", service)
+        editorInfo.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+        service.onStartInput(editorInfo, false)
+        assertTrue(modifierController().capsLockEnabled)
+
+        switchSubtype("ug:uyghur")
+        assertFalse(modifierController().capsLockEnabled)
+        service.onKeyDown(KeyEvent.KEYCODE_D, keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_D, 10_000L, 10_000L))
+        service.onKeyUp(KeyEvent.KEYCODE_D, keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_D, 10_000L, 10_030L))
+        assertEquals("د", recorder.committedTexts.joinToString(""))
+
+        switchSubtype("en_US:qwertz")
+        assertTrue(modifierController().capsLockEnabled)
+    }
+
+    @Test
+    fun switchingToUyghur_keepsCapsLockTheUserTurnedOn() {
+        SettingsManager.setKeyboardLayoutAutoByLocale(service, false)
+        SettingsManager.setKeyboardLayout(service, "qwerty")
+        LayoutMappingRepository.loadLayout(service.assets, "qwerty", service)
+        service.onStartInput(editorInfo, false)
+        modifierController().capsLockEnabled = true
+
+        switchSubtype("ug:uyghur")
+        assertTrue(modifierController().capsLockEnabled)
+    }
+
+    @Test
+    fun fieldRestartOnUyghur_keepsFieldCapsLockSuspendedForLatin() {
+        startCapCharactersFieldOnQwerty()
+        switchSubtype("ug:uyghur")
+        service.onStartInput(editorInfo, true)
+        service.onStartInputView(editorInfo, true)
+        assertFalse(modifierController().capsLockEnabled)
+
+        switchSubtype("en_US:qwertz")
+        assertTrue(modifierController().capsLockAutomatic)
+    }
+
+    @Test
+    fun manualCapsLock_staysUserOwnedAcrossFieldRestartAndUyghurSwitch() {
+        SettingsManager.setStaticVariationBarLayerStickyEnabled(service, false)
+        startCapCharactersFieldOnQwerty()
+        assertTrue(modifierController().capsLockAutomatic)
+        tapShift(10_000L)
+        tapShift(10_050L)
+        assertTrue(modifierController().capsLockEnabled)
+        assertFalse(modifierController().capsLockAutomatic)
+
+        service.onStartInput(editorInfo, true)
+        service.onStartInputView(editorInfo, true)
+        assertFalse(modifierController().capsLockAutomatic)
+
+        switchSubtype("ug:uyghur")
+        assertTrue(modifierController().capsLockEnabled)
+        switchSubtype("en_US:qwertz")
+        assertTrue(modifierController().capsLockEnabled)
+        assertFalse(modifierController().capsLockAutomatic)
+    }
+
+    @Test
+    fun shiftHeldAcrossSwitchToUyghur_doesNotRestoreFieldCapsLock() {
+        SettingsManager.setAutoCorrectEnabled(service, false)
+        startCapCharactersFieldOnQwerty()
+        service.onKeyDown(KeyEvent.KEYCODE_SHIFT_LEFT, keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SHIFT_LEFT, 10_000L, 10_000L))
+        switchSubtype("ug:uyghur")
+        service.onKeyUp(KeyEvent.KEYCODE_SHIFT_LEFT, keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SHIFT_LEFT, 10_000L, 10_400L))
+        assertFalse(modifierController().capsLockEnabled)
+
+        service.onKeyDown(KeyEvent.KEYCODE_D, keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_D, 11_000L, 11_000L))
+        service.onKeyUp(KeyEvent.KEYCODE_D, keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_D, 11_000L, 11_030L))
+        assertEquals("د", recorder.committedTexts.joinToString(""))
+
+        switchSubtype("en_US:qwertz")
+        assertTrue(modifierController().capsLockAutomatic)
+    }
+
+    @Test
+    fun shiftHeldAcrossSwitchToLatin_restoresSuspendedFieldCapsLock() {
+        startCapCharactersFieldOnQwerty()
+        switchSubtype("ug:uyghur")
+        assertFalse(modifierController().capsLockEnabled)
+
+        service.onKeyDown(KeyEvent.KEYCODE_SHIFT_LEFT, keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SHIFT_LEFT, 10_000L, 10_000L))
+        switchSubtype("en_US:qwertz")
+        service.onKeyUp(KeyEvent.KEYCODE_SHIFT_LEFT, keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SHIFT_LEFT, 10_000L, 10_400L))
+
+        assertTrue(modifierController().capsLockAutomatic)
+    }
+
+    @Test
+    fun fieldRestartDroppingCapsDuringShiftHoldOnUyghur_doesNotBringFieldCapsLockBackOnLatin() {
+        startCapCharactersFieldOnQwerty()
+        switchSubtype("ug:uyghur")
+        service.onKeyDown(KeyEvent.KEYCODE_SHIFT_LEFT, keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SHIFT_LEFT, 10_000L, 10_000L))
+        restartFieldWithoutCapCharacters()
+        service.onKeyUp(KeyEvent.KEYCODE_SHIFT_LEFT, keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SHIFT_LEFT, 10_000L, 10_400L))
+
+        switchSubtype("en_US:qwertz")
+        assertFalse(modifierController().capsLockAutomatic)
+        assertFalse(modifierController().capsLockEnabled)
+    }
+
+    @Test
+    fun fieldRestartDroppingCapsDuringShiftHoldOnLatin_doesNotRestoreFieldCapsLock() {
+        startCapCharactersFieldOnQwerty()
+        service.onKeyDown(KeyEvent.KEYCODE_SHIFT_LEFT, keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SHIFT_LEFT, 10_000L, 10_000L))
+        restartFieldWithoutCapCharacters()
+        service.onKeyUp(KeyEvent.KEYCODE_SHIFT_LEFT, keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SHIFT_LEFT, 10_000L, 10_400L))
+        assertFalse(modifierController().capsLockEnabled)
+
+        switchSubtype("ug:uyghur")
+        switchSubtype("en_US:qwertz")
+        assertFalse(modifierController().capsLockEnabled)
+    }
+
+    @Test
+    fun fieldRestartDroppingCapsDuringShiftHeldAcrossSwitchToLatin_doesNotRestoreFieldCapsLock() {
+        startCapCharactersFieldOnQwerty()
+        switchSubtype("ug:uyghur")
+        service.onKeyDown(KeyEvent.KEYCODE_SHIFT_LEFT, keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SHIFT_LEFT, 10_000L, 10_000L))
+        restartFieldWithoutCapCharacters()
+        switchSubtype("en_US:qwertz")
+        service.onKeyUp(KeyEvent.KEYCODE_SHIFT_LEFT, keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SHIFT_LEFT, 10_000L, 10_400L))
+        assertFalse(modifierController().capsLockEnabled)
+    }
+
+    @Test
+    fun fieldRestartDroppingCapsDuringShiftHeldAcrossSwitchToUyghur_doesNotRestoreFieldCapsLockOnLatin() {
+        startCapCharactersFieldOnQwerty()
+        service.onKeyDown(KeyEvent.KEYCODE_SHIFT_LEFT, keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SHIFT_LEFT, 10_000L, 10_000L))
+        restartFieldWithoutCapCharacters()
+        switchSubtype("ug:uyghur")
+        service.onKeyUp(KeyEvent.KEYCODE_SHIFT_LEFT, keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SHIFT_LEFT, 10_000L, 10_400L))
+
+        switchSubtype("en_US:qwertz")
+        assertFalse(modifierController().capsLockEnabled)
+    }
+
+    @Test
+    fun fieldRestartDroppingCapsOnUyghurWithoutHold_keepsRequestCleared() {
+        startCapCharactersFieldOnQwerty()
+        switchSubtype("ug:uyghur")
+        restartFieldWithoutCapCharacters()
+        switchSubtype("en_US:qwertz")
+        assertFalse(modifierController().capsLockEnabled)
+    }
+
+    @Test
+    fun fieldRestartDroppingCapsOnLatinWithoutHold_turnsFieldCapsLockOff() {
+        startCapCharactersFieldOnQwerty()
+        restartFieldWithoutCapCharacters()
+        assertFalse(modifierController().capsLockEnabled)
+    }
+
+    private fun restartFieldWithoutCapCharacters() {
+        editorInfo.inputType = InputType.TYPE_CLASS_TEXT
+        service.onStartInput(editorInfo, true)
+        service.onStartInputView(editorInfo, true)
+    }
+
+    private fun startCapCharactersFieldOnQwerty() {
+        SettingsManager.setKeyboardLayoutAutoByLocale(service, false)
+        SettingsManager.setKeyboardLayout(service, "qwerty")
+        LayoutMappingRepository.loadLayout(service.assets, "qwerty", service)
+        editorInfo.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+        service.onStartInput(editorInfo, false)
+        assertTrue(modifierController().capsLockAutomatic)
+    }
+
+    @Test
+    fun midWordQuoteToApostrophe_keepsTheLayoutOutputOfTheNextKey() {
+        val shift = KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON
+        assertEquals("ب'د", typeAfterMidWordQuote("uyghur", "ب", KeyEvent.KEYCODE_D))
+        assertEquals("ب'لا", typeAfterMidWordQuote("uyghur", "ب", KeyEvent.KEYCODE_L, shift))
+        assertEquals("ب'ئ", typeAfterMidWordQuote("uyghur", "ب", KeyEvent.KEYCODE_SLASH))
+        assertEquals("а'в", typeAfterMidWordQuote("russian_standard", "а", KeyEvent.KEYCODE_D))
+        assertEquals("α'δ", typeAfterMidWordQuote("greek", "α", KeyEvent.KEYCODE_D))
+        assertEquals("a'd", typeAfterMidWordQuote("qwerty", "a", KeyEvent.KEYCODE_D))
+        assertEquals("a'D", typeAfterMidWordQuote("qwerty", "a", KeyEvent.KEYCODE_D, shift))
+    }
+
+    @Test
+    fun greekPunctuationOnLetterKey_isCommittedOnceAsPunctuation() {
+        useLayout("greek")
+        recorder.textBeforeCursor = "αβ"
+        val time = 10_000L
+        service.onKeyDown(KeyEvent.KEYCODE_Q, keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_Q, time, time))
+        service.onKeyUp(KeyEvent.KEYCODE_Q, keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_Q, time, time + 30L))
+        assertEquals("αβ;", recorder.textBeforeCursor)
+    }
+
+    @Test
+    fun softShiftOnUyghur_isConsumedOnceByTheMultiCharacterTextOfTheNextSoftKey() {
+        useLayout("uyghur")
+        val keyboard = SoftwareKeyboardHarness()
+
+        keyboard.tap("⇧")
+        assertTrue(modifierController().shiftOneShot)
+        keyboard.tap("l")
+        assertFalse(modifierController().shiftOneShot)
+        keyboard.tap("k")
+
+        assertEquals(listOf("لا", "ك"), recorder.committedTexts)
+    }
+
+    @Test
+    fun softShiftOnLatin_isConsumedOnceByTheNextSoftKey() {
+        useLayout("qwerty")
+        val keyboard = SoftwareKeyboardHarness()
+
+        keyboard.tap("⇧")
+        keyboard.tap("a")
+        keyboard.tap("b")
+
+        assertEquals(listOf("A", "b"), recorder.committedTexts)
+    }
+
+    /**
+     * The software keyboard view wired to the service's own callbacks: taps go through
+     * AospKeyboardView touch handling, and every tap re-renders it from the service's
+     * modifier state, as the status bar does on device.
+     */
+    private inner class SoftwareKeyboardHarness {
+        private val context = RuntimeEnvironment.getApplication()
+        private val statusBar: StatusBarController =
+            getField(getField<Any>(service, "candidatesBarController"), "inputStatusBar")
+        private val view = rocks.pkb.plektra.inputmethod.aospkeyboard.AospKeyboardView(context)
+        private val parent = android.widget.FrameLayout(context).apply {
+            addView(view, android.widget.FrameLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+            ))
+        }
+        private var time = 0L
+
+        init {
+            render()
+        }
+
+        fun tap(label: String) {
+            val key = getField<List<Any>>(view, "keys").first { key ->
+                getField<String>(getField<Any>(key, "spec"), "label") == label
+            }
+            val rect = getField<android.graphics.RectF>(key, "hitRect")
+            time += 100L
+            view.dispatchTouchEvent(android.view.MotionEvent.obtain(0L, time, android.view.MotionEvent.ACTION_DOWN, rect.centerX(), rect.centerY(), 0))
+            view.dispatchTouchEvent(android.view.MotionEvent.obtain(0L, time + 20L, android.view.MotionEvent.ACTION_UP, rect.centerX(), rect.centerY(), 0))
+            render()
+        }
+
+        private fun render() {
+            val modifiers = modifierController().snapshot()
+            val snapshot = StatusBarController.StatusSnapshot(
+                capsLockEnabled = modifiers.capsLockEnabled,
+                shiftPhysicallyPressed = modifiers.shiftPhysicallyPressed,
+                shiftOneShot = modifiers.shiftOneShot,
+                ctrlLatchActive = modifiers.ctrlLatchActive,
+                ctrlPhysicallyPressed = modifiers.ctrlPhysicallyPressed,
+                ctrlOneShot = modifiers.ctrlOneShot,
+                ctrlLatchFromNavMode = modifiers.ctrlLatchFromNavMode,
+                altLatchActive = modifiers.altLatchActive,
+                altPhysicallyPressed = modifiers.altPhysicallyPressed,
+                altOneShot = modifiers.altOneShot,
+                symPage = 0,
+                activeKeyboardLayoutName = SettingsManager.getKeyboardLayout(context)
+            )
+            StatusBarController::class.java.getDeclaredMethod(
+                "configureSoftwareKeyboard",
+                view.javaClass,
+                snapshot.javaClass,
+                InputConnection::class.java,
+                Map::class.java
+            ).apply { isAccessible = true }.invoke(statusBar, view, snapshot, inputConnection, null)
+            val width = android.view.View.MeasureSpec.makeMeasureSpec(1000, android.view.View.MeasureSpec.EXACTLY)
+            val height = android.view.View.MeasureSpec.makeMeasureSpec(240, android.view.View.MeasureSpec.EXACTLY)
+            parent.measure(width, height)
+            parent.layout(0, 0, 1000, 240)
+        }
+    }
+
+    private fun useLayout(layout: String) {
+        SettingsManager.setKeyboardLayoutAutoByLocale(service, false)
+        SettingsManager.setKeyboardLayout(service, layout)
+        SettingsManager.setAutoCorrectEnabled(service, false)
+        SettingsManager.setMidWordQuoteToApostrophe(service, true)
+        LayoutMappingRepository.loadLayout(service.assets, layout, service)
+        service.onStartInput(editorInfo, false)
+        // The tests type mid-sentence; drop the auto-cap one-shot of the empty field.
+        modifierController().consumeShiftOneShot()
+        recorder.committedTexts.clear()
+    }
+
+    private fun typeAfterMidWordQuote(layout: String, letter: String, keyCode: Int, meta: Int = 0): String {
+        useLayout(layout)
+        recorder.textBeforeCursor = "$letter\""
+        val time = 10_000L
+        service.onKeyDown(keyCode, keyEvent(KeyEvent.ACTION_DOWN, keyCode, time, time, meta))
+        service.onKeyUp(keyCode, keyEvent(KeyEvent.ACTION_UP, keyCode, time, time + 30L, meta))
+        return recorder.textBeforeCursor
+    }
+
+    private fun switchSubtype(prefValue: String) {
+        val subtype = rocks.pkb.plektra.inputmethod.subtype.AdditionalSubtypeUtils.createAdditionalSubtypesArray(
+            prefValue, service.assets, service
+        ).single()
+        PhysicalKeyboardInputMethodService::class.java.getDeclaredMethod(
+            "onCurrentInputMethodSubtypeChanged", android.view.inputmethod.InputMethodSubtype::class.java
+        ).apply { isAccessible = true }.invoke(service, subtype)
+    }
+
+    @Test
+    fun uyghurOnQ25_routesAllLettersAndPunctuationThroughRealImePath() {
+        DeviceSpecific.setBuildFingerprintForTests("zinwa", "zinwa", "Q25", "Q25", "q25")
+        SettingsManager.setPhysicalKeyboardProfileOverride(service, "Q25")
+        setField(service, "physicalKeyboardProfileOverride", "Q25")
+        SettingsManager.setKeyboardLayoutAutoByLocale(service, false)
+        SettingsManager.setKeyboardLayout(service, "uyghur")
+        SettingsManager.setAutoCorrectEnabled(service, false)
+        SettingsManager.setLongPressModifier(service, "alt")
+        LayoutMappingRepository.loadLayout(service.assets, "uyghur", service)
+        service.onStartInput(editorInfo, false)
+
+        val shift = KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON
+        val alt = KeyEvent.META_ALT_ON or KeyEvent.META_ALT_LEFT_ON
+        var time = 10_000L
+        fun press(key: Int, meta: Int = 0) {
+            service.onKeyDown(key, keyEvent(KeyEvent.ACTION_DOWN, key, time, time, meta))
+            service.onKeyUp(key, keyEvent(KeyEvent.ACTION_UP, key, time, time + 30L, meta))
+            time += 1_000L
+        }
+        "QWERTYUIOPASDFGHJKLZXCVBNM".forEach { press(KeyEvent.KEYCODE_A + (it - 'A')) }
+        "DFGHJKLMNVX".forEach { press(KeyEvent.KEYCODE_A + (it - 'A'), shift) }
+        listOf(KeyEvent.KEYCODE_SLASH, KeyEvent.KEYCODE_COMMA, KeyEvent.KEYCODE_SEMICOLON).forEach { press(it) }
+        "NVJRHBIM".forEach { press(KeyEvent.KEYCODE_A + (it - 'A'), alt) }
+
+        assertEquals(
+            "چۋېرتيۇڭوپھسداەىقكلزشغۈبنمژفگخجۆلائنۈشئ،؛،؟؛3:!-.",
+            recorder.committedTexts.joinToString("")
+        )
+    }
+
+    @Test
     fun autoCap_manualShiftOff_survivesRestartOfCurrentField() {
         val context = RuntimeEnvironment.getApplication()
         SettingsManager.setAutoCapitalizeFirstLetter(context, true)
@@ -471,6 +978,23 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
         service.onStartInput(editorInfo, true)
 
         assertTrue(modifierController().shiftOneShot)
+    }
+
+    @Test
+    fun literalEditorOptOutSurvivesRestrictedCapitalizationAndAllowsManualShift() {
+        val context = RuntimeEnvironment.getApplication()
+        SettingsManager.setAutoCapitalizeRestrictedFields(context, true)
+        editorInfo.privateImeOptions = InputContextState.LITERAL_ENTRY_IME_OPTION
+        service.onStartInput(editorInfo, false)
+        assertFalse("Literal spelling must not inherit automatic Shift", modifierController().shiftOneShot)
+
+        tapShift(20_000L)
+        assertTrue("Deliberate capitalization remains available", modifierController().shiftOneShot)
+        tapShift(21_000L)
+        assertFalse(modifierController().shiftOneShot)
+
+        focusNewField(RecordingInputConnection(), inputType = InputType.TYPE_CLASS_TEXT)
+        assertTrue("Ordinary editors retain the user's capitalization preference", modifierController().shiftOneShot)
     }
 
     @Test
@@ -803,6 +1327,75 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
             keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, t0 + 560L, t0 + 560L)
         )
         assertTrue("commits=${recorder.committedTexts}", recorder.committedTexts.contains("="))
+    }
+
+    /** The emoji page's first People & Body page, opened as the service has it (no recents). */
+    private fun openPeopleEmojiPage(): rocks.pkb.plektra.core.SymLayoutController {
+        val context = RuntimeEnvironment.getApplication()
+        context.getSharedPreferences("recent_emojis_prefs", 0).edit().clear().commit()
+        rocks.pkb.plektra.data.emoji.TestEmojiFont.install(context)
+        val sym: rocks.pkb.plektra.core.SymLayoutController = getField(service, "symLayoutController")
+        sym.openEmojiPage()
+        sym.turnPage(1, section = true)
+        sym.turnPage(1, section = true)
+        assertEquals("👋", sym.currentSymMappings()!![KeyEvent.KEYCODE_W])
+        return sym
+    }
+
+    private fun rollOverWAndE(t0: Long) {
+        service.onKeyDown(KeyEvent.KEYCODE_W, keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_W, t0, t0))
+        service.onKeyDown(KeyEvent.KEYCODE_E, keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_E, t0 + 30L, t0 + 30L))
+        service.onKeyUp(KeyEvent.KEYCODE_W, keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_W, t0, t0 + 60L))
+        service.onKeyUp(KeyEvent.KEYCODE_E, keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_E, t0 + 30L, t0 + 90L))
+    }
+
+    @Test
+    fun emojiPageRolloverWithAutoCloseTypesTheSecondKeyAsALetterOnce() {
+        val context = RuntimeEnvironment.getApplication()
+        SettingsManager.setAutoCapitalizeFirstLetter(context, false)
+        SettingsManager.setAutoCapitalizeAfterPeriod(context, false)
+        SettingsManager.setSymAutoClose(context, true)
+        val sym = openPeopleEmojiPage()
+
+        rollOverWAndE(5_000L)
+
+        assertEquals(listOf("👋", "e"), recorder.committedTexts)
+        assertFalse(sym.isSymActive())
+    }
+
+    @Test
+    fun emojiPageRolloverWithoutAutoCloseTypesBothEmojiOnce() {
+        val context = RuntimeEnvironment.getApplication()
+        SettingsManager.setSymAutoClose(context, false)
+        val sym = openPeopleEmojiPage()
+        val keys = sym.currentSymMappings()!!
+
+        rollOverWAndE(5_200L)
+
+        assertEquals(listOf(keys[KeyEvent.KEYCODE_W], keys[KeyEvent.KEYCODE_E]), recorder.committedTexts)
+        assertTrue(sym.isSymActive())
+    }
+
+    @Test
+    fun heldSymTypesTheOwnMappingOfQAndPThatThePagesTurnWith() {
+        val context = RuntimeEnvironment.getApplication()
+        SettingsManager.setSymAutoClose(context, false)
+        rocks.pkb.plektra.data.emoji.TestEmojiFont.install(context)
+        val sym: rocks.pkb.plektra.core.SymLayoutController = getField(service, "symLayoutController")
+        val own: AlternateCharacterManager = getField(service, "alternateCharacterManager")
+        val ownQ = own.getSymMappings()[KeyEvent.KEYCODE_Q]
+        sym.openEmojiPage()
+        assertEquals(rocks.pkb.plektra.core.SymPagedLayer.PREVIOUS_LABEL, sym.currentSymMappings()!![KeyEvent.KEYCODE_Q])
+        assertTrue(!ownQ.isNullOrEmpty())
+
+        val t0 = 5_400L
+        service.onKeyDown(KeyEvent.KEYCODE_SYM, keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SYM, t0, t0))
+        service.onKeyDown(KeyEvent.KEYCODE_Q, keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_Q, t0 + 30L, t0 + 30L))
+        service.onKeyUp(KeyEvent.KEYCODE_Q, keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_Q, t0 + 30L, t0 + 60L))
+        service.onKeyUp(KeyEvent.KEYCODE_SYM, keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SYM, t0, t0 + 90L))
+
+        assertEquals(listOf(ownQ), recorder.committedTexts)
+        assertTrue("the chord leaves the page open", sym.isSymActive())
     }
 
     @Test
@@ -1178,6 +1771,76 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
         assertTrue(recorder.editorActions.isEmpty())
     }
 
+    @Test
+    fun hiddenBarApp_refusesShowRequestsButHardwareTypingAndSymLayerStillWork() {
+        val context = RuntimeEnvironment.getApplication()
+        SettingsManager.setAutoCapitalizeFirstLetter(context, false)
+        SettingsManager.setKeyboardBarHiddenInApp(context, "rocks.pkb.plektra.test", true)
+        focusNewField(RecordingInputConnection(), InputType.TYPE_CLASS_TEXT)
+
+        assertFalse(visibilityController().allowsSurface())
+        assertFalse(service.onEvaluateInputViewShown())
+        assertFalse(service.onShowInputRequested(0, false))
+        assertTrue(visibilityController().shouldRecoverSurfaceOnHardwareKey())
+
+        val t0 = 9_000L
+        service.onKeyDown(KeyEvent.KEYCODE_B, keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_B, t0, t0))
+        service.onKeyUp(KeyEvent.KEYCODE_B, keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_B, t0, t0 + 20L))
+        tapSym(t0 + 100L)
+        service.onKeyDown(KeyEvent.KEYCODE_A, keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, t0 + 140L, t0 + 140L))
+        assertEquals("commits=${recorder.committedTexts}", listOf("b", "@"), recorder.committedTexts)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        assertFalse(visibilityController().allowsSurface())
+    }
+
+    @Test
+    fun hiddenBarApp_dedicatedEmojiKeyAndPickerRequestsDoNotOpenInvisiblePickers() {
+        val context = RuntimeEnvironment.getApplication()
+        SettingsManager.setAutoCapitalizeFirstLetter(context, false)
+        SettingsManager.setKeyboardBarHiddenInApp(context, "rocks.pkb.plektra.test", true)
+        focusNewField(RecordingInputConnection(), InputType.TYPE_CLASS_TEXT)
+        setField(service, "physicalKeyboardProfileOverride", "mp01")
+
+        assertTrue(service.onKeyDown(666, keyEvent(KeyEvent.ACTION_DOWN, 666, 9_500L, 9_500L)))
+        assertEquals(0, symLayout().currentSymPage())
+        assertFalse(symLayout().openClipboardPage())
+        assertEquals(0, symLayout().currentSymPage())
+        recorder.committedTexts.clear()
+        service.onKeyDown(KeyEvent.KEYCODE_C, keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_C, 9_600L, 9_600L))
+        assertEquals(listOf("c"), recorder.committedTexts)
+    }
+
+    @Test
+    fun hiddenBarApp_appSwitchAndSettingsChangeReevaluateTheBlock() {
+        val context = RuntimeEnvironment.getApplication()
+        SettingsManager.setKeyboardBarHiddenInApp(context, "com.example.blocked", true)
+
+        focusNewField(RecordingInputConnection(), InputType.TYPE_CLASS_TEXT, packageName = "com.example.blocked")
+        assertFalse(visibilityController().allowsSurface())
+        focusNewField(RecordingInputConnection(), InputType.TYPE_CLASS_TEXT, packageName = "com.example.allowed")
+        assertTrue(visibilityController().allowsSurface())
+        assertTrue(symLayout().openEmojiPickerPage())
+
+        // Adding the current app while a picker is open closes the picker and blocks the bar.
+        SettingsManager.setKeyboardBarHiddenInApp(context, "com.example.allowed", true)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        assertFalse(visibilityController().allowsSurface())
+        assertEquals(0, symLayout().currentSymPage())
+        assertFalse(service.onShowInputRequested(0, false))
+
+        SettingsManager.setKeyboardBarHiddenInApp(context, "com.example.allowed", false)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        assertTrue(visibilityController().allowsSurface())
+        focusNewField(RecordingInputConnection(), InputType.TYPE_CLASS_TEXT, packageName = "com.example.blocked")
+        assertFalse(visibilityController().allowsSurface())
+    }
+
+    private fun visibilityController(): KeyboardVisibilityController =
+        getField(service, "keyboardVisibilityController")
+
+    private fun symLayout(): rocks.pkb.plektra.core.SymLayoutController =
+        getField(service, "symLayoutController")
+
     private fun focusNewField(
         newRecorder: RecordingInputConnection,
         inputType: Int = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES,
@@ -1272,6 +1935,8 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
     }
 
     private class RecordingInputConnection {
+        var commitAttempts = 0
+        var commitResult = true
         var textBeforeCursor: String = ""
         var sendKeyEventResult: Boolean = true
         var performEditorActionResult: Boolean = false
@@ -1286,8 +1951,9 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
                 InputConnection::class.java.classLoader,
                 arrayOf(InputConnection::class.java)
             ) { _, method, args ->
+                if (method.name == "commitText") commitAttempts++
                 when (method.name) {
-                    "commitText" -> {
+                    "commitText" -> if (!commitResult) false else {
                         val text = args?.getOrNull(0)?.toString()
                         if (text != null) {
                             committedTexts += text
@@ -1349,4 +2015,236 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
             }
         }
     }
+
+    @Test
+    fun longPress_realBoundaryCallbackRejectedCommit_doesNotReportAlternate() {
+        useLayout("uyghur")
+        SettingsManager.setLongPressModifier(service, "alt")
+        SettingsManager.setLongPressThreshold(service, 50L)
+        SettingsManager.setFrenchPunctuationSpacing(service, true)
+        SettingsManager.setFrenchPunctuationOnlyFrenchLayouts(service, false)
+        recorder.textBeforeCursor = "ب"
+        val manager = getField<AlternateCharacterManager>(service, "alternateCharacterManager")
+        manager.addAltKeyMapping(KeyEvent.KEYCODE_L, "?")
+        val alternates = mutableListOf<Char>()
+        manager.onAltCharInserted = { alternates += it }
+        manager.handleKeyWithAltMapping(KeyEvent.KEYCODE_L,
+            KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_L, 0, KeyEvent.META_SHIFT_ON), false, inputConnection)
+        assertEquals("بلا", recorder.textBeforeCursor)
+        val attemptsBeforeReplacement = recorder.commitAttempts
+        recorder.commitResult = false
+        shadowOf(android.os.Looper.getMainLooper()).idleFor(60, java.util.concurrent.TimeUnit.MILLISECONDS)
+        manager.handleKeyUp(KeyEvent.KEYCODE_L, false)
+        assertEquals("ب", recorder.textBeforeCursor)
+        assertTrue("Real service boundary callback reported rejected alternate: $alternates", alternates.isEmpty())
+        assertEquals("only the handled replacement commit is attempted",
+            attemptsBeforeReplacement + 1, recorder.commitAttempts)
+    }
+
+
+    @Test
+    fun longPress_deferredSpaceMustNotSwallowOpeningBracket() {
+        useLayout("uyghur")
+        SettingsManager.setLongPressModifier(service, "alt")
+        SettingsManager.setLongPressThreshold(service, 50L)
+        SettingsManager.setFrenchPunctuationSpacing(service, false)
+        SettingsManager.setAutoCorrectEnabled(service, false)
+        SettingsManager.setSpaceAfterPunctuation(service, ".")
+        rocks.pkb.plektra.core.DeferredPunctuationSpaceTracker.clear()
+        editorInfo.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+        setField(service, "inputContextState", InputContextState.fromEditorInfo(editorInfo))
+        recorder.textBeforeCursor = "ب"
+        val manager = getField<AlternateCharacterManager>(service, "alternateCharacterManager")
+        manager.addAltKeyMapping(KeyEvent.KEYCODE_PERIOD, "(")
+        val alternates = mutableListOf<Char>()
+        manager.onAltCharInserted = { alternates += it }
+        service.onKeyDown(KeyEvent.KEYCODE_PERIOD, KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_PERIOD))
+        assertEquals("ب.", recorder.textBeforeCursor)
+        shadowOf(android.os.Looper.getMainLooper()).idleFor(60, java.util.concurrent.TimeUnit.MILLISECONDS)
+        service.onKeyUp(KeyEvent.KEYCODE_PERIOD, KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_PERIOD))
+        assertEquals("ب (", recorder.textBeforeCursor)
+        assertEquals(listOf('('), alternates)
+    }
+
+
+    @Test
+    fun emojiSearchHeldInSearchIsConsumed() {
+        val picker = openEmojiPickerSearch()
+        val modifier = modifierController()
+        modifier.clearShiftState(resetPressedState = true)
+        val meta = KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON
+        service.onKeyDown(KeyEvent.KEYCODE_SHIFT_LEFT, keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SHIFT_LEFT, 10000L, 10000L, meta))
+        pressKey(KeyEvent.KEYCODE_A, 10050L, meta)
+        service.onKeyUp(KeyEvent.KEYCODE_SHIFT_LEFT, keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SHIFT_LEFT, 10000L, 10450L))
+        assertEquals("A", searchText(picker))
+        pressKey(KeyEvent.KEYCODE_B, 10500L)
+        assertEquals("Ab", searchText(picker))
+    }
+
+    @Test
+    fun emojiSearchSoftOneShotInSearchIsConsumed() {
+        val picker = openEmojiPickerSearch()
+        val modifier = modifierController()
+        modifier.clearShiftState(resetPressedState = true)
+        modifier.shiftOneShot = true
+        pressKey(KeyEvent.KEYCODE_A, 10000L)
+        assertEquals("A", searchText(picker))
+        pressKey(KeyEvent.KEYCODE_B, 10100L)
+        assertEquals("Ab", searchText(picker))
+    }
+
+    @Test
+    fun emojiSearchOnUyghur_softOneShotTypesTheWholeMultiCharacterLetter() {
+        useLayout("uyghur")
+        val picker = openEmojiPickerSearch()
+        val modifier = modifierController()
+        modifier.clearShiftState(resetPressedState = true)
+        modifier.shiftOneShot = true
+        pressKey(KeyEvent.KEYCODE_L, 10000L)
+        assertEquals("لا", searchText(picker))
+        assertFalse(modifier.shiftOneShot)
+        pressKey(KeyEvent.KEYCODE_L, 10100L)
+        assertEquals("لال", searchText(picker))
+    }
+
+    @Test
+    fun emojiSearchManualLatchSurvivesSearch() {
+        val picker = openEmojiPickerSearch()
+        val modifier = modifierController()
+        modifier.clearShiftState(resetPressedState = true)
+        modifier.capsLockEnabled = true
+        pressKey(KeyEvent.KEYCODE_A,10000L)
+        pressKey(KeyEvent.KEYCODE_B,10100L)
+        assertTrue(modifier.capsLockEnabled)
+    }
+
+    private fun useCalculatorInput() {
+        editorInfo.packageName = "com.google.android.calculator"
+        editorInfo.inputType = EditorInfo.TYPE_NULL
+        setField(service, "inputContextState", InputContextState.fromEditorInfo(editorInfo))
+        modifierController().clearAltState(resetPressedState = true)
+        modifierController().altTapLatches = false
+        setField(service, "isInputViewActive", false)
+        setField(service, "requestedInputViewShown", false)
+        getField<AlternateCharacterManager>(service, "alternateCharacterManager")
+            .addAltKeyMapping(KeyEvent.KEYCODE_W, "1")
+    }
+
+    @Test
+    fun calculatorAltLockSendsRepeatedDigitsAndConsumesOriginalKeyUps() {
+        useCalculatorInput()
+        pressKey(KeyEvent.KEYCODE_ALT_LEFT, 10000L)
+        pressKey(KeyEvent.KEYCODE_ALT_LEFT, 10100L)
+        assertTrue(modifierController().altLatchActive)
+        pressKey(KeyEvent.KEYCODE_W, 10200L)
+        pressKey(KeyEvent.KEYCODE_W, 10300L)
+        assertEquals(listOf(KeyEvent.KEYCODE_1, KeyEvent.KEYCODE_1, KeyEvent.KEYCODE_1, KeyEvent.KEYCODE_1),
+            recorder.sentKeyEvents.map { it.keyCode })
+        assertEquals(listOf(KeyEvent.ACTION_DOWN, KeyEvent.ACTION_UP, KeyEvent.ACTION_DOWN, KeyEvent.ACTION_UP),
+            recorder.sentKeyEvents.map { it.action })
+        assertTrue(modifierController().altLatchActive)
+        pressKey(KeyEvent.KEYCODE_ALT_LEFT, 10400L)
+        assertFalse(modifierController().altLatchActive)
+    }
+
+    @Test
+    fun calculatorHeldAltDigitsTakePriorityOverLauncherShortcuts() {
+        useCalculatorInput()
+        SettingsManager.setQuickLauncherAltShortcutsOutsideTextFields(service, true)
+        val meta = KeyEvent.META_ALT_ON or KeyEvent.META_ALT_LEFT_ON
+        service.onKeyDown(KeyEvent.KEYCODE_ALT_LEFT,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ALT_LEFT, 10000L, 10000L, meta))
+        pressKey(KeyEvent.KEYCODE_W, 10100L, meta)
+        service.onKeyUp(KeyEvent.KEYCODE_ALT_LEFT,
+            keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ALT_LEFT, 10000L, 10200L))
+        assertEquals(2, recorder.sentKeyEvents.size)
+        assertTrue(recorder.sentKeyEvents.all { it.keyCode == KeyEvent.KEYCODE_1 && it.metaState == 0 })
+        assertFalse(modifierController().altOneShot)
+        assertFalse(modifierController().altPressed)
+        assertEquals(null, shadowOf(service).nextStartedActivity)
+    }
+
+    @Test
+    fun otherTypeNullAppsKeepTheirExistingAltRouting() {
+        useCalculatorInput()
+        editorInfo.packageName = "com.example.other"
+        SettingsManager.setQuickLauncherAltShortcutsOutsideTextFields(service, false)
+        pressKey(KeyEvent.KEYCODE_ALT_LEFT, 10000L)
+        pressKey(KeyEvent.KEYCODE_ALT_LEFT, 10100L)
+        pressKey(KeyEvent.KEYCODE_W, 10200L)
+        assertTrue(recorder.sentKeyEvents.isEmpty())
+        assertFalse(modifierController().altLatchActive)
+    }
+
+    @Test
+    fun calculatorOperatorsUseTheSameMappingsWithHeldAndLockedAlt() {
+        val mappings = linkedMapOf(
+            KeyEvent.KEYCODE_A to ("*" to KeyEvent.KEYCODE_NUMPAD_MULTIPLY),
+            KeyEvent.KEYCODE_G to ("/" to KeyEvent.KEYCODE_NUMPAD_DIVIDE),
+            KeyEvent.KEYCODE_O to ("+" to KeyEvent.KEYCODE_NUMPAD_ADD),
+            KeyEvent.KEYCODE_I to ("-" to KeyEvent.KEYCODE_NUMPAD_SUBTRACT),
+            KeyEvent.KEYCODE_T to ("(" to KeyEvent.KEYCODE_NUMPAD_LEFT_PAREN),
+            KeyEvent.KEYCODE_Y to (")" to KeyEvent.KEYCODE_NUMPAD_RIGHT_PAREN),
+            KeyEvent.KEYCODE_M to ("." to KeyEvent.KEYCODE_PERIOD),
+            KeyEvent.KEYCODE_N to ("," to KeyEvent.KEYCODE_NUMPAD_COMMA)
+        )
+        for (locked in listOf(false, true)) {
+            useCalculatorInput()
+            SettingsManager.setQuickLauncherAltShortcutsOutsideTextFields(service, true)
+            val manager = getField<AlternateCharacterManager>(service, "alternateCharacterManager")
+            mappings.forEach { (key, mapping) -> manager.addAltKeyMapping(key, mapping.first) }
+            recorder.sentKeyEvents.clear()
+            val meta = if (locked) 0 else KeyEvent.META_ALT_ON or KeyEvent.META_ALT_LEFT_ON
+            if (locked) {
+                pressKey(KeyEvent.KEYCODE_ALT_LEFT, 20000L)
+                pressKey(KeyEvent.KEYCODE_ALT_LEFT, 20100L)
+            } else {
+                service.onKeyDown(KeyEvent.KEYCODE_ALT_LEFT,
+                    keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ALT_LEFT, 20000L, 20000L, meta))
+            }
+            mappings.keys.forEachIndexed { i, key ->
+                val time = 20200L + i * 100
+                assertTrue(service.onKeyDown(key, keyEvent(KeyEvent.ACTION_DOWN, key, time, time, meta)))
+                // Firmware can report a different modifier state when the character key is released.
+                assertTrue(service.onKeyUp(key, keyEvent(KeyEvent.ACTION_UP, key, time, time + 30, 0)))
+            }
+            val expected = mappings.values.flatMap { listOf(it.second, it.second) }
+            assertEquals(expected, recorder.sentKeyEvents.map { it.keyCode })
+            assertTrue(recorder.sentKeyEvents.all { it.metaState == 0 })
+            assertEquals(0, recorder.commitAttempts)
+            assertFalse(getField<Boolean>(service, "isInputViewActive"))
+            assertFalse(getField<Boolean>(service, "requestedInputViewShown"))
+            assertEquals(null, shadowOf(service).nextStartedActivity)
+            if (!locked) {
+                service.onKeyUp(KeyEvent.KEYCODE_ALT_LEFT,
+                    keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ALT_LEFT, 20000L, 21500L))
+                assertFalse(modifierController().altOneShot)
+            }
+        }
+    }
+
+    @Test
+    fun calculatorOneShotRepeatsTheResolvedCharacterUntilKeyUp() {
+        useCalculatorInput()
+        pressKey(KeyEvent.KEYCODE_ALT_LEFT, 30000L)
+        service.onKeyDown(KeyEvent.KEYCODE_W,
+            keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_W, 30100L, 30100L))
+        assertFalse(modifierController().altOneShot)
+        val repeat = KeyEvent(30100L, 30200L, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_W, 1)
+        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_W, repeat))
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_W,
+            keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_W, 30100L, 30300L)))
+        assertEquals(List(4) { KeyEvent.KEYCODE_1 }, recorder.sentKeyEvents.map { it.keyCode })
+    }
+
+    @Test
+    fun calculatorUnmappedAltDoesNotOpenShortcutAssignment() {
+        useCalculatorInput()
+        SettingsManager.setQuickLauncherAltShortcutsOutsideTextFields(service, true)
+        getField<AlternateCharacterManager>(service, "alternateCharacterManager").removeAltKeyMapping(KeyEvent.KEYCODE_A)
+        pressKey(KeyEvent.KEYCODE_ALT_LEFT, 30000L)
+        pressKey(KeyEvent.KEYCODE_A, 30100L)
+        assertEquals(null, shadowOf(service).nextStartedActivity)
+    }
+
 }
