@@ -2460,6 +2460,57 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
     }
 
     @Test
+    fun swapOn_upTheImeConsumes_endsTheRawShiftTheSystemDeliveredInPlaceOfEnter() {
+        enableShiftEnterSwap()
+        val connection = keyEventField()
+
+        // Right Shift as Enter cannot be sent: the system delivers the raw Shift DOWN.
+        connection.sendKeyEventResult = false
+        val down = tick()
+        assertFalse(service.onKeyDown(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_DOWN, down, down)))
+        connection.sentKeyEvents.clear()
+
+        // The handler takes the UP for itself, as an Enter (the tail of an Alt+Enter): the app
+        // would be left holding the Shift. It gets that Shift's UP, cancelled.
+        connection.sendKeyEventResult = true
+        setField(service, "consumeAltEnterUntilKeyUp", true)
+        val up = tick()
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_UP, down, up)))
+        assertFalse(getField<Boolean>(service, "consumeAltEnterUntilKeyUp"))
+        assertEquals(listOf("SHIFT_RIGHT up repeat=0 shift=false"), sentKeys(connection))
+        val release = connection.sentKeyEvents.single()
+        assertTrue(release.isCanceled)
+        assertEquals(down, release.downTime)
+        assertEquals(up, release.eventTime)
+        assertEquals(FakeKeyboards.BUILT_IN, release.deviceId)
+        assertEquals(54, release.scanCode)
+
+        // The connection still takes no key events at the UP: the system delivers the raw UP,
+        // as it delivered the DOWN.
+        connection.sentKeyEvents.clear()
+        connection.sendKeyEventResult = false
+        val again = tick()
+        assertFalse(service.onKeyDown(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_DOWN, again, again)))
+        setField(service, "consumeAltEnterUntilKeyUp", true)
+        assertFalse(service.onKeyUp(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_UP, again, tick())))
+        assertFalse(getField<Boolean>(service, "consumeAltEnterUntilKeyUp"))
+    }
+
+    @Test
+    fun upTheImeConsumes_ofAKeyNoRemapTouched_staysConsumed() {
+        // The same keyboard and field without the swap: Enter is Enter, the system delivers it.
+        useTitan2EliteBuiltInKeyboard()
+        val connection = keyEventField()
+        val down = tick()
+        assertFalse(service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, down, down)))
+
+        setField(service, "consumeAltEnterUntilKeyUp", true)
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_UP, down, tick())))
+        assertFalse(getField<Boolean>(service, "consumeAltEnterUntilKeyUp"))
+        assertTrue(sentKeys(connection).toString(), connection.sentKeyEvents.isEmpty())
+    }
+
+    @Test
     fun swapOn_keyTheAppHolds_isReleasedAsCancelled_whenItsOwnUpIsLost() {
         enableShiftEnterSwap()
         val connection = keyEventField()

@@ -47,9 +47,38 @@ class KeyDeliveryLedgerTest {
         // The IME sent this one: a repeat the system delivers afterwards does not take it over.
         ledger.onInitialDown(otherDeviceKey)
         ledger.onSentByIme(otherDeviceKey, KeyEvent.KEYCODE_DPAD_LEFT, "left")
-        ledger.onDeliveredBySystem(otherDeviceKey, KeyEvent.KEYCODE_DPAD_RIGHT)
+        ledger.onDeliveredBySystem(otherDeviceKey, KeyEvent.KEYCODE_DPAD_RIGHT, insteadOfRemapped = true)
         assertEquals(KeyEvent.KEYCODE_DPAD_LEFT, ledger.deliveredKeyCode(otherDeviceKey))
         assertEquals("left", ledger.sentByIme(otherDeviceKey))
+        assertFalse(ledger.isDeliveredInsteadOfRemapped(otherDeviceKey))
+    }
+
+    @Test
+    fun aRawKeyDeliveredInPlaceOfARemappedOne_isMarkedSo_untilItsUpOrTheNextConnection() {
+        ledger.onInitialDown(key)
+        ledger.onDeliveredBySystem(key, KeyEvent.KEYCODE_SHIFT_RIGHT, insteadOfRemapped = true)
+        ledger.onInitialDown(otherDeviceKey)
+        ledger.onDeliveredBySystem(otherDeviceKey, KeyEvent.KEYCODE_TAB)
+
+        assertTrue(ledger.isDeliveredInsteadOfRemapped(key))
+        assertNull(ledger.sentByIme(key))
+        // A key no remap touched is not marked.
+        assertFalse(ledger.isDeliveredInsteadOfRemapped(otherDeviceKey))
+
+        ledger.onUp(key)
+        assertFalse(ledger.isDeliveredInsteadOfRemapped(key))
+
+        ledger.onInitialDown(key)
+        ledger.onDeliveredBySystem(key, KeyEvent.KEYCODE_SHIFT_RIGHT, insteadOfRemapped = true)
+        changeConnection()
+        assertFalse(ledger.isDeliveredInsteadOfRemapped(key))
+        // The system delivered it: nothing for the caller to release.
+        assertTrue(released.toString(), released.isEmpty())
+
+        // A press the IME then sends itself is no stand-in.
+        ledger.onDeliveredBySystem(key, KeyEvent.KEYCODE_SHIFT_RIGHT, insteadOfRemapped = true)
+        ledger.onSentByIme(key, KeyEvent.KEYCODE_ENTER, "enter")
+        assertFalse(ledger.isDeliveredInsteadOfRemapped(key))
     }
 
     @Test

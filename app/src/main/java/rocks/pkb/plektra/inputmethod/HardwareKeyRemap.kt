@@ -105,6 +105,12 @@ import android.view.KeyEvent
  * view has focus in the connection's window, not to the view the connection was made for, and
  * nothing the IME can observe (package, field id) proves that two connections lead to one view;
  * a retry would be the UP without a DOWN this rule exists to prevent.
+ *
+ * A raw key the system delivered in place of a remapped one that could not be sent is the
+ * system's to continue and to end, with one exception: when the IME consumes its UP (as the
+ * remapped key, which the app never saw), the IME ends it, as a cancelled UP of the raw key
+ * through the connection, or by letting the system deliver the raw UP when the connection still
+ * takes nothing. A key no remap touched keeps the IME's handling as it is.
  */
 
 /** How a [KeySource] names its physical key. */

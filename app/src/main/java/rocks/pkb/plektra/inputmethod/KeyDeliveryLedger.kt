@@ -14,7 +14,8 @@ import android.util.LongSparseArray
  *   send fails or the handler consumes the UP: the raw key the system would deliver instead is a
  *   different key;
  * - a key the system delivered ([onDeliveredBySystem]) stays the system's, also when the remapped
- *   key could be sent by now;
+ *   key could be sent by now; when it stands in for a remapped key and the IME consumes its UP,
+ *   the IME ends it ([isDeliveredInsteadOfRemapped]);
  * - a key the app never saw go down gets no repeat and no UP.
  *
  * What was delivered counts for one input connection only ([onConnectionChanged]): a key held
@@ -32,11 +33,13 @@ internal class KeyDeliveryLedger<S : Any> {
         var seenGeneration = NONE
         var seenKeyCode = NONE
         var sent: S? = null
+        var insteadOfRemapped = false
 
         fun forget() {
             seenGeneration = NONE
             seenKeyCode = NONE
             sent = null
+            insteadOfRemapped = false
         }
     }
 
@@ -88,18 +91,22 @@ internal class KeyDeliveryLedger<S : Any> {
         entry.seenGeneration = generation
         entry.seenKeyCode = keyCode
         entry.sent = sent
+        entry.insteadOfRemapped = false
     }
 
     /**
      * The IME left a DOWN of this key to the system, which delivers the raw [keyCode]. Does not
-     * take over a press the IME already sent to this connection.
+     * take over a press the IME already sent to this connection. [insteadOfRemapped] marks a
+     * press whose remapped key the connection did not take, so that the raw key went in its
+     * place: see [isDeliveredInsteadOfRemapped].
      */
-    fun onDeliveredBySystem(key: Long, keyCode: Int) {
+    fun onDeliveredBySystem(key: Long, keyCode: Int, insteadOfRemapped: Boolean = false) {
         val entry = entryFor(key)
         if (entry.seenGeneration == generation) return
         entry.seenGeneration = generation
         entry.seenKeyCode = keyCode
         entry.sent = null
+        entry.insteadOfRemapped = insteadOfRemapped
     }
 
     /** The key code the current connection's app saw go down for this key, [NONE] when none. */
@@ -112,6 +119,16 @@ internal class KeyDeliveryLedger<S : Any> {
     fun sentByIme(key: Long): S? {
         val entry = entries.get(key) ?: return null
         return if (entry.seenGeneration == generation) entry.sent else null
+    }
+
+    /**
+     * True when the current connection's app holds the raw key of a remapped press, delivered by
+     * the system because the remapped key could not be sent. Unlike a key no remap touched, such
+     * a press is the caller's to end when it consumes the UP the system would deliver.
+     */
+    fun isDeliveredInsteadOfRemapped(key: Long): Boolean {
+        val entry = entries.get(key) ?: return false
+        return entry.seenGeneration == generation && entry.insteadOfRemapped
     }
 
     /**

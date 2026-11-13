@@ -4831,8 +4831,13 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         return target != normalizedKeyCode && HardwareKeyRemapper.isModifierKeyCode(target)
     }
 
-    /** How a remapped event the handler left alone reaches the app, see [passRemappedKeyToApp]. */
-    private enum class RemapDelivery { SYSTEM_DELIVERS, SWALLOWED, INJECTED }
+    /**
+     * How a remapped event the handler left alone reaches the app, see [passRemappedKeyToApp].
+     * [SYSTEM_DELIVERS] is the route such an event is meant to take (a modifier whose meta state
+     * alone changed), [RAW_FALLBACK] the raw key going in place of an event that could not be
+     * sent.
+     */
+    private enum class RemapDelivery { SYSTEM_DELIVERS, RAW_FALLBACK, SWALLOWED, INJECTED }
 
     /**
      * The handler returned false for an event a user remap changed, so the system would deliver
@@ -4868,7 +4873,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             }
             return RemapDelivery.INJECTED
         }
-        return if (keyCodeRemapped && isModifier) RemapDelivery.SWALLOWED else RemapDelivery.SYSTEM_DELIVERS
+        return if (keyCodeRemapped && isModifier) RemapDelivery.SWALLOWED else RemapDelivery.RAW_FALLBACK
     }
 
     /**
@@ -4937,6 +4942,8 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
      * the modifier it acted as ends with it, without the tap its UP would be.
      */
     private fun onRemappedKeyHoldCancelled(physicalKey: Long, targetKeyCode: Int) {
+        // A raw key the system delivered in its place is the system's to cancel; when this
+        // key's UP comes after all, [onKeyUp] ends that one.
         keyDeliveries.sentByIme(physicalKey)?.let { sent ->
             sendCancelledUpToApp(sent)
             keyDeliveries.onUp(physicalKey)
@@ -5247,6 +5254,12 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             RemapDelivery.INJECTED, RemapDelivery.SWALLOWED -> true
             RemapDelivery.SYSTEM_DELIVERS -> {
                 if (systemDelivers) keyDeliveries.onDeliveredBySystem(physicalKey, keyCode_)
+                false
+            }
+            RemapDelivery.RAW_FALLBACK -> {
+                if (systemDelivers) {
+                    keyDeliveries.onDeliveredBySystem(physicalKey, keyCode_, insteadOfRemapped = true)
+                }
                 false
             }
         }
@@ -6141,6 +6154,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         // What this connection's app saw go down for the key, and by which route.
         val delivered = keyDeliveries.deliveredKeyCode(physicalKey)
         val sentByIme = keyDeliveries.sentByIme(physicalKey) != null
+        val insteadOfRemapped = keyDeliveries.isDeliveredInsteadOfRemapped(physicalKey)
         keyDeliveries.onUp(physicalKey)
         if (event_ == null) return handled
         val remap = dispatch.result
@@ -6163,6 +6177,14 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
                 currentInputConnection?.sendKeyEvent(
                     if (remap != null) remappedEventForApp(remap, event_, dispatch.metaStateBefore) else event_
                 )
+            } else if (insteadOfRemapped) {
+                // The app holds the raw key in place of a remapped one that could not be sent:
+                // the handler took the UP as the remapped key, which that raw key never was to
+                // the app. Its press ends as a cancelled one; when the connection still takes
+                // no key events, the system delivers the UP as it delivered the DOWN. A key no
+                // remap touched stays as the handler left it.
+                val cancelled = KeyEvent.changeFlags(event_, event_.flags or KeyEvent.FLAG_CANCELED)
+                if (currentInputConnection?.sendKeyEvent(cancelled) != true) return false
             }
             return true
         }
@@ -6173,8 +6195,10 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         if (delivered == KeyDeliveryLedger.NONE) return true
         // The app holds the raw key: the system delivers its UP.
         if (remap.change == KeyRemapResult.Change.KEY) return false
-        return passRemappedKeyToApp(remap, event_, dispatch.metaStateBefore, physicalKey) !=
-            RemapDelivery.SYSTEM_DELIVERS
+        return when (passRemappedKeyToApp(remap, event_, dispatch.metaStateBefore, physicalKey)) {
+            RemapDelivery.INJECTED, RemapDelivery.SWALLOWED -> true
+            RemapDelivery.SYSTEM_DELIVERS, RemapDelivery.RAW_FALLBACK -> false
+        }
     }
 
     private fun onKeyUpImpl(keyCode_: Int, event_: KeyEvent?, dispatch: KeyRemapDispatch): Boolean {
