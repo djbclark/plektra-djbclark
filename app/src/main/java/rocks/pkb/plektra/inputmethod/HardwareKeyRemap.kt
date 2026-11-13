@@ -76,6 +76,14 @@ import android.view.KeyEvent
  * key and per connection ([KeyDeliveryLedger]): a press ends with the key it began with, or not
  * at all. That record ends with the connection, not with the hold: a held key survives a new
  * editor, what the previous one saw of it does not.
+ *
+ * Every onStartInput counts as a new connection, a restarting one included. The framework hands
+ * the IME a new connection object on each start and no way to tell whether it reaches the view
+ * the previous one did ("restarting" means the client already had an editor, which need not be
+ * the same view). The choice is between an UP that may land in a view that never saw the DOWN
+ * and an UP that is withheld from one that did. The second is taken: a key held across a start
+ * gets its UP only after a repeat has brought it to the new connection, so a key released
+ * between a restart and its next repeat leaves the view with a press it saw begin and not end.
  */
 
 /** How a [KeySource] names its physical key. */

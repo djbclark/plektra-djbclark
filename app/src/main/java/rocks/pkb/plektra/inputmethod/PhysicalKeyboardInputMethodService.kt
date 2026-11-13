@@ -3857,8 +3857,13 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         if (!restarting) {
             cancelSpeechRecognition()
             ++speechEditorSession
-            keyDeliveries.onConnectionChanged()
         }
+        // Every start comes with an input connection of its own, a restarting one too, and the
+        // IME cannot tell whether it leads to the view that saw the held keys go down. What the
+        // app saw of them therefore counts for the connection before this start only: no UP
+        // goes into this one unless a repeat brought the key there first. The held keys
+        // themselves go on (see the design note in HardwareKeyRemap.kt).
+        keyDeliveries.onConnectionChanged()
         super.onStartInput(info, restarting)
         inputStarted = true
         if (::textExpansionController.isInitialized) textExpansionController.clear()

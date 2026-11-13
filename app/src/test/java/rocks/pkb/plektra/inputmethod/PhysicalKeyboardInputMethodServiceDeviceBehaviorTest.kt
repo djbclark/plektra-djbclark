@@ -1734,6 +1734,17 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
         return connection
     }
 
+    /** The framework starts input again in the same editor: the IME gets another connection. */
+    private fun restartInputWithNewConnection(): RecordingInputConnection {
+        val connection = RecordingInputConnection()
+        recorder = connection
+        inputConnection = connection.asProxy()
+        setField(service, "mInputConnection", inputConnection)
+        setField(service, "mStartedInputConnection", inputConnection)
+        service.onStartInput(editorInfo, true)
+        return connection
+    }
+
     private fun scanKey(
         action: Int,
         keyCode: Int,
@@ -2089,6 +2100,64 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
         assertTrue(service.onKeyUp(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_UP, again, tick())))
         assertTrue(sentKeys(third).toString(), third.sentKeyEvents.isEmpty())
         assertEquals(3, second.sentKeyEvents.size)
+    }
+
+    @Test
+    fun swapOn_keyReleasedAfterARestartWithANewConnection_sendsNoUpIntoIt() {
+        enableShiftEnterSwap()
+        val first = keyEventField()
+
+        // Right Shift as Enter.
+        val shift = tick()
+        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_DOWN, shift, shift)))
+        val second = restartInputWithNewConnection()
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_UP, shift, tick())))
+        assertEquals(listOf("ENTER down repeat=0 shift=false"), sentKeys(first))
+        assertTrue(sentKeys(second).toString(), second.sentKeyEvents.isEmpty())
+
+        // Enter as Shift.
+        val enter = tick()
+        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, enter, enter)))
+        assertEquals(listOf("SHIFT_RIGHT down repeat=0 shift=true"), sentKeys(second))
+        val third = restartInputWithNewConnection()
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_UP, enter, tick())))
+        assertEquals(1, second.sentKeyEvents.size)
+        assertTrue(sentKeys(third).toString(), third.sentKeyEvents.isEmpty())
+    }
+
+    @Test
+    fun swapOn_keyRepeatingAfterARestartWithANewConnection_isAPairedPressThere() {
+        enableShiftEnterSwap()
+        val first = keyEventField()
+
+        val shift = tick()
+        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_DOWN, shift, shift)))
+        val second = restartInputWithNewConnection()
+        assertTrue(
+            service.onKeyDown(
+                KeyEvent.KEYCODE_SHIFT_RIGHT,
+                rightShiftKey(KeyEvent.ACTION_DOWN, shift, tick(), repeatCount = 1)
+            )
+        )
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_UP, shift, tick())))
+        assertEquals(listOf("ENTER down repeat=0 shift=false"), sentKeys(first))
+        assertEquals(
+            listOf("ENTER down repeat=1 shift=false", "ENTER up repeat=0 shift=false"),
+            sentKeys(second)
+        )
+
+        val enter = tick()
+        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, enter, enter)))
+        val third = restartInputWithNewConnection()
+        assertTrue(
+            service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, enter, tick(), repeatCount = 1))
+        )
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_UP, enter, tick())))
+        assertEquals(3, second.sentKeyEvents.size)
+        assertEquals(
+            listOf("SHIFT_RIGHT down repeat=1 shift=true", "SHIFT_RIGHT up repeat=0 shift=false"),
+            sentKeys(third)
+        )
     }
 
     @Test
