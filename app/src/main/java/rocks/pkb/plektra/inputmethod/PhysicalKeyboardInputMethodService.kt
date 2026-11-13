@@ -4914,7 +4914,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
      * through it is released there as a cancelled press; the held keys themselves go on.
      */
     private fun endKeyDeliveriesOfThisConnection() {
-        keyDeliveries.onConnectionChanged(::sendCancelledUpToApp)
+        keyDeliveries.onConnectionChanged { }
     }
 
     /**
@@ -4978,16 +4978,6 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
                 KeyEvent.KEYCODE_SHIFT_LEFT, KeyEvent.KEYCODE_SHIFT_RIGHT -> {
                     shiftPressed = true
                     shiftPhysicallyPressed = true
-                    otherKeyInteractedDuringHold = true
-                }
-                KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.KEYCODE_CTRL_RIGHT -> {
-                    ctrlPressed = true
-                    ctrlPhysicallyPressed = true
-                    otherKeyInteractedDuringHold = true
-                }
-                KeyEvent.KEYCODE_ALT_LEFT, KeyEvent.KEYCODE_ALT_RIGHT -> {
-                    altPressed = true
-                    altPhysicallyPressed = true
                     otherKeyInteractedDuringHold = true
                 }
             }
@@ -6154,7 +6144,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         // What this connection's app saw go down for the key, and by which route.
         val delivered = keyDeliveries.deliveredKeyCode(physicalKey)
         val sentByIme = keyDeliveries.sentByIme(physicalKey) != null
-        val insteadOfRemapped = keyDeliveries.isDeliveredInsteadOfRemapped(physicalKey)
+        val insteadOfRemapped = keyDeliveries.isDeliveredInsteadOfRemapped(physicalKey) && physicalKey == -1L
         keyDeliveries.onUp(physicalKey)
         if (event_ == null) return handled
         val remap = dispatch.result
