@@ -17,7 +17,10 @@ import rocks.pkb.plektra.commands.PlektraCommandSource
 import rocks.pkb.plektra.core.Punctuation
 import rocks.pkb.plektra.data.layout.BundledLayoutAssets
 import rocks.pkb.plektra.inputmethod.DeviceSpecific
-import rocks.pkb.plektra.inputmethod.HardwareKeyRemapRegistry
+import rocks.pkb.plektra.inputmethod.KeyRemapJson
+import rocks.pkb.plektra.inputmethod.KeyRemapRule
+import rocks.pkb.plektra.inputmethod.KeyRemapRules
+import rocks.pkb.plektra.inputmethod.KeyRemapTable
 import rocks.pkb.plektra.inputmethod.ScreenTrackpadTerminalApps
 import rocks.pkb.plektra.inputmethod.subtype.AdditionalSubtypeUtils
 import rocks.pkb.plektra.inputmethod.subtype.AdditionalSubtypeUtils.localeString
@@ -175,7 +178,9 @@ object SettingsManager {
     private const val KEY_SHIFT_BACKSPACE_DELETE = "shift_backspace_delete" // Shift + Backspace performs forward delete
     private const val KEY_ALT_BACKSPACE_DELETE = "alt_backspace_delete" // Alt + Backspace performs forward delete
     private const val KEY_BACKSPACE_AT_START_DELETE = "backspace_at_start_delete" // Backspace at line start performs forward delete
-    private const val KEY_KEY_REMAP_PREFIX = "key_remap_" // + KeyRemapOption.id; boolean, default off
+    const val KEY_HARDWARE_KEY_REMAPS = "hardware_key_remaps" // JSON, see KeyRemapJson
+    // The switch of the first fork builds: a boolean, migrated to rules on first read.
+    internal const val LEGACY_KEY_REMAP_SWAP_SHIFT_RIGHT_ENTER = "key_remap_swap_shift_right_enter"
     private const val KEY_SLIM_MODE_OVERRIDE = "slim_mode_override" // slim | full_status_bar
     private const val KEY_SLIM_MODE_ACTIVE = "slim_mode_active" // Current effective state
     private const val KEY_SOFTWARE_KEYBOARD_MODE = "software_keyboard_mode" // auto | force_hardware | force_virtual
@@ -2825,56 +2830,106 @@ object SettingsManager {
             .apply()
     }
 
-    /**
-     * The pref keys of the hardware key remap options, in [HardwareKeyRemapRegistry.options] order.
-     * Built once: [getEnabledKeyRemaps] runs per key event.
-     */
-    private val keyRemapPrefKeys: List<String> = HardwareKeyRemapRegistry.options.map {
-        KEY_KEY_REMAP_PREFIX + it.id
-    }.also { require(it.size <= Long.SIZE_BITS) { "Too many key remap options for the enabled mask" } }
-
-    private class EnabledKeyRemaps(val mask: Long, val ids: Set<String>)
-
+    // The compiled rules keyed on the JSON they came from; every writer goes through the
+    // preference, so a changed string is the only invalidation needed.
     @Volatile
-    private var enabledKeyRemapsCache = EnabledKeyRemaps(0L, emptySet())
+    private var hardwareKeyRemapsCache: Pair<String, KeyRemapTable>? = null
 
     /**
-     * Returns the ids of the hardware key remap options that are switched on.
-     * Called per key event, so it only reads the in-memory preferences and allocates nothing when
-     * none is on, or when the set of options that are on has not changed since the last call:
-     * callers get the same set instance then.
+     * The hardware key remap rules of every keyboard profile, compiled. Called per key event: it
+     * reads the in-memory preferences and decodes only when the stored rules changed.
      */
-    fun getEnabledKeyRemaps(context: Context): Set<String> {
+    fun getHardwareKeyRemaps(context: Context): KeyRemapTable {
         val prefs = getPreferences(context)
-        var mask = 0L
-        for (i in keyRemapPrefKeys.indices) {
-            if (prefs.getBoolean(keyRemapPrefKeys[i], false)) mask = mask or (1L shl i)
+        if (prefs.contains(LEGACY_KEY_REMAP_SWAP_SHIFT_RIGHT_ENTER)) migrateLegacyKeyRemap(context, prefs)
+        val json = prefs.getString(KEY_HARDWARE_KEY_REMAPS, null) ?: return KeyRemapTable.EMPTY
+        hardwareKeyRemapsCache?.let { (cachedJson, table) ->
+            if (cachedJson == json) return table
         }
-        if (mask == 0L) return emptySet()
-        val cached = enabledKeyRemapsCache
-        if (cached.mask == mask) return cached.ids
-        val ids = HashSet<String>()
-        for (i in keyRemapPrefKeys.indices) {
-            if ((mask and (1L shl i)) != 0L) ids.add(HardwareKeyRemapRegistry.options[i].id)
-        }
-        enabledKeyRemapsCache = EnabledKeyRemaps(mask, ids)
-        return ids
+        val table = KeyRemapJson.decode(json).table()
+        hardwareKeyRemapsCache = json to table
+        return table
     }
 
     /**
-     * Returns whether the hardware key remap option with the given id is switched on.
+     * Turns the boolean of the first fork builds into the preset's rules for the built-in
+     * keyboard, once: the boolean is removed, and rules already stored (set here, or restored
+     * from a backup) are never replaced.
      */
-    fun isKeyRemapEnabled(context: Context, id: String): Boolean {
-        return getPreferences(context).getBoolean(KEY_KEY_REMAP_PREFIX + id, false)
+    private fun migrateLegacyKeyRemap(context: Context, prefs: SharedPreferences) {
+        val wasOn = try {
+            prefs.getBoolean(LEGACY_KEY_REMAP_SWAP_SHIFT_RIGHT_ENTER, false)
+        } catch (_: ClassCastException) {
+            false
+        }
+        val editor = prefs.edit().remove(LEGACY_KEY_REMAP_SWAP_SHIFT_RIGHT_ENTER)
+        val preset = HardwareKeyRemapPresets.byId(HardwareKeyRemapPresets.SWAP_SHIFT_RIGHT_ENTER)
+        val profileId = builtInKeyboardProfileId(context)
+        if (wasOn && preset != null && preset.supports(profileId) && !prefs.contains(KEY_HARDWARE_KEY_REMAPS)) {
+            editor.putString(KEY_HARDWARE_KEY_REMAPS, KeyRemapJson.encode(mapOf(profileId to preset.rules)))
+        }
+        editor.apply()
+    }
+
+    /** The profile of the built-in keyboard: the manual override, else the detected device. */
+    fun builtInKeyboardProfileId(context: Context): String = DeviceSpecific.resolveInputProfile(
+        event = null,
+        physicalProfileOverride = getPhysicalKeyboardProfileOverride(context)
+    ).profileId
+
+    /** The stored hardware key remap rules of one keyboard profile, valid ones only. */
+    fun getHardwareKeyRemapRules(context: Context, profileId: String): List<KeyRemapRule> =
+        getHardwareKeyRemaps(context).rules(profileId)
+
+    /**
+     * Replaces the hardware key remap rules of one keyboard profile; invalid rules are dropped.
+     * False when nothing was written because the stored rules come from a newer app version.
+     */
+    fun setHardwareKeyRemapRules(context: Context, profileId: String, rules: List<KeyRemapRule>): Boolean {
+        getHardwareKeyRemaps(context) // migrates first, so the write is not migrated over
+        val prefs = getPreferences(context)
+        val store = KeyRemapJson.decode(prefs.getString(KEY_HARDWARE_KEY_REMAPS, null))
+        if (!store.writable) return false
+        val rulesByProfile = LinkedHashMap(store.rulesByProfile)
+        val valid = KeyRemapRules.compile(rules).rules
+        val profileKey = KeyRemapJson.profileKey(profileId)
+        if (valid.isEmpty()) rulesByProfile.remove(profileKey) else rulesByProfile[profileKey] = valid
+        val editor = prefs.edit()
+        if (rulesByProfile.isEmpty()) {
+            editor.remove(KEY_HARDWARE_KEY_REMAPS)
+        } else {
+            editor.putString(KEY_HARDWARE_KEY_REMAPS, KeyRemapJson.encode(rulesByProfile))
+        }
+        editor.apply()
+        return true
+    }
+
+    /** True when every rule of the preset is among the built-in keyboard's rules. */
+    fun isKeyRemapPresetEnabled(context: Context, presetId: String): Boolean {
+        val preset = HardwareKeyRemapPresets.byId(presetId) ?: return false
+        val rules = getHardwareKeyRemapRules(context, builtInKeyboardProfileId(context))
+        return rules.containsAll(preset.rules)
     }
 
     /**
-     * Sets whether the hardware key remap option with the given id is switched on.
+     * Switches a preset on or off for the built-in keyboard: on puts its rules in front of the
+     * stored ones (replacing rules for the same keys), off removes them. Returns the state the
+     * preset is in afterwards.
      */
-    fun setKeyRemapEnabled(context: Context, id: String, enabled: Boolean) {
-        getPreferences(context).edit()
-            .putBoolean(KEY_KEY_REMAP_PREFIX + id, enabled)
-            .apply()
+    fun setKeyRemapPresetEnabled(context: Context, presetId: String, enabled: Boolean): Boolean {
+        val preset = HardwareKeyRemapPresets.byId(presetId) ?: return false
+        val profileId = builtInKeyboardProfileId(context)
+        if (enabled && !preset.supports(profileId)) return false
+        val current = getHardwareKeyRemapRules(context, profileId)
+        val rules = if (enabled) {
+            preset.rules + current.filter { rule ->
+                preset.rules.none { KeyRemapRules.sameSource(it.from, rule.from) }
+            }
+        } else {
+            current - preset.rules.toSet()
+        }
+        setHardwareKeyRemapRules(context, profileId, rules)
+        return isKeyRemapPresetEnabled(context, presetId)
     }
 
     /**

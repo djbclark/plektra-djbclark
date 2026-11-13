@@ -1,11 +1,13 @@
 package rocks.pkb.plektra.inputmethod
 
 import android.text.InputType
+import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.ExtractedText
 import android.view.inputmethod.InputConnection
 import rocks.pkb.plektra.AltModifierBinding
+import rocks.pkb.plektra.HardwareKeyRemapPresets
 import rocks.pkb.plektra.SettingsManager
 import rocks.pkb.plektra.SymPagesConfig
 import rocks.pkb.plektra.core.InputContextState
@@ -1661,10 +1663,30 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
         }
     }
 
-    // The Titan 2 with the vendor Key setting that makes physical right Shift (scan 54) arrive as
-    // Alt, and the "Swap right Shift and Enter" remap on: scan 54 must act as Enter, and the
-    // physical Enter key (scan 28) as Shift, in an app on the messenger preset.
-    private fun enableSwapOnVendorShiftAsAlt() {
+    // ---- User key remaps: "Swap right Shift and Enter" on the Titan 2 ----
+    // Physical keys by Linux scan code: Enter 28, right Shift 54, left Alt 56, A 30, Tab 15.
+
+    private val rightShiftMeta = KeyEvent.META_SHIFT_RIGHT_ON or KeyEvent.META_SHIFT_ON
+    private var remapClock = 20_000L
+
+    private fun tick(ms: Long = 100L): Long {
+        remapClock += ms
+        return remapClock
+    }
+
+    /** A Titan 2 whose keys come from a built-in keyboard device, with the swap switched on. */
+    private fun enableShiftEnterSwap() {
+        useTitan2BuiltInKeyboard()
+        assertTrue(
+            SettingsManager.setKeyRemapPresetEnabled(
+                RuntimeEnvironment.getApplication(),
+                HardwareKeyRemapPresets.SWAP_SHIFT_RIGHT_ENTER,
+                true
+            )
+        )
+    }
+
+    private fun useTitan2BuiltInKeyboard() {
         DeviceSpecific.setBuildFingerprintForTests(
             brand = "unihertz",
             manufacturer = "unihertz",
@@ -1673,11 +1695,14 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
             product = "titan2"
         )
         setField(service, "physicalKeyboardProfileOverride", "auto")
-        SettingsManager.setKeyRemapEnabled(
-            RuntimeEnvironment.getApplication(),
-            HardwareKeyRemapRegistry.SWAP_SHIFT_RIGHT_ENTER,
-            true
-        )
+        FakeKeyboards.register()
+    }
+
+    // The vendor Key setting makes physical right Shift (scan 54) arrive as Alt: with the swap on,
+    // scan 54 must act as Enter, and the physical Enter key (scan 28) as Shift, in an app on the
+    // messenger preset.
+    private fun enableSwapOnVendorShiftAsAlt() {
+        enableShiftEnterSwap()
         focusNewField(
             newRecorder = RecordingInputConnection(),
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE,
@@ -1686,17 +1711,86 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
         recorder.performEditorActionResult = true
     }
 
+    /** The swap in a plain QWERTY text field where nothing but a held Shift capitalizes. */
+    private fun enableSwapInPlainTextField() {
+        enableShiftEnterSwap()
+        val context = RuntimeEnvironment.getApplication()
+        SettingsManager.setAutoCapitalizeFirstLetter(context, false)
+        SettingsManager.setAutoCapitalizeAfterPeriod(context, false)
+        editorInfo.inputType = InputType.TYPE_CLASS_TEXT
+        useLayout("qwerty")
+    }
+
+    private fun plainTextField() = focusNewField(RecordingInputConnection(), InputType.TYPE_CLASS_TEXT)
+
+    /** A field without an editor (a terminal): the IME leaves Enter, Tab and Shift to the app. */
+    private fun keyEventField(): RecordingInputConnection {
+        SettingsManager.setPowerShortcutsEnabled(RuntimeEnvironment.getApplication(), false)
+        val connection = RecordingInputConnection()
+        focusNewField(connection, EditorInfo.TYPE_NULL, "com.example.remote")
+        return connection
+    }
+
     private fun scanKey(
         action: Int,
         keyCode: Int,
         scanCode: Int,
         downTime: Long,
         eventTime: Long,
-        metaState: Int = 0
+        metaState: Int = 0,
+        repeatCount: Int = 0,
+        deviceId: Int = FakeKeyboards.BUILT_IN,
+        flags: Int = KeyEvent.FLAG_FROM_SYSTEM
     ): KeyEvent = KeyEvent(
-        downTime, eventTime, action, keyCode, 0, metaState, 0, scanCode, 0,
-        android.view.InputDevice.SOURCE_KEYBOARD
+        downTime, eventTime, action, keyCode, repeatCount, metaState, deviceId, scanCode, flags,
+        InputDevice.SOURCE_KEYBOARD
     )
+
+    /** Types the A key of the built-in keyboard and returns what it committed. */
+    private fun typeA(metaState: Int = 0): String {
+        recorder.committedTexts.clear()
+        val time = tick()
+        service.onKeyDown(
+            KeyEvent.KEYCODE_A,
+            scanKey(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, 30, time, time, metaState)
+        )
+        service.onKeyUp(
+            KeyEvent.KEYCODE_A,
+            scanKey(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_A, 30, time, time + 20L, metaState)
+        )
+        return recorder.committedTexts.joinToString("")
+    }
+
+    private fun enterKey(
+        action: Int,
+        downTime: Long,
+        eventTime: Long,
+        repeatCount: Int = 0,
+        deviceId: Int = FakeKeyboards.BUILT_IN,
+        flags: Int = KeyEvent.FLAG_FROM_SYSTEM
+    ): KeyEvent = scanKey(
+        action, KeyEvent.KEYCODE_ENTER, 28, downTime, eventTime,
+        repeatCount = repeatCount, deviceId = deviceId, flags = flags
+    )
+
+    private fun rightShiftKey(action: Int, downTime: Long, eventTime: Long, repeatCount: Int = 0): KeyEvent =
+        scanKey(
+            action, KeyEvent.KEYCODE_SHIFT_RIGHT, 54, downTime, eventTime,
+            metaState = if (action == KeyEvent.ACTION_UP) 0 else rightShiftMeta,
+            repeatCount = repeatCount
+        )
+
+    private fun sentKeys(connection: RecordingInputConnection): List<String> =
+        connection.sentKeyEvents.map {
+            val action = if (it.action == KeyEvent.ACTION_DOWN) "down" else "up"
+            val key = when (it.keyCode) {
+                KeyEvent.KEYCODE_ENTER -> "ENTER"
+                KeyEvent.KEYCODE_TAB -> "TAB"
+                KeyEvent.KEYCODE_SHIFT_RIGHT -> "SHIFT_RIGHT"
+                else -> it.keyCode.toString()
+            }
+            "$key $action repeat=${it.repeatCount} shift=${it.isShiftPressed}"
+        }
 
     @Test
     fun swapOn_vendorRewrittenRightShiftAlone_sendsInMessengerApp() {
@@ -1723,10 +1817,7 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
         enableSwapOnVendorShiftAsAlt()
 
         // Physical Enter (scan 28) is held and acts as Shift.
-        service.onKeyDown(
-            KeyEvent.KEYCODE_ENTER,
-            scanKey(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 28, 9_100L, 9_100L)
-        )
+        service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, 9_100L, 9_100L))
         // Physical right Shift (scan 54, arrives as Alt) acts as Enter.
         service.onKeyDown(
             KeyEvent.KEYCODE_ALT_RIGHT,
@@ -1769,6 +1860,364 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
             recorder.committedTexts.contains("\n")
         )
         assertTrue(recorder.editorActions.isEmpty())
+    }
+
+    @Test
+    fun swapOn_anotherKeyThatSendsRightShift_staysAShift() {
+        enableSwapInPlainTextField()
+        // The vendor Key setting may give another key (here the Alt key, scan 100) the right
+        // Shift's key code: only the key at scan 54 is the one the swap turns into Enter.
+        val down = tick()
+        service.onKeyDown(
+            KeyEvent.KEYCODE_SHIFT_RIGHT,
+            scanKey(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SHIFT_RIGHT, 100, down, down, rightShiftMeta)
+        )
+        assertEquals("A", typeA(rightShiftMeta))
+        service.onKeyUp(
+            KeyEvent.KEYCODE_SHIFT_RIGHT,
+            scanKey(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SHIFT_RIGHT, 100, down, tick())
+        )
+        assertEquals("a", typeA())
+        assertTrue(recorder.editorActions.isEmpty())
+        assertTrue(sentKeys(recorder).toString(), recorder.sentKeyEvents.isEmpty())
+    }
+
+    @Test
+    fun swapOn_tappedEnterArmsTheUsersOneShotShift_soTheNextEnterIsANewline() {
+        enableSwapOnVendorShiftAsAlt()
+        modifierController().consumeShiftOneShot()
+
+        // Physical Enter tapped alone: a Shift tap.
+        val tap = tick()
+        service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, tap, tap))
+        service.onKeyUp(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_UP, tap, tap + 40L))
+        assertTrue(recorder.editorActions.isEmpty())
+        assertTrue(modifierController().shiftOneShot)
+        assertTrue(modifierController().shiftOneShotFromUserTap)
+
+        // The Enter that follows (physical right Shift) is Shift+Enter: a newline, not a send.
+        val enter = tick(200L)
+        service.onKeyDown(
+            KeyEvent.KEYCODE_SHIFT_RIGHT,
+            rightShiftKey(KeyEvent.ACTION_DOWN, enter, enter)
+        )
+        assertTrue(
+            "text=${recorder.committedTexts} sent=${recorder.editorActions}",
+            recorder.committedTexts.contains("\n")
+        )
+        assertTrue(recorder.editorActions.isEmpty())
+    }
+
+    @Test
+    fun swapOn_appliesToTheBuiltInKeyboardOnly() {
+        enableSwapOnVendorShiftAsAlt()
+        fun enterSends(down: KeyEvent, up: KeyEvent): Boolean {
+            recorder.editorActions.clear()
+            service.onKeyDown(KeyEvent.KEYCODE_ENTER, down)
+            service.onKeyUp(KeyEvent.KEYCODE_ENTER, up)
+            return recorder.editorActions == listOf(EditorInfo.IME_ACTION_SEND)
+        }
+
+        var time = tick()
+        assertTrue(
+            "accessory keyboard",
+            enterSends(
+                enterKey(KeyEvent.ACTION_DOWN, time, time, deviceId = FakeKeyboards.ACCESSORY),
+                enterKey(KeyEvent.ACTION_UP, time, time + 20L, deviceId = FakeKeyboards.ACCESSORY)
+            )
+        )
+        time = tick(500L)
+        assertTrue(
+            "event without a device",
+            enterSends(
+                keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, time, time),
+                keyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER, time, time + 20L)
+            )
+        )
+        time = tick(500L)
+        assertTrue(
+            "on-screen key",
+            enterSends(
+                enterKey(KeyEvent.ACTION_DOWN, time, time, flags = KeyEvent.FLAG_SOFT_KEYBOARD),
+                enterKey(KeyEvent.ACTION_UP, time, time + 20L, flags = KeyEvent.FLAG_SOFT_KEYBOARD)
+            )
+        )
+        // The control: the same key from the built-in keyboard acts as Shift.
+        time = tick(500L)
+        assertFalse(
+            "built-in keyboard",
+            enterSends(enterKey(KeyEvent.ACTION_DOWN, time, time), enterKey(KeyEvent.ACTION_UP, time, time + 20L))
+        )
+    }
+
+    @Test
+    fun swapOn_heldEnterKeepsShiftingThroughEditorChanges() {
+        enableSwapInPlainTextField()
+        assertEquals("a", typeA())
+
+        val down = tick()
+        service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, down, down))
+        assertEquals("A", typeA())
+
+        service.onStartInput(editorInfo, true)
+        assertEquals("after a restarting start", "A", typeA())
+        service.onFinishInput()
+        plainTextField()
+        assertEquals("in the next field", "A", typeA())
+        service.onFinishInputView(false)
+        service.onWindowHidden()
+        assertEquals("with the keyboard hidden", "A", typeA())
+
+        service.onKeyUp(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_UP, down, tick()))
+        assertEquals("a", typeA())
+        assertTrue(recorder.editorActions.isEmpty())
+        assertTrue(sentKeys(recorder).toString(), recorder.sentKeyEvents.isEmpty())
+    }
+
+    @Test
+    fun swapOn_heldEnterEndsWhereTheClientUnbinds_andTheRestOfThePressIsSwallowed() {
+        enableSwapInPlainTextField()
+        val down = tick()
+        service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, down, down))
+        assertEquals("A", typeA())
+
+        service.onUnbindInput()
+        plainTextField()
+        assertEquals("a", typeA())
+        assertFalse(modifierController().shiftPressed)
+        assertFalse(modifierController().shiftPhysicallyPressed)
+
+        // The key is still down: its repeat and its UP are neither Shift nor a raw Enter.
+        recorder.committedTexts.clear()
+        assertTrue(
+            service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, down, tick(), repeatCount = 1))
+        )
+        assertEquals("a", typeA())
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_UP, down, tick())))
+        assertFalse(modifierController().shiftOneShot)
+        assertTrue(recorder.editorActions.isEmpty())
+        assertTrue(sentKeys(recorder).toString(), recorder.sentKeyEvents.isEmpty())
+
+        // The next press is a Shift again.
+        val again = tick()
+        service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, again, again))
+        assertEquals("A", typeA())
+        service.onKeyUp(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_UP, again, tick()))
+    }
+
+    @Test
+    fun swapOn_rightShiftCutOffByAnUnbind_doesNotTurnIntoAShift() {
+        enableSwapInPlainTextField()
+        val down = tick()
+        // Physical right Shift goes down as Enter, and the client unbinds under it.
+        service.onKeyDown(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_DOWN, down, down))
+        service.onUnbindInput()
+        plainTextField()
+
+        // The framework goes on reporting the held Shift; the key never acted as one.
+        assertEquals("a", typeA(rightShiftMeta))
+        // Another Shift held with it still shifts.
+        assertEquals("A", typeA(rightShiftMeta or KeyEvent.META_SHIFT_LEFT_ON))
+        recorder.committedTexts.clear()
+        assertTrue(
+            service.onKeyDown(
+                KeyEvent.KEYCODE_SHIFT_RIGHT,
+                rightShiftKey(KeyEvent.ACTION_DOWN, down, tick(), repeatCount = 1)
+            )
+        )
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_UP, down, tick())))
+        assertTrue(recorder.committedTexts.toString(), recorder.committedTexts.isEmpty())
+        assertTrue(recorder.editorActions.isEmpty())
+        assertTrue(sentKeys(recorder).toString(), recorder.sentKeyEvents.isEmpty())
+        assertEquals("a", typeA())
+    }
+
+    @Test
+    fun swapOn_heldRightShiftRepeatsEnterIntoTheNextField_withoutAnOrphanUp() {
+        enableShiftEnterSwap()
+        val first = keyEventField()
+        val down = tick()
+        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_DOWN, down, down)))
+        assertEquals(listOf("ENTER down repeat=0 shift=false"), sentKeys(first))
+
+        // Tab while the key is held: the app must see Tab, not Shift+Tab.
+        val tab = tick()
+        assertTrue(
+            service.onKeyDown(
+                KeyEvent.KEYCODE_TAB,
+                scanKey(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_TAB, 15, tab, tab, rightShiftMeta)
+            )
+        )
+        assertTrue(
+            service.onKeyUp(
+                KeyEvent.KEYCODE_TAB,
+                scanKey(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_TAB, 15, tab, tab + 20L, rightShiftMeta)
+            )
+        )
+        assertEquals(
+            listOf(
+                "ENTER down repeat=0 shift=false",
+                "TAB down repeat=0 shift=false",
+                "TAB up repeat=0 shift=false"
+            ),
+            sentKeys(first)
+        )
+
+        // Focus moved: the held key repeats into the new field and is released there.
+        val second = keyEventField()
+        assertTrue(
+            service.onKeyDown(
+                KeyEvent.KEYCODE_SHIFT_RIGHT,
+                rightShiftKey(KeyEvent.ACTION_DOWN, down, tick(), repeatCount = 1)
+            )
+        )
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_UP, down, tick())))
+        assertEquals(
+            listOf("ENTER down repeat=1 shift=false", "ENTER up repeat=0 shift=false"),
+            sentKeys(second)
+        )
+        assertEquals(3, first.sentKeyEvents.size)
+
+        // Released in a field that never saw it go down: the UP goes nowhere.
+        val again = tick()
+        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_DOWN, again, again)))
+        assertEquals(3, second.sentKeyEvents.size)
+        val third = keyEventField()
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_UP, again, tick())))
+        assertTrue(sentKeys(third).toString(), third.sentKeyEvents.isEmpty())
+        assertEquals(3, second.sentKeyEvents.size)
+    }
+
+    @Test
+    fun swapOn_enterAsShiftReachesAnAppThatReadsKeys_asAPairedShiftPress() {
+        enableShiftEnterSwap()
+        val connection = keyEventField()
+        val down = tick()
+        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, down, down)))
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_UP, down, tick())))
+        assertEquals(
+            listOf("SHIFT_RIGHT down repeat=0 shift=true", "SHIFT_RIGHT up repeat=0 shift=false"),
+            sentKeys(connection)
+        )
+    }
+
+    @Test
+    fun swapOn_connectionThatTakesNoKeys_rawShiftGoesToTheSystem_rawEnterGoesNowhere() {
+        enableShiftEnterSwap()
+        val connection = keyEventField()
+        connection.sendKeyEventResult = false
+
+        // Right Shift as Enter cannot be sent: the system delivers the raw pair.
+        val shift = tick()
+        assertFalse(service.onKeyDown(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_DOWN, shift, shift)))
+        assertFalse(service.onKeyUp(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_UP, shift, tick())))
+
+        // Enter as Shift cannot be sent: a raw Enter would act, so the press ends in the IME.
+        val enter = tick()
+        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, enter, enter)))
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_UP, enter, tick())))
+    }
+
+    @Test
+    fun swapOn_overlappingKeysFilter_treatsEnterAsTheModifierItActsAs() {
+        enableSwapInPlainTextField()
+        SettingsManager.setOverlappingKeysEnabled(RuntimeEnvironment.getApplication(), true)
+        val down = tick()
+        service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, down, down))
+        assertEquals("A", typeA())
+        assertEquals("A", typeA())
+        service.onKeyUp(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_UP, down, tick()))
+        assertEquals("a", typeA())
+    }
+
+    @Test
+    fun userKeyRemap_seesTheKeyAfterDeviceNormalization() {
+        // The Q25's Ctrl key sends the right Shift key code, and device normalization makes it
+        // Ctrl: the user's rules apply to that Ctrl, not to the key code that arrived.
+        DeviceSpecific.setBuildFingerprintForTests(
+            brand = "zinwa",
+            manufacturer = "zinwa",
+            model = "Q25",
+            device = "Q25",
+            product = "q25"
+        )
+        setField(service, "physicalKeyboardProfileOverride", "auto")
+        FakeKeyboards.register()
+        assertTrue(
+            SettingsManager.setHardwareKeyRemapRules(
+                RuntimeEnvironment.getApplication(),
+                "q25",
+                listOf(
+                    KeyRemapRule(KeySource.key(KeyEvent.KEYCODE_SHIFT_RIGHT), KeyEvent.KEYCODE_ENTER),
+                    KeyRemapRule(KeySource.key(KeyEvent.KEYCODE_CTRL_LEFT), KeyEvent.KEYCODE_TAB)
+                )
+            )
+        )
+        val connection = keyEventField()
+        val down = tick()
+        assertTrue(
+            service.onKeyDown(
+                KeyEvent.KEYCODE_SHIFT_RIGHT,
+                scanKey(
+                    KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SHIFT_RIGHT, 54, down, down,
+                    KeyEvent.META_SHIFT_RIGHT_ON
+                )
+            )
+        )
+        assertTrue(
+            service.onKeyUp(
+                KeyEvent.KEYCODE_SHIFT_RIGHT,
+                scanKey(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SHIFT_RIGHT, 54, down, tick())
+            )
+        )
+        assertEquals(
+            listOf("TAB down repeat=0 shift=false", "TAB up repeat=0 shift=false"),
+            sentKeys(connection)
+        )
+    }
+
+    @Test
+    fun keyRemappedToSym_actsAsSym_andAnUnbindLeavesNoPressedStateBehind() {
+        useTitan2BuiltInKeyboard()
+        val context = RuntimeEnvironment.getApplication()
+        assertTrue(
+            SettingsManager.setHardwareKeyRemapRules(
+                context,
+                "titan2",
+                listOf(KeyRemapRule(KeySource.key(KeyEvent.KEYCODE_ALT_RIGHT), KeyEvent.KEYCODE_SYM))
+            )
+        )
+        plainTextField()
+        val altMeta = KeyEvent.META_ALT_RIGHT_ON or KeyEvent.META_ALT_ON
+        fun altKey(action: Int, downTime: Long, eventTime: Long) = scanKey(
+            action, KeyEvent.KEYCODE_ALT_RIGHT, 100, downTime, eventTime,
+            metaState = if (action == KeyEvent.ACTION_UP) 0 else altMeta
+        )
+
+        // A tap is a Sym tap: the Sym page opens and Alt never shows.
+        val tap = tick()
+        service.onKeyDown(KeyEvent.KEYCODE_ALT_RIGHT, altKey(KeyEvent.ACTION_DOWN, tap, tap))
+        assertTrue(getField<Boolean>(service, "symPhysicallyPressed"))
+        assertFalse(modifierController().altPressed)
+        assertFalse(modifierController().altPhysicallyPressed)
+        service.onKeyUp(KeyEvent.KEYCODE_ALT_RIGHT, altKey(KeyEvent.ACTION_UP, tap, tap + 40L))
+        assertFalse(getField<Boolean>(service, "symPhysicallyPressed"))
+        assertTrue(symLayout().isSymActive())
+        assertFalse(modifierController().altOneShot)
+
+        // Held when the client unbinds: the pressed state ends, and the late UP toggles nothing.
+        val held = tick(1_000L)
+        service.onKeyDown(KeyEvent.KEYCODE_ALT_RIGHT, altKey(KeyEvent.ACTION_DOWN, held, held))
+        assertTrue(getField<Boolean>(service, "symPhysicallyPressed"))
+        service.onUnbindInput()
+        assertFalse(getField<Boolean>(service, "symPhysicallyPressed"))
+        assertFalse(getField<Boolean>(service, "symTogglePendingOnKeyUp"))
+        plainTextField()
+        val symActive = symLayout().isSymActive()
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_ALT_RIGHT, altKey(KeyEvent.ACTION_UP, held, tick())))
+        assertEquals(symActive, symLayout().isSymActive())
+        assertFalse(getField<Boolean>(service, "symPhysicallyPressed"))
+        assertFalse(modifierController().altPressed)
     }
 
     @Test
