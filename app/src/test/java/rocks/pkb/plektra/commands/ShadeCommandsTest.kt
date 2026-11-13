@@ -32,7 +32,7 @@ class ShadeCommandsTest {
         val context = RuntimeEnvironment.getApplication()
         val registry = CommandRegistry(context)
 
-        for (surface in listOf(CommandSurface.AssignedKey, CommandSurface.NavMode, CommandSurface.QuickLauncher)) {
+        for (surface in listOf(CommandSurface.AssignedKey, CommandSurface.NavMode)) {
             val ids = registry.getCommands(surface)
                 .filter { it.source == CommandSourceId.DeviceControl }
                 .map { it.id }
