@@ -152,6 +152,14 @@ import android.view.KeyEvent
  * UP into it, and leaves to the system also an UP it consumed. That UP is a plain one, as the
  * key's own would be without any remap. None of this is the redirected release of a held
  * Shift, Ctrl or Alt: that one is for keys the IME sent.
+ *
+ * Nor does it end where the client unbinds. What the IME sent ends there unreleased, and the
+ * hold of the remapped key becomes a tombstone. But the app still holds the raw key the system
+ * gave it in that key's place, and the client can bind again while the key is down, so that
+ * its UP reaches the IME after all. The record of it is therefore kept over the unbind, and
+ * the owner leaves to the system the UP its tombstone reports as stale: swallowed with the
+ * rest of the press, it would leave the key down in the app. The key itself acts no more, and
+ * its repeats still end at the tombstone; nothing is sent through any connection for it.
  */
 
 /** How a [KeySource] names its physical key. */
@@ -280,7 +288,10 @@ class KeyRemapResult(val keyCode: Int, val event: KeyEvent, val change: Change) 
         META,
         /** Another key code (and the meta state that goes with it). */
         KEY,
-        /** A repeat or the UP of a tombstoned key: the owner swallows it. */
+        /**
+         * A repeat or the UP of a tombstoned key: the owner swallows it, except the UP of a raw
+         * key the app holds from the system (the end of the design note).
+         */
         STALE
     }
 

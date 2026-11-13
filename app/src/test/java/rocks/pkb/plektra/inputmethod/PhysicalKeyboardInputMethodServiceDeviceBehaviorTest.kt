@@ -3264,6 +3264,177 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
         assertTrue(sentKeys(third).toString(), third.sentKeyEvents.isEmpty())
     }
 
+    /**
+     * Right Shift as Enter cannot be sent, so the system delivers the raw Shift DOWN, and the
+     * client unbinds under the held key. [afterwards] is what follows before the key's events
+     * reach the IME again; it returns the connections made by then. The remapped key has ended
+     * at the unbind, as every held remapped key does (its repeat does nothing any more), but
+     * the app still holds the raw Shift and only the system can end that: the IME leaves it the
+     * UP and sends nothing through any connection. Returns the last of those connections.
+     */
+    private fun rawShiftTheSystemDeliveredGetsItsUpFromTheSystemAfterAnUnbind(
+        afterwards: (view: MutableList<KeyEvent>) -> List<RecordingInputConnection>
+    ): RecordingInputConnection? {
+        enableShiftEnterSwap()
+        val view = mutableListOf<KeyEvent>()
+        val first = keyEventField(RecordingInputConnection(view), fieldId = viewId)
+        first.sendKeyEventResult = false
+        val down = tick()
+        assertFalse(service.onKeyDown(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_DOWN, down, down)))
+        first.sentKeyEvents.clear()
+        first.sendKeyEventResult = true
+
+        service.onUnbindInput()
+        val later = afterwards(view)
+        assertTrue(
+            service.onKeyDown(
+                KeyEvent.KEYCODE_SHIFT_RIGHT,
+                rightShiftKey(KeyEvent.ACTION_DOWN, down, tick(), repeatCount = 1)
+            )
+        )
+        // Swallowed with the rest of the press, this UP would leave the Shift down in the app.
+        assertFalse(service.onKeyUp(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_UP, down, tick())))
+        for (connection in later + first) {
+            assertTrue(sentKeys(connection).toString(), connection.sentKeyEvents.isEmpty())
+        }
+        assertTrue(keys(view).toString(), view.isEmpty())
+        return later.lastOrNull()
+    }
+
+    @Test
+    fun swapOn_rawShiftTheSystemDelivered_heldOverAnUnbind_getsItsUpFromTheSystem_whereTheClientBindsAgain() {
+        val now = rawShiftTheSystemDeliveredGetsItsUpFromTheSystemAfterAnUnbind { view ->
+            listOf(keyEventField(RecordingInputConnection(view), fieldId = viewId))
+        }!!
+
+        // The next press is an Enter again, through the connection of now.
+        val again = tick()
+        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_DOWN, again, again)))
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_UP, again, tick())))
+        assertEquals(listOf("ENTER down repeat=0 shift=false", "ENTER up repeat=0 shift=false"), sentKeys(now))
+    }
+
+    @Test
+    fun swapOn_rawShiftTheSystemDelivered_heldOverAnUnbind_getsItsUpFromTheSystem_notThroughTheConnectionLeftBehind() {
+        // An unbind is no finish: the connection of before can still be the current one, and it
+        // takes keys. A cancelled UP of the raw Shift through it is not the system's UP.
+        rawShiftTheSystemDeliveredGetsItsUpFromTheSystemAfterAnUnbind { emptyList() }
+    }
+
+    @Test
+    fun swapOn_rawShiftTheSystemDelivered_heldOverAnUnbind_getsItsUpFromTheSystem_whenNoConnectionIsLeft() {
+        rawShiftTheSystemDeliveredGetsItsUpFromTheSystemAfterAnUnbind {
+            setField(service, "mInputConnection", null)
+            setField(service, "mStartedInputConnection", null)
+            emptyList()
+        }
+    }
+
+    @Test
+    fun swapOn_rawShiftTheSystemDelivered_heldOverAnUnbind_getsItsUpFromTheSystem_alsoAfterARestartOfTheNextEditor() {
+        rawShiftTheSystemDeliveredGetsItsUpFromTheSystemAfterAnUnbind { view ->
+            val second = keyEventField(RecordingInputConnection(view), fieldId = viewId)
+            // The same package and field id, restarting: what a held Shift the IME sent is
+            // redirected by. Nothing of this press is the IME's to release.
+            listOf(second, restartInputWithNewConnection(RecordingInputConnection(view)))
+        }
+    }
+
+    @Test
+    fun swapOn_keyTheSystemDelivered_heldOverAnUnbind_stillGetsItsUp_underAHeldEnterAsShiftOfTheNextClient() {
+        enableShiftEnterSwap()
+        keyEventField()
+        // Tab goes down as itself (the system delivers it), and the client unbinds under it.
+        val tab = tick()
+        assertFalse(
+            service.onKeyDown(KeyEvent.KEYCODE_TAB, scanKey(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_TAB, 15, tab, tab))
+        )
+        service.onUnbindInput()
+        val second = keyEventField()
+        val enter = tick()
+        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, enter, enter)))
+
+        // The app holds the Tab: its UP is the key's own, with the Shift the held key adds. It
+        // was swallowed when the unbind made the IME forget what the system had delivered.
+        assertTrue(
+            service.onKeyUp(KeyEvent.KEYCODE_TAB, scanKey(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_TAB, 15, tab, tick()))
+        )
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_UP, enter, tick())))
+        assertEquals(
+            listOf(
+                "SHIFT_RIGHT down repeat=0 shift=true",
+                "TAB up repeat=0 shift=true",
+                "SHIFT_RIGHT up repeat=0 shift=false"
+            ),
+            sentKeys(second)
+        )
+        assertFalse(second.sentKeyEvents[1].isCanceled)
+    }
+
+    @Test
+    fun swapOn_keyTheSystemDelivered_heldOverAnUnbind_stillGetsItsUp_underTheRightShiftTheUnbindCutOff() {
+        enableShiftEnterSwap()
+        val first = keyEventField()
+        val tab = tick()
+        assertFalse(
+            service.onKeyDown(KeyEvent.KEYCODE_TAB, scanKey(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_TAB, 15, tab, tab))
+        )
+        // Right Shift goes down as Enter, sent by the IME; the client unbinds under both keys.
+        val shift = tick()
+        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_DOWN, shift, shift)))
+        val sentToFirst = listOf("ENTER down repeat=0 shift=false")
+        assertEquals(sentToFirst, sentKeys(first))
+        service.onUnbindInput()
+        // What the IME sent ends there unreleased: the client it went to is gone.
+        assertEquals(sentToFirst, sentKeys(first))
+        val second = keyEventField()
+
+        // The framework still reports the held right Shift, which never acted as one: Tab's UP
+        // comes without it. Tab was swallowed here too before the delivery outlived the unbind.
+        assertTrue(
+            service.onKeyUp(
+                KeyEvent.KEYCODE_TAB,
+                scanKey(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_TAB, 15, tab, tick(), metaState = rightShiftMeta)
+            )
+        )
+        assertEquals(listOf("TAB up repeat=0 shift=false"), sentKeys(second))
+
+        // The rest of the cut-off Enter is swallowed as before: the app held no raw key for it.
+        assertTrue(
+            service.onKeyDown(
+                KeyEvent.KEYCODE_SHIFT_RIGHT,
+                rightShiftKey(KeyEvent.ACTION_DOWN, shift, tick(), repeatCount = 1)
+            )
+        )
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_UP, shift, tick())))
+        assertEquals(sentToFirst, sentKeys(first))
+        assertEquals(1, second.sentKeyEvents.size)
+    }
+
+    @Test
+    fun swapOn_shiftTheImeSent_heldOverAnUnbind_endsThereUnreleased_andTheRestOfItsPressIsSwallowed() {
+        enableShiftEnterSwap()
+        val view = mutableListOf<KeyEvent>()
+        val first = keyEventField(RecordingInputConnection(view), fieldId = viewId)
+        val down = tick()
+        assertTrue(service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, down, down)))
+        val sent = listOf("SHIFT_RIGHT down repeat=0 shift=true")
+        assertEquals(sent, sentKeys(first))
+
+        // Nothing is sent after the client, and nothing is kept to send later: a restarting
+        // start of the same package and field id finds no Shift of the IME's to release.
+        service.onUnbindInput()
+        assertEquals(sent, sentKeys(first))
+        val second = restartInputWithNewConnection(RecordingInputConnection(view))
+        assertTrue(
+            service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, down, tick(), repeatCount = 1))
+        )
+        assertTrue(service.onKeyUp(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_UP, down, tick())))
+        assertEquals(sent, sentKeys(first))
+        assertTrue(sentKeys(second).toString(), second.sentKeyEvents.isEmpty())
+        assertEquals(sent, keys(view))
+    }
+
     @Test
     fun upTheImeConsumes_ofAKeyNoRemapTouched_staysConsumed() {
         // The same keyboard and field without the swap: Enter is Enter, the system delivers it.
