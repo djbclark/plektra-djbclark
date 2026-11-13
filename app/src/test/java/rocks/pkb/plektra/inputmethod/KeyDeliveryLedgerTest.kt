@@ -223,7 +223,7 @@ class KeyDeliveryLedgerTest {
     }
 
     @Test
-    fun clearAndClearDevice_forgetDeliveredKeys() {
+    fun clearDevice_forgetsTheDeliveredKeysOfThatKeyboard() {
         ledger.onInitialDown(key)
         ledger.onSentByIme(key, KeyEvent.KEYCODE_ENTER, "enter")
         ledger.onInitialDown(otherDeviceKey)
@@ -233,13 +233,9 @@ class KeyDeliveryLedgerTest {
         assertEquals(none, ledger.deliveredKeyCode(key))
         assertTrue(ledger.mayStartWithRepeat(key))
         assertEquals(KeyEvent.KEYCODE_TAB, ledger.deliveredKeyCode(otherDeviceKey))
-
-        ledger.clear()
-        assertEquals(none, ledger.deliveredKeyCode(otherDeviceKey))
-        assertNull(ledger.onInitialDown(otherDeviceKey))
         // What was cleared is not handed back for release.
         changeConnection()
-        assertTrue(released.toString(), released.isEmpty())
+        assertEquals(listOf("tab"), released)
 
         // A key the system delivered is forgotten the same way, also one held over a change.
         ledger.onDeliveredBySystem(key, KeyEvent.KEYCODE_SHIFT_RIGHT, insteadOfRemapped = true)
@@ -249,8 +245,38 @@ class KeyDeliveryLedgerTest {
         assertEquals(none, ledger.deliveredKeyCode(key))
         assertFalse(ledger.isDeliveredBeforeThisConnection(key))
         assertEquals(KeyEvent.KEYCODE_SPACE, ledger.deliveredKeyCode(otherDeviceKey))
-        ledger.clear()
-        assertEquals(none, ledger.deliveredKeyCode(otherDeviceKey))
-        assertFalse(ledger.isDeliveredBeforeThisConnection(otherDeviceKey))
+        assertTrue(ledger.isDeliveredBeforeThisConnection(otherDeviceKey))
+    }
+
+    @Test
+    fun whereTheClientIsGone_whatTheImeSentIsForgottenUnreleased_andWhatTheSystemDeliveredIsKeptUntilItsUp() {
+        val systemKey = (3L shl 32) or 54L
+        ledger.onInitialDown(key)
+        ledger.onSentByIme(key, KeyEvent.KEYCODE_ENTER, "enter")
+        ledger.onInitialDown(systemKey)
+        ledger.onDeliveredBySystem(systemKey, KeyEvent.KEYCODE_SHIFT_RIGHT, insteadOfRemapped = true)
+        assertFalse(ledger.isDeliveredBeforeThisConnection(systemKey))
+
+        ledger.onClientGone()
+        // The app still holds the key the system gave it, since before whatever connection is
+        // next: that one saw nothing of the press.
+        assertEquals(KeyEvent.KEYCODE_SHIFT_RIGHT, ledger.deliveredKeyCode(systemKey))
+        assertTrue(ledger.isDeliveredInsteadOfRemapped(systemKey))
+        assertTrue(ledger.isDeliveredBeforeThisConnection(systemKey))
+        // Nothing can be sent after the client: the IME's key is not kept for a release.
+        assertEquals(none, ledger.deliveredKeyCode(key))
+        assertNull(ledger.sentByIme(key))
+        assertTrue(ledger.mayStartWithRepeat(key))
+        changeConnection()
+        assertTrue(released.toString(), released.isEmpty())
+        assertNull(ledger.onInitialDown(key))
+
+        // Over the next unbind too, until the key comes up.
+        ledger.onClientGone()
+        assertEquals(KeyEvent.KEYCODE_SHIFT_RIGHT, ledger.deliveredKeyCode(systemKey))
+        assertTrue(ledger.isDeliveredBeforeThisConnection(systemKey))
+        ledger.onUp(systemKey)
+        assertEquals(none, ledger.deliveredKeyCode(systemKey))
+        assertFalse(ledger.isDeliveredBeforeThisConnection(systemKey))
     }
 }

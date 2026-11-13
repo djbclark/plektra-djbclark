@@ -28,8 +28,11 @@ import android.util.LongSparseArray
  * key and the system can still end it: forgetting it there would make its UP look like the UP
  * of a key the app never saw ([isDeliveredBeforeThisConnection]).
  *
- * The entries themselves live as long as the held keys of [HardwareKeyRemapper]: until [clear]
- * where the client unbinds, or [clearDevice].
+ * Where the client unbinds ([onClientGone]) the connection goes with it: what the IME sent is
+ * forgotten there unreleased, there being nobody left to send a release to. What the system
+ * delivered is kept there as at a start: the client can bind again under the held key, and the
+ * key's UP is then still the system's to deliver. [clearDevice] forgets the keys of a keyboard
+ * that is gone.
  *
  * [S] is the caller's record of a DOWN it sent: what it needs to send that key's UP later (the
  * event, and the connection that took it).
@@ -180,8 +183,17 @@ internal class KeyDeliveryLedger<S : Any> {
         entries.get(key)?.forget()
     }
 
-    fun clear() {
-        entries.clear()
+    /**
+     * The client unbinds, or the service ends: the connection is gone and nothing can be sent
+     * through it any more, so what the IME sent is forgotten without a release. A key the
+     * system delivered is kept, as at [onConnectionChanged], and counts as held since before
+     * whatever connection comes next ([isDeliveredBeforeThisConnection]).
+     */
+    fun onClientGone() {
+        for (i in entries.size() - 1 downTo 0) {
+            if (!entries.valueAt(i).bySystem) entries.removeAt(i)
+        }
+        generation++
     }
 
     fun clearDevice(deviceId: Int) {
