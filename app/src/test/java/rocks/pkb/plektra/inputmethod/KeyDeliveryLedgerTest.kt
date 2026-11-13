@@ -54,7 +54,7 @@ class KeyDeliveryLedgerTest {
     }
 
     @Test
-    fun aRawKeyDeliveredInPlaceOfARemappedOne_isMarkedSo_untilItsUpOrTheNextConnection() {
+    fun aRawKeyDeliveredInPlaceOfARemappedOne_isMarkedSo_untilItsUp() {
         ledger.onInitialDown(key)
         ledger.onDeliveredBySystem(key, KeyEvent.KEYCODE_SHIFT_RIGHT, insteadOfRemapped = true)
         ledger.onInitialDown(otherDeviceKey)
@@ -68,17 +68,65 @@ class KeyDeliveryLedgerTest {
         ledger.onUp(key)
         assertFalse(ledger.isDeliveredInsteadOfRemapped(key))
 
+        // Another connection changes nothing about it: the app still holds that raw key.
         ledger.onInitialDown(key)
         ledger.onDeliveredBySystem(key, KeyEvent.KEYCODE_SHIFT_RIGHT, insteadOfRemapped = true)
         changeConnection()
-        assertFalse(ledger.isDeliveredInsteadOfRemapped(key))
+        assertTrue(ledger.isDeliveredInsteadOfRemapped(key))
         // The system delivered it: nothing for the caller to release.
         assertTrue(released.toString(), released.isEmpty())
 
         // A press the IME then sends itself is no stand-in.
+        ledger.onInitialDown(key)
         ledger.onDeliveredBySystem(key, KeyEvent.KEYCODE_SHIFT_RIGHT, insteadOfRemapped = true)
         ledger.onSentByIme(key, KeyEvent.KEYCODE_ENTER, "enter")
         assertFalse(ledger.isDeliveredInsteadOfRemapped(key))
+        assertFalse(ledger.isDeliveredBeforeThisConnection(key))
+    }
+
+    @Test
+    fun aKeyTheSystemDelivered_isWhatTheAppHolds_overEveryConnectionChange_untilItsUp() {
+        ledger.onInitialDown(key)
+        ledger.onDeliveredBySystem(key, KeyEvent.KEYCODE_SHIFT_RIGHT, insteadOfRemapped = true)
+        ledger.onInitialDown(otherDeviceKey)
+        ledger.onSentByIme(otherDeviceKey, KeyEvent.KEYCODE_TAB, "tab")
+        assertFalse(ledger.isDeliveredBeforeThisConnection(key))
+        assertFalse(ledger.isDeliveredBeforeThisConnection(otherDeviceKey))
+
+        changeConnection()
+        changeConnection()
+
+        // The system delivers without a connection: the app holds the key as before.
+        assertEquals(KeyEvent.KEYCODE_SHIFT_RIGHT, ledger.deliveredKeyCode(key))
+        assertTrue(ledger.isDeliveredInsteadOfRemapped(key))
+        assertTrue(ledger.isDeliveredBeforeThisConnection(key))
+        assertNull(ledger.sentByIme(key))
+        // A key the IME sent went through a connection, and ended with it.
+        assertEquals(listOf("tab"), released)
+        assertEquals(none, ledger.deliveredKeyCode(otherDeviceKey))
+        assertFalse(ledger.isDeliveredBeforeThisConnection(otherDeviceKey))
+
+        // A raw repeat the system delivers now belongs to that press: it stays one of before
+        // this connection, and keeps what it was delivered as.
+        ledger.onDeliveredBySystem(key, KeyEvent.KEYCODE_SHIFT_RIGHT)
+        assertTrue(ledger.isDeliveredBeforeThisConnection(key))
+        assertTrue(ledger.isDeliveredInsteadOfRemapped(key))
+
+        ledger.onUp(key)
+        assertEquals(none, ledger.deliveredKeyCode(key))
+        assertFalse(ledger.isDeliveredInsteadOfRemapped(key))
+        assertFalse(ledger.isDeliveredBeforeThisConnection(key))
+
+        // The next press is one of this connection.
+        ledger.onInitialDown(key)
+        ledger.onDeliveredBySystem(key, KeyEvent.KEYCODE_SHIFT_RIGHT)
+        assertEquals(KeyEvent.KEYCODE_SHIFT_RIGHT, ledger.deliveredKeyCode(key))
+        assertFalse(ledger.isDeliveredBeforeThisConnection(key))
+        // A new press over a lost UP ends the old one here too.
+        changeConnection()
+        assertNull(ledger.onInitialDown(key))
+        assertEquals(none, ledger.deliveredKeyCode(key))
+        assertFalse(ledger.isDeliveredBeforeThisConnection(key))
     }
 
     @Test
@@ -97,6 +145,7 @@ class KeyDeliveryLedgerTest {
 
         changeConnection()
         assertEquals(listOf("enter", "tab"), released.sorted())
+        assertEquals(KeyEvent.KEYCODE_SPACE, ledger.deliveredKeyCode(systemKey))
 
         // Released or not, nothing is owed for them any more: not at the next change, not at
         // the next press, and not when a repeat brings one of them to the new connection.
@@ -191,5 +240,17 @@ class KeyDeliveryLedgerTest {
         // What was cleared is not handed back for release.
         changeConnection()
         assertTrue(released.toString(), released.isEmpty())
+
+        // A key the system delivered is forgotten the same way, also one held over a change.
+        ledger.onDeliveredBySystem(key, KeyEvent.KEYCODE_SHIFT_RIGHT, insteadOfRemapped = true)
+        ledger.onDeliveredBySystem(otherDeviceKey, KeyEvent.KEYCODE_SPACE)
+        changeConnection()
+        ledger.clearDevice(3)
+        assertEquals(none, ledger.deliveredKeyCode(key))
+        assertFalse(ledger.isDeliveredBeforeThisConnection(key))
+        assertEquals(KeyEvent.KEYCODE_SPACE, ledger.deliveredKeyCode(otherDeviceKey))
+        ledger.clear()
+        assertEquals(none, ledger.deliveredKeyCode(otherDeviceKey))
+        assertFalse(ledger.isDeliveredBeforeThisConnection(otherDeviceKey))
     }
 }

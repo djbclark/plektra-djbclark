@@ -81,8 +81,9 @@ import android.view.KeyEvent
  * The remapper only transforms events. An owner that passes remapped keys on (the IME service,
  * through the input connection) keeps its own record of what the app saw go down, per physical
  * key and per connection ([KeyDeliveryLedger]): a press ends with the key it began with, or not
- * at all. That record ends with the connection, not with the hold: a held key survives a new
- * editor, what the previous one saw of it does not.
+ * at all. For a key the IME sent, that record ends with the connection, not with the hold: a
+ * held key survives a new editor, what the previous one saw of it does not. (A key the system
+ * delivered is another matter: see the end of this note.)
  *
  * Every onStartInput counts as a new connection, a restarting one included. The framework hands
  * the IME a new connection object on each start and no way to tell whether it reaches the view
@@ -140,6 +141,17 @@ import android.view.KeyEvent
  * remapped key, which the app never saw), the IME ends it, as a cancelled UP of the raw key
  * through the connection, or by letting the system deliver the raw UP when the connection still
  * takes nothing. A key no remap touched keeps the IME's handling as it is.
+ *
+ * What the system delivered does not end with the connection. The system hands a key to the app
+ * without one, so a start or a finish under a held key changes nothing about it: the app still
+ * holds the key, the record of it is kept until the key comes up, and its repeats and its UP
+ * stay the system's (the IME returns false for them, as within one connection). Forgetting the
+ * record at a start would make the IME take the UP for that of a key the app never saw, and
+ * consume it: the system would never deliver it. The exception above is narrower after a
+ * start. The connection of that start saw nothing of the press, so the IME sends no cancelled
+ * UP into it, and leaves to the system also an UP it consumed. That UP is a plain one, as the
+ * key's own would be without any remap. None of this is the redirected release of a held
+ * Shift, Ctrl or Alt: that one is for keys the IME sent.
  */
 
 /** How a [KeySource] names its physical key. */
