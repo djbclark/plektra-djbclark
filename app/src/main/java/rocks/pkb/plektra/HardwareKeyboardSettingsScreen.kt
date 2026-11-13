@@ -45,8 +45,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import rocks.pkb.plektra.inputmethod.DeviceSpecific
-import rocks.pkb.plektra.inputmethod.HardwareKeyRemapRegistry
-import rocks.pkb.plektra.inputmethod.KeyRemapOption
 
 private val hardwareKeyboardProfiles = listOf(
     "auto" to R.string.keyboard_profile_option_auto,
@@ -309,14 +307,14 @@ private fun HardwareKeyboardListScreen(
                 }
             }
 
-            // Each option hides where the keyboard does not support it (see KeyRemapOption.unsupportedModels).
-            val supportedKeyRemaps = HardwareKeyRemapRegistry.options.filter {
-                DeviceSpecific.supportsUserKeyRemap(it, profile)
-            }
-            if (supportedKeyRemaps.isNotEmpty()) {
+            // A preset shows where its keys exist (KeyRemapPreset.profiles); its switch writes
+            // the preset's rules for this profile and clears them again.
+            val keyRemapProfile = SettingsManager.builtInKeyboardProfileId(context)
+            val keyRemapPresets = HardwareKeyRemapPresets.forProfile(keyRemapProfile)
+            if (keyRemapPresets.isNotEmpty()) {
                 HardwareKeyboardSectionDivider(stringResource(R.string.key_remap_section_title))
-                supportedKeyRemaps.forEach { option ->
-                    HardwareKeyRemapSwitchRow(option)
+                keyRemapPresets.forEach { preset ->
+                    HardwareKeyRemapSwitchRow(preset, keyRemapProfile)
                 }
             }
         }
@@ -324,19 +322,18 @@ private fun HardwareKeyboardListScreen(
 }
 
 @Composable
-private fun HardwareKeyRemapSwitchRow(option: KeyRemapOption) {
+private fun HardwareKeyRemapSwitchRow(preset: KeyRemapPreset, profileId: String) {
     val context = LocalContext.current
-    var enabled by remember(option.id) {
-        mutableStateOf(SettingsManager.isKeyRemapEnabled(context, option.id))
+    var enabled by remember(preset.id, profileId) {
+        mutableStateOf(SettingsManager.isKeyRemapPresetEnabled(context, preset.id))
     }
     HardwareKeyboardSwitchRow(
-        title = stringResource(option.titleRes),
-        linkId = keyRemapSettingId(option),
-        description = stringResource(option.summaryRes),
+        title = stringResource(preset.titleRes),
+        linkId = keyRemapSettingId(preset),
+        description = stringResource(preset.summaryRes),
         checked = enabled,
         onCheckedChange = { checked ->
-            enabled = checked
-            SettingsManager.setKeyRemapEnabled(context, option.id, checked)
+            enabled = SettingsManager.setKeyRemapPresetEnabled(context, preset.id, checked)
         }
     )
 }

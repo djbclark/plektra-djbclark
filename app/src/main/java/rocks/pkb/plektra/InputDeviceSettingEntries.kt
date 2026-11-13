@@ -1,9 +1,5 @@
 package rocks.pkb.plektra
 
-import rocks.pkb.plektra.inputmethod.DeviceSpecific
-import rocks.pkb.plektra.inputmethod.HardwareKeyRemapRegistry
-import rocks.pkb.plektra.inputmethod.KeyRemapOption
-
 /** Static rows and aggregate editors; individual user/device data is not indexed. */
 internal fun inputDeviceSettingEntries(): List<SettingEntry> = listOf(
     SettingEntry("text_expansion.snippets.enabled", R.string.snippets_enable_title, summaryRes = R.string.snippets_title, route = SettingRoute(SettingsDestination.TextInput)),
@@ -77,18 +73,18 @@ internal fun inputDeviceSettingEntries(): List<SettingEntry> = listOf(
     SettingEntry("clicks.charging_reserve", R.string.clicks_charging_reserve_title, route = SettingRoute(SettingsDestination.KeyboardsDevices, keyboardsDevicesDestination = KeyboardsDevicesDestination.PowerKeyboard)),
     SettingEntry("clicks.manual_wireless_charging", R.string.clicks_manual_wireless_charging_title, route = SettingRoute(SettingsDestination.KeyboardsDevices, keyboardsDevicesDestination = KeyboardsDevicesDestination.PowerKeyboard)),
 ).filter { BuildConfig.ENABLE_ACCESSIBILITY_SERVICE || it.id != "clicks.buttons.launcher_button" } +
-    HardwareKeyRemapRegistry.options.map { option ->
+    HardwareKeyRemapPresets.all.map { preset ->
         SettingEntry(
-            keyRemapSettingId(option),
-            option.titleRes,
-            option.summaryRes,
+            keyRemapSettingId(preset),
+            preset.titleRes,
+            preset.summaryRes,
             route = SettingRoute(SettingsDestination.KeyboardsDevices, keyboardsDevicesDestination = KeyboardsDevicesDestination.BuiltIn),
-            // Same rule as the Built-in Keyboards screen, which hides an unsupported option.
+            // Same rule as the Built-in Keyboards screen, which hides an unsupported preset.
             availabilityCheck = { context ->
-                DeviceSpecific.supportsUserKeyRemap(option, SettingsManager.getPhysicalKeyboardProfileOverride(context))
+                preset.supports(SettingsManager.builtInKeyboardProfileId(context))
             }
         )
     }
 
 /** Search and deep-link id of a hardware key remap switch. */
-internal fun keyRemapSettingId(option: KeyRemapOption): String = "hardware.key_remap.${option.id}"
+internal fun keyRemapSettingId(preset: KeyRemapPreset): String = "hardware.key_remap.${preset.id}"

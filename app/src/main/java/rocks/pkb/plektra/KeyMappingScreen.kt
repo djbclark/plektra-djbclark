@@ -14,8 +14,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import rocks.pkb.plektra.inputmethod.DeviceSpecific
-import rocks.pkb.plektra.inputmethod.HardwareKeyRemapRegistry
 import rocks.pkb.plektra.toolbox.KeyInventory
 
 /**
@@ -97,8 +95,7 @@ fun KeyMappingScreen(
 
             // djb/key-remap: the keyboard's own remaps live on Built-in Keyboards; each row opens
             // its switch there, so this list points at every way a key can change.
-            val profile = SettingsManager.getPhysicalKeyboardProfileOverride(context)
-            val keyRemaps = HardwareKeyRemapRegistry.options.filter { DeviceSpecific.supportsUserKeyRemap(it, profile) }
+            val keyRemaps = HardwareKeyRemapPresets.forProfile(SettingsManager.builtInKeyboardProfileId(context))
             if (keyRemaps.isNotEmpty()) {
                 Text(
                     text = stringResource(R.string.key_remap_section_title),

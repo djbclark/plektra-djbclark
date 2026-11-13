@@ -464,7 +464,9 @@ internal object BackupPreferenceContract {
             "alt_backspace_delete" to PreferenceValueType.BOOLEAN,
             "backspace_at_start_delete" to PreferenceValueType.BOOLEAN,
             // djb/sym-shortcuts: Sym+C/V/X/A edit shortcuts toggle
-            "sym_edit_shortcuts" to PreferenceValueType.BOOLEAN
+            "sym_edit_shortcuts" to PreferenceValueType.BOOLEAN,
+            // Hardware key remap rules of every keyboard profile, see KeyRemapJson.
+            "hardware_key_remaps" to PreferenceValueType.STRING
         ),
         dynamicKeys = listOf(
             PreferenceFileSchema.DynamicKey(
@@ -475,6 +477,8 @@ internal object BackupPreferenceContract {
                 prefix = "clicks_power_soc_calibration_",
                 type = PreferenceValueType.STRING
             ),
+            // The key remap switches of the first fork builds, for their backups: the settings
+            // turn a restored one into rules (SettingsManager.getHardwareKeyRemaps).
             PreferenceFileSchema.DynamicKey(
                 prefix = "key_remap_",
                 type = PreferenceValueType.BOOLEAN
