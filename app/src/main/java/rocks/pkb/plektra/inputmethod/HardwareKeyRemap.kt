@@ -160,6 +160,17 @@ import android.view.KeyEvent
  * the owner leaves to the system the UP its tombstone reports as stale: swallowed with the
  * rest of the press, it would leave the key down in the app. The key itself acts no more, and
  * its repeats still end at the tombstone; nothing is sent through any connection for it.
+ *
+ * A record kept that long can outlive its press. It is the record of a physical key, with
+ * nothing in it that names the press, and it ends only with an UP or an initial DOWN of the
+ * key that reaches the owner. When the key's UP goes to a window whose keys the owner does not
+ * see, the next UP of the key is taken for it, also the UP of a later press the owner saw no
+ * DOWN of. A key no remap touched then gets that UP as a held key would: from the system, or,
+ * under a held remapped modifier, through the current connection with the rebuilt meta state
+ * (one key event the app saw no DOWN for, where the UP of a key the app never saw go down is
+ * otherwise swallowed). A raw key standing in for a remapped one gets it from the system, as
+ * after any start or unbind, and never through the connection. A new press of the key
+ * replaces the record and is handled as a first press.
  */
 
 /** How a [KeySource] names its physical key. */

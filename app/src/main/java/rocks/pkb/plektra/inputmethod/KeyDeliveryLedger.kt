@@ -34,6 +34,23 @@ import android.util.LongSparseArray
  * key's UP is then still the system's to deliver. [clearDevice] forgets the keys of a keyboard
  * that is gone.
  *
+ * A record is that of a physical key, not of one press: it keeps no down time, and nothing in
+ * it tells one press of the key from the next. It ends with the next UP ([onUp]) or initial
+ * DOWN ([onInitialDown]) of the key that reaches the caller. So where a key the system
+ * delivered loses its UP (the system gave the UP to a window whose keys the caller does not
+ * see), its record stays, over starts and unbinds alike, and the next UP of that key is taken
+ * for the one it waits for, also when it is the UP of a later press whose DOWN the caller saw
+ * nothing of. What becomes of that UP:
+ *
+ * - a key no remap touched gets it as a held key gets its UP: from the system, or, where a
+ *   held remapped key changes its meta state, through the current connection with that meta
+ *   state. Without the record the second would be swallowed, as the UP of a key the app never
+ *   saw go down; with no remapped key held, the system delivers such an UP in any case;
+ * - a raw key that stands in for a remapped one gets it as its own UP would come: after a start
+ *   or an unbind from the system, never through the connection.
+ *
+ * A new press replaces the record before anything else and is handled as a first press.
+ *
  * [S] is the caller's record of a DOWN it sent: what it needs to send that key's UP later (the
  * event, and the connection that took it).
  */
