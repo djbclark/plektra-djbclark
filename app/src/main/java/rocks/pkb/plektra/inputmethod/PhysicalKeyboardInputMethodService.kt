@@ -375,9 +375,10 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
     private class SentKey(
         val down: KeyEvent,
         val via: InputConnection,
-        val packageName: String,
-        val fieldId: Int
+        private val editor: EditorInfo?
     ) {
+        val packageName: String get() = editor?.packageName.orEmpty()
+        val fieldId: Int get() = editor?.fieldId ?: 0
         /**
          * True when this key's release may go into the connection of a restarting start for
          * [editor] instead of into [via]: it is a Shift, Ctrl or Alt key, and both editors name
@@ -4906,7 +4907,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
                 keyDeliveries.onSentByIme(
                     physicalKey,
                     event.keyCode,
-                    SentKey(event, connection, editor?.packageName.orEmpty(), editor?.fieldId ?: 0)
+                    SentKey(event, connection, editor)
                 )
             }
             return RemapDelivery.INJECTED
