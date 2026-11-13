@@ -20,7 +20,7 @@ import rocks.pkb.plektra.inputmethod.KeyRemapRule
 import rocks.pkb.plektra.inputmethod.KeySource
 
 /**
- * The key test screen's view of the keys: on a Titan 2 with "Swap right Shift and Enter" on.
+ * The key test screen's view of the keys: on a Titan 2 Elite with "Swap right Shift and Enter" on.
  * Physical keys by Linux scan code: Enter 28, right Shift 54, A 30.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -34,12 +34,15 @@ class ActivityKeyRemapTest {
 
     @Before
     fun setUp() {
+        // A Titan 2 Elite reports itself as a Titan 2; its board and display name tell it apart.
         DeviceSpecific.setBuildFingerprintForTests(
             brand = "unihertz",
             manufacturer = "unihertz",
             model = "Titan 2",
-            device = "titan2",
-            product = "titan2"
+            device = "Titan_2",
+            product = "Titan_2_EEA",
+            board = "G72BoardV1",
+            display = "Titan 2 Elite"
         )
         SettingsManager.setPhysicalKeyboardProfileOverride(context, "auto")
         FakeKeyboards.register()

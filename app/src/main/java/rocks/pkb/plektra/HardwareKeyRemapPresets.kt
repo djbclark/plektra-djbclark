@@ -32,10 +32,12 @@ object HardwareKeyRemapPresets {
             id = SWAP_SHIFT_RIGHT_ENTER,
             titleRes = R.string.key_remap_swap_shift_right_enter_title,
             summaryRes = R.string.key_remap_swap_shift_right_enter_summary,
-            // Not the Q25: its physical right Shift is its Ctrl key, so only half the swap would
-            // apply (Enter would become Shift and nothing would type Enter). Not the Clicks
-            // keyboards: accessories are not remapped.
-            profiles = setOf("key2", "titan", "titan2", "titan2elite_qwerty", "mp01"),
+            // Only where the right Shift key is known to report scan code 54. Anywhere else half
+            // the swap would apply: Enter would become Shift and nothing would type Enter. That
+            // is known for the Q25 (its physical right Shift is its Ctrl key) and for the Titan 2
+            // (one Shift, scan code 42); the other profiles are unverified. A keyboard joins
+            // this list once its right Shift is seen on the key test screen.
+            profiles = setOf("titan2elite_qwerty"),
             rules = listOf(
                 // The right Shift key by scan code, and by nothing else: a vendor key setting
                 // rewrites key codes (the Titan 2's Shortcut keys > Key setting makes this key
