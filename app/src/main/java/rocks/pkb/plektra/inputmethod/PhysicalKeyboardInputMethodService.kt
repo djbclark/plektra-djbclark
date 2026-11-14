@@ -4808,7 +4808,110 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
      */
     private fun keyRemapRulesFor(table: KeyRemapTable, event: KeyEvent): KeyRemapRules {
         if (table.isEmpty) return KeyRemapRules.NONE
-        return table.rulesFor(DeviceSpecific.resolveInputProfile(event, physicalKeyboardProfileOverride))
+        val rules = table.rulesFor(DeviceSpecific.resolveInputProfile(event, physicalKeyboardProfileOverride))
+        // Chosen where a key goes down; the remapper keeps the choice for its repeats and UP.
+        return if (forceShiftKeysStayShift || navModeChordActive()) rules.shiftKeysStayShift else rules
+    }
+
+    /**
+     * True while the next key would be a nav-mode chord: nav mode is latched, or Ctrl (Fn on the
+     * Titan 2) is held where holding it drives nav mode (an editable field with the hold setting
+     * on). A Shift key the user remapped to Enter ("Swap right Shift and Enter") is then a Shift,
+     * so Fn plus the key beside it extends the selection; without a chord it types Enter as set.
+     * Ctrl held elsewhere stays Ctrl+Enter.
+     */
+    private fun navModeChordActive(): Boolean {
+        if (ctrlLatchFromNavMode || navModeController.isNavModeActive()) return true
+        return (ctrlPressed || ctrlPhysicallyPressed) && ctrlHoldDrivesNavMode()
+    }
+
+    /** Holding Ctrl (Fn) would run nav mode here: an editable field, with the hold setting on. */
+    private fun ctrlHoldDrivesNavMode(): Boolean {
+        val hasEditableField = currentInputConnection != null &&
+            (currentInputEditorInfo?.inputType ?: EditorInfo.TYPE_NULL) != EditorInfo.TYPE_NULL
+        return hasEditableField && SettingsManager.getNavModeCtrlHoldEnabled(this)
+    }
+
+    /**
+     * A Shift key remapped to Enter, pressed with no Ctrl and no nav mode, where Ctrl could still
+     * come down on top of it: its press is held back until it is known which key it is. [key] is
+     * the physical key, [event] its DOWN, kept to be played later.
+     */
+    private class DeferredShiftEnter(val key: Long, val keyCode: Int, val event: KeyEvent)
+
+    private var deferredShiftEnter: DeferredShiftEnter? = null
+    private var replayingDeferredShiftEnter = false
+    private var forceShiftKeysStayShift = false
+
+    private fun actsAsCtrl(keyCode: Int, event: KeyEvent): Boolean {
+        if (!HardwareKeyRemapper.isPhysicalKeyEvent(event)) return false
+        val table = SettingsManager.getHardwareKeyRemaps(this)
+        val normalized = DeviceSpecific.normalizedKeyCode(keyCode, event, physicalKeyboardProfileOverride)
+        val target = hardwareKeyRemapper.peekKeyCode(
+            normalized,
+            event,
+            keyRemapRulesFor(table, event),
+            HardwareKeyRemapper.physicalKeyId(keyCode, event)
+        )
+        return target == KeyEvent.KEYCODE_CTRL_LEFT || target == KeyEvent.KEYCODE_CTRL_RIGHT
+    }
+
+    /**
+     * The Fn (Ctrl) chord needs the key beside Fn to be a Shift whichever goes down first, and
+     * a Shift that typed Enter on its DOWN cannot be taken back. So where holding Ctrl runs nav
+     * mode, a remapped Shift key is held back: Ctrl going down while it is held makes it a Shift
+     * for the rest of the press; any other key going down first, or its UP with no Ctrl, plays
+     * it as the Enter it is remapped to (a tap, once, with no auto-repeat). True when this DOWN
+     * is held back, or is a repeat of the held key.
+     */
+    private fun deferShiftEnterDown(keyCode_: Int, event_: KeyEvent?): Boolean {
+        if (event_ == null || replayingDeferredShiftEnter || !HardwareKeyRemapper.isPhysicalKeyEvent(event_)) {
+            return false
+        }
+        val physicalKey = HardwareKeyRemapper.physicalKeyId(keyCode_, event_)
+        val initialDown = event_.repeatCount == 0
+        val pending = deferredShiftEnter
+        if (pending != null) {
+            if (pending.key == physicalKey) {
+                if (!initialDown) return true
+                deferredShiftEnter = null // a new press: the UP of the old one was lost
+            } else {
+                if (initialDown) {
+                    val ctrl = actsAsCtrl(keyCode_, event_) && ctrlHoldDrivesNavMode()
+                    playDeferredShiftEnterDown(pending, asShift = ctrl)
+                }
+                return false
+            }
+        }
+        if (!initialDown || ctrlPressed || ctrlPhysicallyPressed || ctrlLatchActive || ctrlLatchFromNavMode ||
+            !ctrlHoldDrivesNavMode()
+        ) {
+            return false
+        }
+        val table = SettingsManager.getHardwareKeyRemaps(this)
+        if (table.isEmpty) return false
+        val normalized = DeviceSpecific.normalizedKeyCode(keyCode_, event_, physicalKeyboardProfileOverride)
+        if (!keyRemapRulesFor(table, event_).isShiftTypingEnter(normalized, event_.scanCode)) return false
+        deferredShiftEnter = DeferredShiftEnter(physicalKey, keyCode_, event_)
+        return true
+    }
+
+    /**
+     * Plays the held back DOWN through the whole key path: as a Shift ([asShift], Ctrl is going
+     * down on top of it) or as the Enter the rules make of it. A Shift the handler leaves to the
+     * system is sent to the app here, as the system will not deliver it any more.
+     */
+    private fun playDeferredShiftEnterDown(pending: DeferredShiftEnter, asShift: Boolean) {
+        deferredShiftEnter = null
+        replayingDeferredShiftEnter = true
+        forceShiftKeysStayShift = asShift
+        try {
+            val handled = onKeyDown(pending.keyCode, pending.event)
+            if (!handled && asShift) currentInputConnection?.sendKeyEvent(pending.event)
+        } finally {
+            replayingDeferredShiftEnter = false
+            forceShiftKeysStayShift = false
+        }
     }
 
     /**
@@ -5062,12 +5165,14 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
      */
     private fun resetHardwareKeyRemap(): Boolean {
         keyDeliveries.onClientGone()
+        deferredShiftEnter = null
         return hardwareKeyRemapper.reset()
     }
 
     private fun clearHardwareKeyRemapDevice(deviceId: Int) {
         // The remapper first: the app is still there, and each key the IME sent it for a key of
         // this keyboard is released as its hold ends ([onRemappedKeyHoldCancelled]).
+        if (deferredShiftEnter?.let { HardwareKeyRemapper.deviceIdOf(it.key) } == deviceId) deferredShiftEnter = null
         val cutOff = hardwareKeyRemapper.clearDevice(deviceId)
         keyDeliveries.clearDevice(deviceId)
         if (cutOff) updateStatusBarText()
@@ -5317,6 +5422,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
     }
 
     override fun onKeyLongPress(keyCode_: Int, event_: KeyEvent?): Boolean {
+        if (deferredShiftEnter?.key == HardwareKeyRemapper.physicalKeyId(keyCode_, event_)) return true
         if (!replayingProtectedNumberKey) {
             val accidentalInput = accidentalKeyInput(keyCode_, event_)
             accidentalKeyPressFilter.shouldConsumeKeyDown(
@@ -5354,6 +5460,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
     }
 
     override fun onKeyDown(keyCode_: Int, event_: KeyEvent?): Boolean {
+        if (deferShiftEnterDown(keyCode_, event_)) return true
         val physicalKey = HardwareKeyRemapper.physicalKeyId(keyCode_, event_)
         val initialDown = (event_?.repeatCount ?: 0) == 0
         if (initialDown) {
@@ -6277,6 +6384,12 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
     }
 
     override fun onKeyUp(keyCode_: Int, event_: KeyEvent?): Boolean {
+        val deferred = deferredShiftEnter
+        if (deferred != null && event_ != null && deferred.key == HardwareKeyRemapper.physicalKeyId(keyCode_, event_)) {
+            // Let go with no Ctrl on top of it: a tap of the key, which types its Enter now.
+            playDeferredShiftEnterDown(deferred, asShift = false)
+            return onKeyUp(keyCode_, event_)
+        }
         val physicalKey = HardwareKeyRemapper.physicalKeyId(keyCode_, event_)
         // What the key is held as, before the handler releases it.
         val heldAs = hardwareKeyRemapper.heldTargetOf(physicalKey)

@@ -23,7 +23,10 @@ import android.view.KeyEvent
  * skip the remapper altogether ([HardwareKeyRemapper.isPhysicalKeyEvent]); an accessory's events
  * pass through it with no rules, because the framework reports modifier state for all keyboards
  * together. A rule is applied once: its output is never matched against the rules again. Lock
- * keys (Caps, Num, Scroll Lock) are neither sources nor targets.
+ * keys (Caps, Num, Scroll Lock) are neither sources nor targets. One exception is chosen by the
+ * owner for each DOWN: while a nav-mode chord is on (nav mode latched, or Ctrl held where that
+ * drives nav mode), a Shift key remapped to Enter stays Shift ([KeyRemapRules.shiftKeysStayShift]),
+ * so that Shift+Fn+S extends a selection with the key beside Fn.
  *
  * Ordering
  * --------
@@ -217,6 +220,38 @@ class KeyRemapRules private constructor(val rules: List<KeyRemapRule>) {
     val isEmpty: Boolean get() = rules.isEmpty()
 
     /**
+     * These rules with every rule that makes a Shift key type Enter ("Swap right Shift and Enter")
+     * turned into the Shift key itself, for the moment a nav-mode chord needs that key as Shift
+     * (Fn+S moves the cursor, Shift on top extends the selection). A rule's Shift key is its
+     * source key code when that is a Shift, else the Shift at its scan code (42 left, 54 right),
+     * so the key is a Shift whatever key code a vendor setting gave it. Every other rule is
+     * unchanged, so Enter-as-Shift still holds. A key keeps what its DOWN chose, so a press that
+     * began as Shift ends as Shift and one that began as Enter ends as Enter.
+     */
+    val shiftKeysStayShift: KeyRemapRules by lazy {
+        var changed = false
+        val kept = rules.map { rule ->
+            val shift = shiftKeyOf(rule.from)
+            if (shift != KeyEvent.KEYCODE_UNKNOWN && isEnterKeyCode(rule.toKeyCode)) {
+                changed = true
+                KeyRemapRule(rule.from, shift)
+            } else {
+                rule
+            }
+        }
+        if (changed) KeyRemapRules(kept) else this
+    }
+
+    /**
+     * True when this key types Enter by a rule that [shiftKeysStayShift] would turn back into
+     * its Shift: the key whose press the owner may hold back until it knows which one it is.
+     */
+    fun isShiftTypingEnter(keyCode: Int, scanCode: Int): Boolean {
+        val target = targetFor(keyCode, scanCode)
+        return isEnterKeyCode(target) && shiftKeysStayShift.targetFor(keyCode, scanCode) != target
+    }
+
+    /**
      * The key code this key acts as: a scan-code rule wins over a key-code rule; else [keyCode].
      * A lock key stays itself whatever a scan-code rule says: the framework would go on toggling
      * its lock state.
@@ -262,6 +297,21 @@ class KeyRemapRules private constructor(val rules: List<KeyRemapRule>) {
 
         private fun isRemappableKeyCode(keyCode: Int): Boolean =
             keyCode > KeyEvent.KEYCODE_UNKNOWN && keyCode <= KeyEvent.getMaxKeyCode() && !isLockKey(keyCode)
+
+        private const val SCAN_SHIFT_LEFT = 42 // KEY_LEFTSHIFT, linux/input-event-codes.h
+        private const val SCAN_SHIFT_RIGHT = 54 // KEY_RIGHTSHIFT
+
+        /** The Shift key [source] names, [KeyEvent.KEYCODE_UNKNOWN] when it names none. */
+        private fun shiftKeyOf(source: KeySource): Int = when {
+            source.keyCode == KeyEvent.KEYCODE_SHIFT_LEFT || source.keyCode == KeyEvent.KEYCODE_SHIFT_RIGHT ->
+                source.keyCode
+            source.match == KeyMatch.SCAN && source.scanCode == SCAN_SHIFT_LEFT -> KeyEvent.KEYCODE_SHIFT_LEFT
+            source.match == KeyMatch.SCAN && source.scanCode == SCAN_SHIFT_RIGHT -> KeyEvent.KEYCODE_SHIFT_RIGHT
+            else -> KeyEvent.KEYCODE_UNKNOWN
+        }
+
+        private fun isEnterKeyCode(keyCode: Int): Boolean =
+            keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
 
         private fun isLockKey(keyCode: Int): Boolean = keyCode == KeyEvent.KEYCODE_CAPS_LOCK ||
             keyCode == KeyEvent.KEYCODE_NUM_LOCK || keyCode == KeyEvent.KEYCODE_SCROLL_LOCK
