@@ -279,4 +279,38 @@ class KeyDeliveryLedgerTest {
         assertEquals(none, ledger.deliveredKeyCode(systemKey))
         assertFalse(ledger.isDeliveredBeforeThisConnection(systemKey))
     }
+
+    @Test
+    fun aRecordOfTheSystems_whoseUpWasLost_isThatOfTheKey_untilItsNextUpOrInitialDown() {
+        val standIn = (3L shl 32) or 54L
+        ledger.onInitialDown(key)
+        ledger.onDeliveredBySystem(key, KeyEvent.KEYCODE_TAB)
+        ledger.onInitialDown(standIn)
+        ledger.onDeliveredBySystem(standIn, KeyEvent.KEYCODE_SHIFT_RIGHT, insteadOfRemapped = true)
+        // The client unbinds, another binds and starts; neither key's UP reaches the IME.
+        ledger.onClientGone()
+        changeConnection()
+
+        // Nothing in a record names the press: the next UP of the key finds it, whichever
+        // press that UP ends, and takes it away.
+        assertEquals(KeyEvent.KEYCODE_TAB, ledger.deliveredKeyCode(key))
+        assertTrue(ledger.isDeliveredBeforeThisConnection(key))
+        assertFalse(ledger.isDeliveredInsteadOfRemapped(key))
+        ledger.onUp(key)
+        assertEquals(none, ledger.deliveredKeyCode(key))
+        assertFalse(ledger.isDeliveredBeforeThisConnection(key))
+
+        // A new press replaces it: nothing is owed for the lost one, and what the system
+        // delivers now is a key of this connection, with no mark of the old press.
+        assertTrue(ledger.isDeliveredInsteadOfRemapped(standIn))
+        assertNull(ledger.onInitialDown(standIn))
+        assertEquals(none, ledger.deliveredKeyCode(standIn))
+        assertFalse(ledger.isDeliveredInsteadOfRemapped(standIn))
+        assertFalse(ledger.isDeliveredBeforeThisConnection(standIn))
+        assertFalse(ledger.mayStartWithRepeat(standIn))
+        ledger.onDeliveredBySystem(standIn, KeyEvent.KEYCODE_SHIFT_RIGHT)
+        assertEquals(KeyEvent.KEYCODE_SHIFT_RIGHT, ledger.deliveredKeyCode(standIn))
+        assertFalse(ledger.isDeliveredInsteadOfRemapped(standIn))
+        assertFalse(ledger.isDeliveredBeforeThisConnection(standIn))
+    }
 }
