@@ -1776,6 +1776,7 @@ QWERTZ σε φυσικό QWERTY
     <string name="key_remap_section_title">Αντιστοίχιση πλήκτρων</string>
     <string name="key_remap_swap_shift_right_enter_title">Εναλλαγή δεξιού Shift και Enter</string>
     <string name="key_remap_swap_shift_right_enter_summary">Το δεξί πλήκτρο Shift πληκτρολογεί Enter και το πλήκτρο Enter λειτουργεί ως Shift.</string>
+    <string name="key_remap_limits_note">Οι αντιστοιχίσεις ισχύουν όπου το Plektra λαμβάνει τα πλήκτρα. Τα παράθυρα διαλόγου και τα μενού χωρίς πεδίο κειμένου παρακάμπτουν την εφαρμογή πληκτρολογίου· εκεί, πατήστε το τυπωμένο πλήκτρο Enter ή το Διάστημα για επιβεβαίωση.</string>
     <string name="caret_modifier_badge_title">Εμφάνιση τροποποιητών στον δρομέα</string>
     <string name="caret_modifier_badge_description">Τα Shift, Alt, Ctrl και Sym εμφανίζονται δίπλα στον δρομέα κειμένου όταν είναι ενεργά. Λειτουργεί μόνο σε εφαρμογές που αναφέρουν πού βρίσκεται ο δρομέας.</string>
     <string name="caret_modifier_badge_needs_overlay">Το σχέδιο δίπλα στον δρομέα σημαίνει σχέδιο πάνω από την εφαρμογή στην οποία πληκτρολογείτε, οπότε το Android χρειάζεται πρώτα άδεια.</string>

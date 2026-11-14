@@ -1119,6 +1119,7 @@ Mỗi phím có thể cấu hình là Keycode, Action, Native Ctrl hoặc None. 
     <string name="key_remap_section_title">Gán lại phím</string>
     <string name="key_remap_swap_shift_right_enter_title">Hoán đổi Shift phải và Enter</string>
     <string name="key_remap_swap_shift_right_enter_summary">Phím Shift phải nhập Enter và phím Enter hoạt động như Shift.</string>
+    <string name="key_remap_limits_note">Gán lại phím chỉ có hiệu lực ở nơi Plektra nhận phím. Hộp thoại và menu không có ô nhập văn bản sẽ bỏ qua ứng dụng bàn phím; ở đó, hãy dùng phím Enter in trên bàn phím hoặc phím cách để xác nhận.</string>
     <string name="caret_badge_custom_colors_title">Dùng màu tùy chỉnh</string>
     <string name="caret_badge_custom_colors_description">Thay thế màu của giao diện bàn phím.</string>
     <string name="alt_latch_stays_on_space_title">Giữ Alt-Lock</string>

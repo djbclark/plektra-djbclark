@@ -1128,6 +1128,7 @@ Każdy klawisz można skonfigurować jako Keycode, Akcja, Native Ctrl lub Brak. 
     <string name="key_remap_section_title">Zmiana przypisania klawiszy</string>
     <string name="key_remap_swap_shift_right_enter_title">Zamień prawy Shift i Enter</string>
     <string name="key_remap_swap_shift_right_enter_summary">Prawy klawisz Shift wpisuje Enter, a klawisz Enter działa jak Shift.</string>
+    <string name="key_remap_limits_note">Zmiany przypisania działają tam, gdzie Plektra odbiera klawisze. Okna dialogowe i menu bez pola tekstowego omijają aplikację klawiatury; tam zatwierdź nadrukowanym klawiszem Enter lub spacją.</string>
     <string name="caret_badge_custom_colors_title">Używaj własnych kolorów</string>
     <string name="caret_badge_custom_colors_description">Zastąp kolory motywu klawiatury.</string>
     <string name="alt_latch_stays_on_space_title">Zachowaj Alt-Lock</string>

@@ -1122,6 +1122,7 @@ Nav Mode-ը օգտագործում է ստեղնի ֆիզիկական դիրքը
     <string name="key_remap_section_title">Ստեղների վերանշանակում</string>
     <string name="key_remap_swap_shift_right_enter_title">Փոխանակել աջ Shift-ը և Enter-ը</string>
     <string name="key_remap_swap_shift_right_enter_summary">Աջ Shift ստեղնը մուտքագրում է Enter, իսկ Enter ստեղնը գործում է որպես Shift։</string>
+    <string name="key_remap_limits_note">Վերանշանակումները գործում են այնտեղ, որտեղ Plektra-ն ստանում է ստեղները։ Առանց տեքստային դաշտի երկխոսություններն ու ընտրացանկերը շրջանցում են ստեղնաշարի հավելվածը։ Այնտեղ հաստատելու համար օգտագործեք տպված Enter ստեղնը կամ բացատը։</string>
     <string name="caret_badge_custom_colors_title">Օգտագործել սեփական գույներ</string>
     <string name="caret_badge_custom_colors_description">Փոխարինել ստեղնաշարի թեմայի գույները։</string>
     <string name="alt_latch_stays_on_space_title">Պահպանել Alt-Lock-ը</string>

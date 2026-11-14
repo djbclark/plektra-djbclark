@@ -1125,6 +1125,7 @@ Chaque touche peut être configurée comme Keycode, Action, Native Ctrl ou Aucun
     <string name="key_remap_section_title">Remappage des touches</string>
     <string name="key_remap_swap_shift_right_enter_title">Intervertir Shift droit et Entrée</string>
     <string name="key_remap_swap_shift_right_enter_summary">La touche Shift droite saisit Entrée et la touche Entrée agit comme Shift.</string>
+    <string name="key_remap_limits_note">Les remappages s\'appliquent là où Plektra reçoit les touches. Les boîtes de dialogue et les menus sans champ de texte contournent l\'application clavier ; pour y confirmer, utilisez la touche Entrée imprimée ou Espace.</string>
     <string name="caret_badge_custom_colors_title">Utiliser des couleurs personnalisées</string>
     <string name="caret_badge_custom_colors_description">Remplacer les couleurs du thème du clavier.</string>
     <string name="alt_latch_stays_on_space_title">Conserver Alt-Lock</string>

@@ -1128,6 +1128,7 @@ Ctrl-ярлики застосунків із урахуванням розкл�
     <string name="key_remap_section_title">Перепризначення клавіш</string>
     <string name="key_remap_swap_shift_right_enter_title">Поміняти місцями правий Shift і Enter</string>
     <string name="key_remap_swap_shift_right_enter_summary">Права клавіша Shift вводить Enter, а клавіша Enter працює як Shift.</string>
+    <string name="key_remap_limits_note">Перепризначення діють там, де Plektra отримує натискання клавіш. Діалоги й меню без текстового поля обходять застосунок клавіатури; там для підтвердження натисніть надруковану клавішу Enter або пробіл.</string>
     <string name="caret_badge_custom_colors_title">Використовувати власні кольори</string>
     <string name="caret_badge_custom_colors_description">Замінити кольори теми клавіатури.</string>
     <string name="alt_latch_stays_on_space_title">Зберігати Alt-Lock</string>

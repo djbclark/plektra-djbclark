@@ -1830,6 +1830,7 @@ Jede Taste kann als Keycode, Aktion, Native Ctrl oder Keine konfiguriert werden.
     <string name="key_remap_section_title">Tasten umbelegen</string>
     <string name="key_remap_swap_shift_right_enter_title">Rechte Shift- und Enter-Taste tauschen</string>
     <string name="key_remap_swap_shift_right_enter_summary">Die rechte Shift-Taste gibt Enter ein, die Enter-Taste wirkt als Shift.</string>
+    <string name="key_remap_limits_note">Umbelegungen wirken nur dort, wo Plektra die Tasten empfängt. Dialoge und Menüs ohne Textfeld umgehen die Tastatur-App; dort bestätigt die aufgedruckte Enter-Taste oder die Leertaste.</string>
     <string name="shift_tap_latches_title">Shift mit einem Tipp einrasten</string>
     <string name="shift_tap_latches_description">Ein Tipp auf Shift aktiviert Caps Lock, statt Shift nur für die nächste Taste zu aktivieren.</string>
     <string name="alt_tap_latches_title">Alt mit einem Tipp einrasten</string>

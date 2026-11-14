@@ -1125,6 +1125,7 @@ Cada tecla puede configurarse como Keycode, Acción, Native Ctrl o Ninguno. Usa 
     <string name="key_remap_section_title">Reasignación de teclas</string>
     <string name="key_remap_swap_shift_right_enter_title">Intercambiar Shift derecho y Enter</string>
     <string name="key_remap_swap_shift_right_enter_summary">La tecla Shift derecha escribe Enter y la tecla Enter actúa como Shift.</string>
+    <string name="key_remap_limits_note">Las reasignaciones se aplican donde Plektra recibe las teclas. Los diálogos y menús sin campo de texto omiten la app de teclado; ahí, usa la tecla Enter impresa o Espacio para confirmar.</string>
     <string name="caret_badge_custom_colors_title">Usar colores personalizados</string>
     <string name="caret_badge_custom_colors_description">Sustituir los colores del tema del teclado.</string>
     <string name="alt_latch_stays_on_space_title">Mantener Alt-Lock</string>
