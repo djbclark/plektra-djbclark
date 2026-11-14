@@ -2238,50 +2238,16 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
     }
 
     @Test
-    fun swapOn_navHoldSettingOff_rightShiftHeldUnderFn_isAShiftSoTheArrowSelects() {
-        enableSwapInPlainTextField()
-        SettingsManager.setNavModeCtrlHoldEnabled(RuntimeEnvironment.getApplication(), false)
-
-        val fn = fnDown()
-        val shift = printedRightShiftDown(metaState = fnMeta or rightShiftMeta)
-        pressS(fnMeta or rightShiftMeta)
-
-        assertSelectingArrow("all=${sentKeys(recorder)} text=${recorder.committedTexts}", recorder)
-        printedRightShiftUp(shift, metaState = fnMeta)
-        fnUp(fn)
-        assertFalse(enterWasTyped(recorder))
-    }
-
-    @Test
-    fun swapOn_navHoldSettingOff_rightShiftFirstThenFn_isAShiftSoTheArrowSelects() {
+    fun swapOn_navHoldSettingOff_rightShiftIsAnImmediateEnterOnDown() {
         enableSwapInPlainTextField()
         SettingsManager.setNavModeCtrlHoldEnabled(RuntimeEnvironment.getApplication(), false)
 
         val shift = printedRightShiftDown(metaState = rightShiftMeta)
-        val fn = fnDown(fnMeta or rightShiftMeta)
-        pressS(fnMeta or rightShiftMeta)
 
-        assertSelectingArrow("all=${sentKeys(recorder)} text=${recorder.committedTexts}", recorder)
-        printedRightShiftUp(shift, metaState = fnMeta)
-        fnUp(fn)
-        assertFalse(enterWasTyped(recorder))
-    }
-
-    @Test
-    fun swapOn_navHoldSettingOff_rightShiftTappedAloneIsOneEnterOnRelease() {
-        enableSwapInPlainTextField()
-        SettingsManager.setNavModeCtrlHoldEnabled(RuntimeEnvironment.getApplication(), false)
-
-        val shift = printedRightShiftDown(metaState = rightShiftMeta)
-        assertFalse("all=${sentKeys(recorder)}", enterWasTyped(recorder))
+        // As before the nav chord: the Enter goes on DOWN, nothing is held back, no Shift.
+        assertTrue("all=${sentKeys(recorder)} text=${recorder.committedTexts}", enterWasTyped(recorder))
+        assertFalse(modifierController().shiftPhysicallyPressed)
         printedRightShiftUp(shift)
-
-        val trace = "all=${sentKeys(recorder)} text=${recorder.committedTexts} actions=${recorder.editorActions}"
-        assertTrue(trace, enterWasTyped(recorder))
-        assertTrue(trace, recorder.committedTexts.count { it == "\n" } <= 1)
-        assertTrue(trace, recorder.sentKeyEvents.count {
-            it.keyCode == KeyEvent.KEYCODE_ENTER && it.action == KeyEvent.ACTION_DOWN
-        } <= 1)
     }
 
     @Test
