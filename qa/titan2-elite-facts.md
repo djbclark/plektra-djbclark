@@ -94,6 +94,11 @@ Each fact: what, how it was established, date. Update in place; mark superseded 
    `wm_relaunch_resume_activity … Calculator,30`. The relaunched dialog puts focus back on its default item. An app
    that does not declare `configChanges="keyboard|keyboardHidden"` loses its focus/dialog state this way. IMEs see it
    as `onConfigurationChanged` with diff 0x30. Adding an input device (for example a uinput test keyboard) does the same.
-   For keyboard-focus tests, wake the keyboard first and press the key under test while the backlight is still on.
+   It also goes the other way: a press of the printed Recent key (vendor Tab, scanCode 580, not on the keyboard
+   device) was followed within 40 ms by `Config changes=30` to `-keyb/v/h` (keyboard NOKEYS, hard keyboard hidden)
+   and another relaunch; the next printed right ⇧ press switched it back to `qwerty/v/v` and relaunched again.
+   So alternating the Recent key and keyboard keys can relaunch the app on each press. Waking the keyboard first
+   does not avoid it. Keyboard-focus tests need an app that handles `keyboard|keyboardHidden` itself
+   (`dumpsys package <pkg>` shows `configChanges`), or the result reflects the relaunch, not the key.
 6. `getevent -lt` timestamps are CLOCK_MONOTONIC; converting them with `/proc/uptime` (CLOCK_BOOTTIME) drifted by
    about 11 s here. Use the vendor `InputReader` lines in logcat to line keys up with other log events.
