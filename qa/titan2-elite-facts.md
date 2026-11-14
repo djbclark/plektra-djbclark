@@ -79,10 +79,21 @@ Each fact: what, how it was established, date. Update in place; mark superseded 
 ## 7. Dialog without a text field (QA S3 / F3, Calculator ⋮ → Choose theme, 2026-11-14)
 1. With Cancel focused (via Tab), printed right ⇧ (raw KEY_RIGHTSHIFT) and printed ⏎ (raw KEY_ENTER) each moved the
    focus back to the first item ("System default") instead of activating Cancel. No Plektra editor is bound there
-   (`dumpsys input_method`: `mServedView=null`, `mInputShown=false`). Cause not yet isolated.
+   (`dumpsys input_method`: `mServedView=null`, `mInputShown=false`). Cause (isolated 2026-11-14, see 5): the press
+   woke the keyboard backlight, which relaunched Calculator and rebuilt the dialog. Not a Plektra effect.
 2. The Recent key arrives raw as KEY_APPSELECT; the vendor layer turns it into Tab (61) above the kernel.
 3. Space never appears on the keyboard input device in `getevent` (Space is also the fingerprint sensor; vendor
    package `com.agui.spacebarkey`). Outside a text field, pressing it left Calculator and showed the launcher page
    Calculator was opened from (more than Back, which only closes the dialog). Do not use Space as a control key.
 4. Screen trackpad (`screen_trackpad_enabled`) was on before Reset all and is off after it (default false);
    `nav_mode_ctrl_hold_enabled` was true before and is back to its default after.
+5. **A key that wakes the keyboard backlight changes the configuration and relaunches the foreground activity.**
+   Evidence (logcat main/system/events, one press of printed right ⇧ in the Choose theme dialog): `InputReader`
+   `aguiSetProgrammableKey` scan 54 → 59, then `KeyboardLightController: pressKeyToPowerOn` (+9 ms), then
+   `ActivityTaskManager: Config changes=30` (keyboard | keyboardHidden, +30 ms), then
+   `wm_relaunch_resume_activity … Calculator,30`. The relaunched dialog puts focus back on its default item. An app
+   that does not declare `configChanges="keyboard|keyboardHidden"` loses its focus/dialog state this way. IMEs see it
+   as `onConfigurationChanged` with diff 0x30. Adding an input device (for example a uinput test keyboard) does the same.
+   For keyboard-focus tests, wake the keyboard first and press the key under test while the backlight is still on.
+6. `getevent -lt` timestamps are CLOCK_MONOTONIC; converting them with `/proc/uptime` (CLOCK_BOOTTIME) drifted by
+   about 11 s here. Use the vendor `InputReader` lines in logcat to line keys up with other log events.
