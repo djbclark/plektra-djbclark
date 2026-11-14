@@ -1128,6 +1128,7 @@ Nav Mode использует физическое положение клави
     <string name="key_remap_section_title">Переназначение клавиш</string>
     <string name="key_remap_swap_shift_right_enter_title">Поменять местами правый Shift и Enter</string>
     <string name="key_remap_swap_shift_right_enter_summary">Правая клавиша Shift вводит Enter, а клавиша Enter работает как Shift.</string>
+    <string name="key_remap_limits_note">Переназначения действуют там, где Plektra получает нажатия клавиш. Диалоги и меню без текстового поля обходят приложение клавиатуры; там для подтверждения нажмите напечатанную клавишу Enter или пробел.</string>
     <string name="caret_badge_custom_colors_title">Использовать свои цвета</string>
     <string name="caret_badge_custom_colors_description">Заменить цвета темы клавиатуры.</string>
     <string name="alt_latch_stays_on_space_title">Сохранять Alt-Lock</string>

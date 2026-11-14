@@ -1252,6 +1252,7 @@ Ogni tasto può essere configurato come Keycode, Azione, Native Ctrl o Nessuno. 
     <string name="key_remap_section_title">Rimappatura dei tasti</string>
     <string name="key_remap_swap_shift_right_enter_title">Scambia Shift destro ed Enter</string>
     <string name="key_remap_swap_shift_right_enter_summary">Il tasto Shift destro digita Enter e il tasto Enter agisce come Shift.</string>
+    <string name="key_remap_limits_note">Le rimappature valgono dove Plektra riceve i tasti. Le finestre di dialogo e i menu senza campo di testo scavalcano l\'app tastiera; lì, usa il tasto Enter stampato o Spazio per confermare.</string>
     <string name="caret_badge_custom_colors_title">Usa colori personalizzati</string>
     <string name="caret_badge_custom_colors_description">Sostituisci i colori del tema della tastiera.</string>
     <string name="alt_latch_stays_on_space_title">Mantieni Alt-Lock</string>

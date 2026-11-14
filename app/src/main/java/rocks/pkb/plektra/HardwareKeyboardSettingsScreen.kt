@@ -316,6 +316,14 @@ private fun HardwareKeyboardListScreen(
                 keyRemapPresets.forEach { preset ->
                     HardwareKeyRemapSwitchRow(preset, keyRemapProfile)
                 }
+                // A dialog with no text field sets FLAG_ALT_FOCUSABLE_IM, so its keys never reach
+                // the IME and no remap applies there; say so where the remaps are switched on.
+                Text(
+                    text = stringResource(R.string.key_remap_limits_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                )
             }
         }
     }

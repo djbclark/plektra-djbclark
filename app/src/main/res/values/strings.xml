@@ -2320,6 +2320,7 @@ Each key can be configured as Keycode, Action, Native Ctrl, or None. Use overrid
     <string name="key_remap_section_title">Key remapping</string>
     <string name="key_remap_swap_shift_right_enter_title">Swap right Shift and Enter</string>
     <string name="key_remap_swap_shift_right_enter_summary">The right Shift key types Enter and the Enter key acts as Shift.</string>
+    <string name="key_remap_limits_note">Remaps apply where Plektra receives keys. Dialogs and menus with no text field bypass the keyboard app; there, use the printed Enter key or Space to confirm.</string>
     <string name="caret_badge_custom_colors_title">Use custom colours</string>
     <string name="caret_badge_custom_colors_description">Override the keyboard theme colours.</string>
     <string name="emoji_category_unicode_symbols">Text symbols</string>
