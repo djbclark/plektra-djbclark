@@ -107,6 +107,66 @@ class HardwareKeyRemapTest {
     }
 
     @Test
+    fun shiftKeysStayShift_turnsOnlyTheShiftToEnterRulesBackIntoShift() {
+        val stay = swap.shiftKeysStayShift
+
+        // The right Shift key, by scan code whatever key code the vendor makes it send.
+        assertEquals(KeyEvent.KEYCODE_SHIFT_RIGHT, stay.targetFor(KeyEvent.KEYCODE_SHIFT_RIGHT, SCAN_SHIFT_RIGHT))
+        assertEquals(KeyEvent.KEYCODE_SHIFT_RIGHT, stay.targetFor(KeyEvent.KEYCODE_ALT_RIGHT, SCAN_SHIFT_RIGHT))
+        // The other direction of the swap is a rule on Enter, not on a Shift: unchanged.
+        assertEquals(KeyEvent.KEYCODE_SHIFT_RIGHT, stay.targetFor(KeyEvent.KEYCODE_ENTER, 28))
+        assertSame(stay, stay.shiftKeysStayShift)
+
+        // A key-code rule from a Shift to Enter, and one with its Shift named by scan code alone.
+        val leftShiftAsEnter = rules(KeyRemapRule(KeySource.key(KeyEvent.KEYCODE_SHIFT_LEFT), KeyEvent.KEYCODE_ENTER))
+        assertEquals(
+            KeyEvent.KEYCODE_SHIFT_LEFT,
+            leftShiftAsEnter.shiftKeysStayShift.targetFor(KeyEvent.KEYCODE_SHIFT_LEFT, 42)
+        )
+        val scanOnly = rules(KeyRemapRule(KeySource.scan(42), KeyEvent.KEYCODE_NUMPAD_ENTER))
+        assertEquals(KeyEvent.KEYCODE_SHIFT_LEFT, scanOnly.shiftKeysStayShift.targetFor(KeyEvent.KEYCODE_ALT_LEFT, 42))
+
+        // Rules that do not make a Shift type Enter are left alone.
+        val shiftAsTab = rules(KeyRemapRule(KeySource.key(KeyEvent.KEYCODE_SHIFT_LEFT), KeyEvent.KEYCODE_TAB))
+        assertSame(shiftAsTab, shiftAsTab.shiftKeysStayShift)
+        val enterAsTab = rules(KeyRemapRule(KeySource.key(KeyEvent.KEYCODE_ENTER), KeyEvent.KEYCODE_TAB))
+        assertSame(enterAsTab, enterAsTab.shiftKeysStayShift)
+        assertSame(KeyRemapRules.NONE, KeyRemapRules.NONE.shiftKeysStayShift)
+    }
+
+    @Test
+    fun shiftKeysStayShift_isShiftForTheWholePressEvenWhenTheRulesChangeBeforeItsUp() {
+        val stay = swap.shiftKeysStayShift
+
+        val pressed = remap(down(KeyEvent.KEYCODE_SHIFT_RIGHT, shiftRightMeta, SCAN_SHIFT_RIGHT), stay)
+        assertEquals(KeyEvent.KEYCODE_SHIFT_RIGHT, pressed.keyCode)
+        val letter = remap(down(KeyEvent.KEYCODE_S, shiftRightMeta), swap)
+        assertEquals(shiftRightMeta, letter.event.metaState)
+        // Fn let go first: the plain swap is back, the key still comes up as the Shift it went down as.
+        val released = remap(up(KeyEvent.KEYCODE_SHIFT_RIGHT, 0, SCAN_SHIFT_RIGHT), swap)
+        assertEquals(KeyEvent.KEYCODE_SHIFT_RIGHT, released.keyCode)
+        assertEquals(0, released.event.metaState)
+        assertTrue(remapper.isIdle)
+
+        // A press that began as Enter ends as Enter under the nav-mode rules.
+        val enter = remap(down(KeyEvent.KEYCODE_SHIFT_RIGHT, shiftRightMeta, SCAN_SHIFT_RIGHT), swap)
+        assertEquals(KeyEvent.KEYCODE_ENTER, enter.keyCode)
+        val enterUp = remap(up(KeyEvent.KEYCODE_SHIFT_RIGHT, 0, SCAN_SHIFT_RIGHT), stay)
+        assertEquals(KeyEvent.KEYCODE_ENTER, enterUp.keyCode)
+        assertTrue(remapper.isIdle)
+    }
+
+    @Test
+    fun shiftKeysStayShift_aVendorAltAtTheShiftScanCodeActsAsShift() {
+        val pressed = remap(down(KeyEvent.KEYCODE_ALT_RIGHT, altRightMeta, SCAN_SHIFT_RIGHT), swap.shiftKeysStayShift)
+        assertEquals(KeyEvent.KEYCODE_SHIFT_RIGHT, pressed.keyCode)
+        assertEquals(shiftRightMeta, pressed.event.metaState)
+        val released = remap(up(KeyEvent.KEYCODE_ALT_RIGHT, 0, SCAN_SHIFT_RIGHT), swap)
+        assertEquals(KeyEvent.KEYCODE_SHIFT_RIGHT, released.keyCode)
+        assertTrue(remapper.isIdle)
+    }
+
+    @Test
     fun scanCodeRule_matchesTheRawKey_whenDeviceNormalizationRewroteTheEvent() {
         val ctrlAsTab = rules(KeyRemapRule(KeySource.scan(SCAN_SHIFT_RIGHT), KeyEvent.KEYCODE_TAB))
         // A Q25's Ctrl key: right Shift with scan code 54 as it arrives, Ctrl with 251 after
