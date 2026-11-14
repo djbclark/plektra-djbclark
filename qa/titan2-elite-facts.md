@@ -99,6 +99,18 @@ Each fact: what, how it was established, date. Update in place; mark superseded 
    and another relaunch; the next printed right ⇧ press switched it back to `qwerty/v/v` and relaunched again.
    So alternating the Recent key and keyboard keys can relaunch the app on each press. Waking the keyboard first
    does not avoid it. Keyboard-focus tests need an app that handles `keyboard|keyboardHidden` itself
-   (`dumpsys package <pkg>` shows `configChanges`), or the result reflects the relaunch, not the key.
+   (`dumpsys package` does not show `configChanges` on this phone: `adb pull` the APK from `pm path <pkg>` and
+   read `android:configChanges` with `aapt2 dump xmltree --file AndroidManifest.xml`; bits 0x30 must be set), or
+   the result reflects the relaunch, not the key.
 6. `getevent -lt` timestamps are CLOCK_MONOTONIC; converting them with `/proc/uptime` (CLOCK_BOOTTIME) drifted by
    about 11 s here. Use the vendor `InputReader` lines in logcat to line keys up with other log events.
+7. **Config-safe retest (QuickEdit `com.rhmsoft.edit.pro`, ⋮ → Visual Styles: radio list, CANCEL/OK, no text field;
+   its `MainActivity` declares configChanges 0xdb0, which includes keyboard|keyboardHidden).** The `Config changes=30`
+   flips still happen on Recent and on backlight-waking presses, but QuickEdit is not relaunched (only the launcher
+   is), and the printed Recent key (vendor Tab) moves focus through the list to CANCEL normally. With CANCEL focused,
+   printed right ⇧ (with Plektra's "Swap right Shift and Enter" on) did **nothing**: the vendor delivered it as
+   `KEYCODE_SHIFT_LEFT` (scanCode 54, the vendor "Shift key" mapping), and Plektra logged nothing for it. With no text
+   field the IME is bound only through `fallbackInputConnection` (`mServedView=null`), and Android does not route
+   hardware keys through the IME then, so **Plektra's IME-level key remaps do not apply in windows without a text
+   field**. The key acts as whatever the vendor layer maps it to. Stock Settings has few config-safe activities
+   (homepage and Wi-Fi/network dialogs); Calculator, Keep, Clock, Contacts, Dialer and Files have none.
