@@ -4815,9 +4815,8 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
 
     /**
      * True while the next key would be a nav-mode chord: nav mode is latched, or Ctrl (Fn on the
-     * Titan 2) is held where holding it drives nav mode (an editable field with the hold setting
-     * on). A Shift key the user remapped to Enter ("Swap right Shift and Enter") is then a Shift,
-     * so Fn plus the key beside it extends the selection; without a chord it types Enter as set.
+     * Titan 2) is held in an editable field (whatever the nav hold setting). A Shift key the user
+     * remapped to Enter ("Swap right Shift and Enter") is then a Shift, so Fn plus the key beside it extends the selection; without a chord it types Enter as set.
      * Ctrl held elsewhere stays Ctrl+Enter.
      */
     private fun navModeChordActive(): Boolean {
@@ -4825,12 +4824,13 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         return (ctrlPressed || ctrlPhysicallyPressed) && ctrlHoldDrivesNavMode()
     }
 
-    /** Holding Ctrl (Fn) would run nav mode here: an editable field, with the hold setting on. */
-    private fun ctrlHoldDrivesNavMode(): Boolean {
-        val hasEditableField = currentInputConnection != null &&
+    /**
+     * Holding Ctrl (Fn) makes a chord here: an editable field. The Ctrl key mappings (Ctrl+S and
+     * its row as arrows) can apply there, and Shift on top extends the selection.
+     */
+    private fun ctrlHoldDrivesNavMode(): Boolean =
+        currentInputConnection != null &&
             (currentInputEditorInfo?.inputType ?: EditorInfo.TYPE_NULL) != EditorInfo.TYPE_NULL
-        return hasEditableField && SettingsManager.getNavModeCtrlHoldEnabled(this)
-    }
 
     /**
      * A Shift key remapped to Enter, pressed with no Ctrl and no nav mode, where Ctrl could still
@@ -5164,6 +5164,9 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
      * the system's to deliver, the UP of a tombstone included ([onKeyUp]).
      */
     private fun resetHardwareKeyRemap(): Boolean {
+        // A held back Shift-as-Enter goes down as the Enter it is, so the unbind cuts off a press
+        // the app has seen begin, as it always did.
+        deferredShiftEnter?.let { playDeferredShiftEnterDown(it, asShift = false) }
         keyDeliveries.onClientGone()
         deferredShiftEnter = null
         return hardwareKeyRemapper.reset()
