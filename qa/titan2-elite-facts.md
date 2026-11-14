@@ -19,7 +19,9 @@ Each fact: what, how it was established, date. Update in place; mark superseded 
 
 ## 2. Physical keys (scan codes; KeyProbe + `getevent -lt`, 2026-11-14)
 1. Keycaps are factory. Printed ⏎ Enter = scan 28. Printed right ⇧ = scan 54. Printed Fn = scan 251 (FUNC3).
-   Sym = scan 253 (AGUI_SYM). Home = scan 102. Back = scan 158. Orange side key = ff_key 249 (vendor "Func1").
+   Sym = scan 253 (AGUI_SYM). Home = printed ○ circle key, scan 102 (KEY_HOME; vendor keycode 407, see 3.7).
+   Back = scan 158 (by convention the printed △ triangle and □ square are Back and Recent; not verified).
+   Orange side key = ff_key 249 (vendor "Func1").
    Volume = gpio-keys 115/114. Power = ff_key 116.
 2. Name keys in prompts as "printed X (now acts as Y)" .
 3. Input devices (`getevent -i`, 2026-11-14): event5 "TitanKey" (keys), event4 "touchPad" (the keyboard's touch surface:
@@ -49,6 +51,9 @@ Each fact: what, how it was established, date. Update in place; mark superseded 
    Changes in the vendor screen take effect at once (property and `_function` update immediately, no reboot).
 6. Plektra recommends Fn → Ctrl ("Map Fn to Ctrl … recommended for Titan 2 Elite", Toolbox, string
    `fn_ctrl_map_description`). Plektra's nav mode then runs on held Fn-as-Ctrl (Fn+S = DPAD_LEFT).
+7. The ○ Home key goes through the vendor shortcut layer (A85ShortcutFunction in com.agui.shortcutsettings), not
+   straight to Android: short press = Home, long press (~0.5 s) = Recents (KEYCODE_APP_SWITCH), double press = Back.
+   Home is injected only after the double-press window closes, ~0.5-0.7 s after ○ is released (QA S6, 2026-11-14).
 
 ## 4. Plektra storage
 1. `shared_prefs/plektra_prefs.xml` (main), `embedded_adb.xml` (toolbox revert records), `app_list_cache_prefs.xml`,
@@ -138,3 +143,18 @@ Each fact: what, how it was established, date. Update in place; mark superseded 
 2. Before the fix (djb-20261114.0856-0ff87be5): app log `sendKeyEvent on inactive InputConnection`, KeyProbe `held: A=[SHIFT_RIGHT]` for good.
 3. After (djb-20261114.1333-6275dd3f, 2026-11-14): same warning, then Plektra re-sends a CANCELED UP through the new
    connection (`route=new (sent again)`, `cancelled UP ... taken=true`); KeyProbe `held=[]`. PASS.
+
+## 9. Held remapped keys across focus changes (QA S5-S8, djb-20261114.1333-6275dd3f, 2026-11-14)
+Only "Swap right Shift and Enter" on: printed ⏎ (scan 28) types SHIFT_RIGHT(60), printed right ⇧ (scan 54) types ENTER(66).
+1. S5, roll ⌫ down, ⏎ down, ⌫ up, ⏎ up across a KeyProbe restartInput: 7/7 valid rolls PASS (DEL UP delivered with
+   meta=0x81, not CANCELED; nothing held after). In 5 of them the app saw the held Shift arrive as `UP ... CANCELED`
+   (flags 0x24) when the connection was replaced; the IME-side Shift state stayed intact.
+2. S6, hold ⏎ in a Keep note and press ○ Home: ⏎ released on the launcher shows no Plektra shortcut sheet, and the
+   next letter back in Keep types lower case. PASS.
+3. S7, hold ⏎ and pull the notification shade down: the app gets `UP SHIFT_RIGHT(60) ... CANCELED`, nothing stays
+   held; right ⇧ then types ENTER(66) scan 54 with meta 0, ⏎ types SHIFT_RIGHT(60) scan 28. PASS.
+4. S8, hold right ⇧ in a Keep note until new lines repeat, switch to Chrome with the recents gesture, release: Chrome's
+   address bar stays empty and the next `a` is lower case. PASS. (Chrome has to be in recents first.)
+5. Auto-rotate (`settings system accelerometer_rotation`) was once found back at its default 1 (written by
+   pkg:android, defaultSystemSet:true) with no agent or Plektra code touching it; cause unknown. Later flips were
+   the operator's Quick Settings rotation tile, which shows "0°" when locked.
