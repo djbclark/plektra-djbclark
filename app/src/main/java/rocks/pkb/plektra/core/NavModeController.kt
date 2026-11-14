@@ -274,7 +274,7 @@ class NavModeController(
     ): Boolean {
         val downTime = event?.downTime ?: SystemClock.uptimeMillis()
         val eventTime = event?.eventTime ?: downTime
-        val metaState = event?.metaState ?: 0
+        val metaState = withHeldShift(event?.metaState ?: 0, mappedKeyCode, hasEvent = event != null)
 
         val downEvent = KeyEvent(
             downTime,
@@ -296,6 +296,30 @@ class NavModeController(
         inputConnection.sendKeyEvent(upEvent)
         Log.d(TAG, "Nav mode: dispatched keycode $mappedKeyCode")
         return true
+    }
+
+    /**
+     * The Shift the IME tracks as held counts for a nav key even when [metaState] lacks it: a key
+     * the user remapped to Shift (Enter as Shift) is not in the framework's meta state of the
+     * events that follow it. A meta state that already carries Shift is returned unchanged, so a
+     * real Shift is never applied twice; with no Shift held, nothing is added.
+     */
+    private fun withHeldShift(metaState: Int, mappedKeyCode: Int, hasEvent: Boolean): Int {
+        if (!hasEvent || (metaState and KeyEvent.META_SHIFT_ON) != 0) return metaState
+        if (!modifierStateController.shiftHeldByUser || !isSelectionAwareNavKey(mappedKeyCode)) return metaState
+        return metaState or KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON
+    }
+
+    private fun isSelectionAwareNavKey(keyCode: Int): Boolean = when (keyCode) {
+        KeyEvent.KEYCODE_DPAD_UP,
+        KeyEvent.KEYCODE_DPAD_DOWN,
+        KeyEvent.KEYCODE_DPAD_LEFT,
+        KeyEvent.KEYCODE_DPAD_RIGHT,
+        KeyEvent.KEYCODE_MOVE_HOME,
+        KeyEvent.KEYCODE_MOVE_END,
+        KeyEvent.KEYCODE_PAGE_UP,
+        KeyEvent.KEYCODE_PAGE_DOWN -> true
+        else -> false
     }
 
     private fun performMappedAction(
