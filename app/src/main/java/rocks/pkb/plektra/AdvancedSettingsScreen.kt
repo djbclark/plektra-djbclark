@@ -64,6 +64,11 @@ import rocks.pkb.plektra.R
 import rocks.pkb.plektra.backup.BackupManager
 import rocks.pkb.plektra.backup.RestoreManager
 import rocks.pkb.plektra.backup.RestoreInspectionResult
+import rocks.pkb.plektra.backup.SettingsResetManager
+import rocks.pkb.plektra.backup.SettingsResetResult
+import android.widget.Toast
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -74,6 +79,8 @@ import rikka.shizuku.Shizuku
 import androidx.compose.runtime.LaunchedEffect
 import android.content.pm.PackageManager
 import androidx.compose.material.icons.filled.Warning
+
+private enum class ResetStep { None, OfferBackup, Confirm }
 
 /**
  * Advanced settings screen.
@@ -160,9 +167,18 @@ fun AdvancedSettingsScreen(
         return "plektra-backup-${formatter.format(Date())}.zip"
     }
 
+    // "Reset all settings": offer a backup, then ask for a typed confirmation.
+    var resetStep by remember { mutableStateOf(ResetStep.None) }
+    var resetInput by remember { mutableStateOf("") }
+    var resetRunning by remember { mutableStateOf(false) }
+    // Set while the backup file picker is open on behalf of a reset, not a plain backup.
+    var backupIsForReset by remember { mutableStateOf(false) }
+
     val backupLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/zip")
     ) { uri ->
+        val forReset = backupIsForReset
+        backupIsForReset = false
         if (uri != null) {
             scope.launch {
                 val result = BackupManager.createBackup(context, uri)
@@ -170,11 +186,114 @@ fun AdvancedSettingsScreen(
                     is rocks.pkb.plektra.backup.BackupResult.Success ->
                         context.getString(R.string.backup_completed)
                     is rocks.pkb.plektra.backup.BackupResult.Failure ->
-                        context.getString(R.string.backup_failed, result.reason)
+                        if (forReset) context.getString(R.string.reset_backup_failed_not_reset, result.reason)
+                        else context.getString(R.string.backup_failed, result.reason)
                 }
-                snackbarHostState.showSnackbar(message)
+                if (forReset && result is rocks.pkb.plektra.backup.BackupResult.Success) {
+                    resetInput = ""
+                    resetStep = ResetStep.Confirm
+                } else {
+                    snackbarHostState.showSnackbar(message)
+                }
             }
         }
+        // A cancelled picker for a reset returns to the screen without resetting anything.
+    }
+
+    fun performReset() {
+        resetRunning = true
+        scope.launch {
+            val result = SettingsResetManager.reset(context)
+            resetRunning = false
+            resetStep = ResetStep.None
+            resetInput = ""
+            when (result) {
+                is SettingsResetResult.Success -> {
+                    // Same re-read as after a restore, then rebuild the screens from the defaults.
+                    swipeIncrementalThreshold = SettingsManager.getSwipeIncrementalThreshold(context)
+                    clipboardRetentionTime = SettingsManager.getClipboardRetentionTime(context)
+                    sensitiveClipboardRetentionTime = SettingsManager.getSensitiveClipboardRetentionTime(context)
+                    trackpadProvider = SettingsManager.getTrackpadProvider(context)
+                    experimentalCandidatesViewEnabled = SettingsManager.getExperimentalCandidatesViewEnabled(context)
+                    Toast.makeText(context, R.string.reset_completed, Toast.LENGTH_LONG).show()
+                    context.settingsActivity().recreate()
+                }
+                is SettingsResetResult.Failure ->
+                    snackbarHostState.showSnackbar(context.getString(R.string.reset_failed, result.reason))
+            }
+        }
+    }
+
+    when (resetStep) {
+        ResetStep.None -> Unit
+        ResetStep.OfferBackup -> AlertDialog(
+            onDismissRequest = { resetStep = ResetStep.None },
+            title = { Text(stringResource(R.string.reset_backup_first_title)) },
+            text = { Text(stringResource(R.string.reset_backup_first_message)) },
+            confirmButton = {
+                Column(horizontalAlignment = Alignment.End) {
+                    TextButton(
+                        onClick = {
+                            resetStep = ResetStep.None
+                            backupIsForReset = true
+                            backupLauncher.launch(defaultBackupName())
+                        }
+                    ) {
+                        Text(stringResource(R.string.reset_backup_now))
+                    }
+                    TextButton(
+                        onClick = {
+                            resetInput = ""
+                            resetStep = ResetStep.Confirm
+                        }
+                    ) {
+                        Text(stringResource(R.string.reset_skip_backup))
+                    }
+                    TextButton(onClick = { resetStep = ResetStep.None }) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                }
+            }
+        )
+        ResetStep.Confirm -> AlertDialog(
+            onDismissRequest = { if (!resetRunning) resetStep = ResetStep.None },
+            title = { Text(stringResource(R.string.reset_confirm_title)) },
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(stringResource(R.string.reset_confirm_message))
+                    OutlinedTextField(
+                        value = resetInput,
+                        onValueChange = { resetInput = it },
+                        label = { Text(stringResource(R.string.reset_confirm_field_label)) },
+                        singleLine = true,
+                        enabled = !resetRunning,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { performReset() },
+                    enabled = !resetRunning && SettingsResetManager.isConfirmationPhrase(resetInput),
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text(stringResource(R.string.reset_confirm_button))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { resetStep = ResetStep.None },
+                    enabled = !resetRunning
+                ) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
     }
 
     fun performRestore(uri: Uri, importMode: RestoreManager.ImportMode) {
@@ -467,6 +586,51 @@ fun AdvancedSettingsScreen(
                                     )
                                     Text(
                                         text = stringResource(R.string.restore_from_file_description),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 2
+                                    )
+                                }
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        // Reset all settings
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(64.dp)
+                                .settingRow(SettingLinkIds.ADVANCED_RESET_ALL) {
+                                    resetStep = ResetStep.OfferBackup
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Warning,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = stringResource(R.string.reset_all_settings),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.error,
+                                        maxLines = 1
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.reset_all_settings_description),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 2
