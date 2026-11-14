@@ -135,6 +135,11 @@ Each fact: what, how it was established, date. Update in place; mark superseded 
    android:bool/config_preventImeStartupUnlessTextEditor`, overlays applied), so Android keeps the IME session in
    ordinary non-text windows; only windows flagged `FLAG_ALT_FOCUSABLE_IM` (text-less AlertDialogs, list popups)
    bypass the IME.
+9. Screen trackpad (trigger Left Shift = bottom-left corner key, scan 42; hold) in that QuickEdit dialog: holding the
+   trigger and swiping does nothing, and Plektra logs no `ScreenTrackpad: activated` (2026-11-14). The trigger is read in
+   the IME's key path and moves are DPAD sent through the IME's InputConnection, so like the remaps it cannot act in
+   text-less dialogs. In a Keep note the same hold + swipe moves the cursor (activated logged per hold). Quick taps of
+   the trigger can arm Plektra's one-shot Shift, after which the next drag selects instead of moving.
 
 ## 8. Remapped key release lost in a restartInput gap (QA S4; fix 47e15a70 on plk/key-remap-v2)
 1. Repro: KeyProbe mode "restart 1x", N=100 ms, "Swap right Shift and Enter" on, press printed ⏎ (acts as Shift) so the
