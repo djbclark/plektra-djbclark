@@ -1869,6 +1869,11 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
                 KeyEvent.META_ALT_RIGHT_ON or KeyEvent.META_ALT_ON
             )
         )
+        // Enter comes on release: the key is held back until it is known Fn does not join it.
+        service.onKeyUp(
+            KeyEvent.KEYCODE_ALT_RIGHT,
+            scanKey(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ALT_RIGHT, 54, 9_000L, 9_050L)
+        )
 
         assertEquals(
             "sent=${recorder.editorActions} text=${recorder.committedTexts}",
@@ -1891,6 +1896,10 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
                 KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ALT_RIGHT, 54, 9_100L, 9_200L,
                 KeyEvent.META_ALT_RIGHT_ON or KeyEvent.META_ALT_ON
             )
+        )
+        service.onKeyUp(
+            KeyEvent.KEYCODE_ALT_RIGHT,
+            scanKey(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ALT_RIGHT, 54, 9_100L, 9_250L)
         )
 
         assertTrue(
@@ -1919,6 +1928,10 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
                 KeyEvent.META_SHIFT_LEFT_ON or KeyEvent.META_SHIFT_ON or
                     KeyEvent.META_ALT_RIGHT_ON or KeyEvent.META_ALT_ON
             )
+        )
+        service.onKeyUp(
+            KeyEvent.KEYCODE_ALT_RIGHT,
+            scanKey(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ALT_RIGHT, 54, 9_300L, 9_450L, KeyEvent.META_SHIFT_LEFT_ON or KeyEvent.META_SHIFT_ON)
         )
 
         assertTrue(
@@ -2143,6 +2156,8 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
         assertFalse(trace, enterWasTyped(recorder))
         assertFalse(trace, modifierController().shiftPressed)
         assertFalse(trace, modifierController().shiftPhysicallyPressed)
+        // A Shift used in a chord does not arm a one-shot for the next letter.
+        assertEquals("a", typeA())
     }
 
     @Test
@@ -2219,19 +2234,54 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
         assertFalse(trace, enterWasTyped(recorder))
         assertFalse(trace, modifierController().shiftPressed)
         assertFalse(trace, modifierController().shiftPhysicallyPressed)
+        assertEquals("a", typeA())
     }
 
     @Test
-    fun swapOn_rightShiftUnderFnWithoutTheNavHoldSetting_staysEnter() {
+    fun swapOn_navHoldSettingOff_rightShiftHeldUnderFn_isAShiftSoTheArrowSelects() {
         enableSwapInPlainTextField()
         SettingsManager.setNavModeCtrlHoldEnabled(RuntimeEnvironment.getApplication(), false)
 
-        fnDown()
-        printedRightShiftDown(metaState = fnMeta or rightShiftMeta)
+        val fn = fnDown()
+        val shift = printedRightShiftDown(metaState = fnMeta or rightShiftMeta)
+        pressS(fnMeta or rightShiftMeta)
 
-        // Ctrl+Enter is still reachable: the key acted as Enter, not as a Shift.
-        assertFalse(modifierController().shiftPhysicallyPressed)
-        assertFalse(modifierController().shiftPressed)
+        assertSelectingArrow("all=${sentKeys(recorder)} text=${recorder.committedTexts}", recorder)
+        printedRightShiftUp(shift, metaState = fnMeta)
+        fnUp(fn)
+        assertFalse(enterWasTyped(recorder))
+    }
+
+    @Test
+    fun swapOn_navHoldSettingOff_rightShiftFirstThenFn_isAShiftSoTheArrowSelects() {
+        enableSwapInPlainTextField()
+        SettingsManager.setNavModeCtrlHoldEnabled(RuntimeEnvironment.getApplication(), false)
+
+        val shift = printedRightShiftDown(metaState = rightShiftMeta)
+        val fn = fnDown(fnMeta or rightShiftMeta)
+        pressS(fnMeta or rightShiftMeta)
+
+        assertSelectingArrow("all=${sentKeys(recorder)} text=${recorder.committedTexts}", recorder)
+        printedRightShiftUp(shift, metaState = fnMeta)
+        fnUp(fn)
+        assertFalse(enterWasTyped(recorder))
+    }
+
+    @Test
+    fun swapOn_navHoldSettingOff_rightShiftTappedAloneIsOneEnterOnRelease() {
+        enableSwapInPlainTextField()
+        SettingsManager.setNavModeCtrlHoldEnabled(RuntimeEnvironment.getApplication(), false)
+
+        val shift = printedRightShiftDown(metaState = rightShiftMeta)
+        assertFalse("all=${sentKeys(recorder)}", enterWasTyped(recorder))
+        printedRightShiftUp(shift)
+
+        val trace = "all=${sentKeys(recorder)} text=${recorder.committedTexts} actions=${recorder.editorActions}"
+        assertTrue(trace, enterWasTyped(recorder))
+        assertTrue(trace, recorder.committedTexts.count { it == "\n" } <= 1)
+        assertTrue(trace, recorder.sentKeyEvents.count {
+            it.keyCode == KeyEvent.KEYCODE_ENTER && it.action == KeyEvent.ACTION_DOWN
+        } <= 1)
     }
 
     @Test
@@ -2285,6 +2335,7 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
             KeyEvent.KEYCODE_SHIFT_RIGHT,
             rightShiftKey(KeyEvent.ACTION_DOWN, enter, enter)
         )
+        service.onKeyUp(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_UP, enter, tick(40L)))
         assertTrue(
             "text=${recorder.committedTexts} sent=${recorder.editorActions}",
             recorder.committedTexts.contains("\n")
