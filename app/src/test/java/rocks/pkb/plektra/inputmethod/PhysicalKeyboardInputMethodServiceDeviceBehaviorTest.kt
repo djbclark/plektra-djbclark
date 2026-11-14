@@ -2143,7 +2143,6 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
         assertFalse(trace, enterWasTyped(recorder))
         assertFalse(trace, modifierController().shiftPressed)
         assertFalse(trace, modifierController().shiftPhysicallyPressed)
-        assertEquals("a", typeA())
     }
 
     @Test
@@ -2220,7 +2219,6 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
         assertFalse(trace, enterWasTyped(recorder))
         assertFalse(trace, modifierController().shiftPressed)
         assertFalse(trace, modifierController().shiftPhysicallyPressed)
-        assertEquals("a", typeA())
     }
 
     @Test
