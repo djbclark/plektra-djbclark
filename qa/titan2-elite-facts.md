@@ -22,6 +22,11 @@ Each fact: what, how it was established, date. Update in place; mark superseded 
    Sym = scan 253 (AGUI_SYM). Home = scan 102. Back = scan 158. Orange side key = ff_key 249 (vendor "Func1").
    Volume = gpio-keys 115/114. Power = ff_key 116.
 2. Name keys in prompts as "printed X (now acts as Y)" .
+3. Input devices (`getevent -i`, 2026-11-14): event5 "TitanKey" (keys), event4 "touchPad" (the keyboard's touch surface:
+   resting a finger on the keys produces BTN_TOUCH there), event6 "fts_ts" (screen), event7 "ff_key", event0 "gpio-keys"
+   (volume), event1 "mtk-pmic-keys", event3 "hall_sensor". During a key batch, `adb shell input tap` on the screen sometimes
+   did not register (3 tries) while event4 had touches; asking the operator to lift fingers between presses and retrying
+   up to 15 x 0.5 s fixed it (18/18). Cause not proven.
 
 ## 3. Vendor key layer (com.agui.shortcutsettings, Settings → Shortcut keys → Key setting)
 1. The firmware remaps before any app sees the key. What a key now types is in
@@ -125,3 +130,11 @@ Each fact: what, how it was established, date. Update in place; mark superseded 
    android:bool/config_preventImeStartupUnlessTextEditor`, overlays applied), so Android keeps the IME session in
    ordinary non-text windows; only windows flagged `FLAG_ALT_FOCUSABLE_IM` (text-less AlertDialogs, list popups)
    bypass the IME.
+
+## 8. Remapped key release lost in a restartInput gap (QA S4; fix 47e15a70 on plk/key-remap-v2)
+1. Repro: KeyProbe mode "restart 1x", N=100 ms, "Swap right Shift and Enter" on, press printed ⏎ (acts as Shift) so the
+   release lands between the app's restartInput and the IME's onStartInput(restarting): about 150-160 ms on this phone
+   (a ~100 ms tap releases before the restart, ~260 ms after the start). Hand timing misses often: ask for 10-15 presses.
+2. Before the fix (djb-20261114.0856-0ff87be5): app log `sendKeyEvent on inactive InputConnection`, KeyProbe `held: A=[SHIFT_RIGHT]` for good.
+3. After (djb-20261114.1333-6275dd3f, 2026-11-14): same warning, then Plektra re-sends a CANCELED UP through the new
+   connection (`route=new (sent again)`, `cancelled UP ... taken=true`); KeyProbe `held=[]`. PASS.
