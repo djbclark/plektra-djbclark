@@ -109,8 +109,12 @@ Each fact: what, how it was established, date. Update in place; mark superseded 
    flips still happen on Recent and on backlight-waking presses, but QuickEdit is not relaunched (only the launcher
    is), and the printed Recent key (vendor Tab) moves focus through the list to CANCEL normally. With CANCEL focused,
    printed right ⇧ (with Plektra's "Swap right Shift and Enter" on) did **nothing**: the vendor delivered it as
-   `KEYCODE_SHIFT_LEFT` (scanCode 54, the vendor "Shift key" mapping), and Plektra logged nothing for it. With no text
-   field the IME is bound only through `fallbackInputConnection` (`mServedView=null`), and Android does not route
-   hardware keys through the IME then, so **Plektra's IME-level key remaps do not apply in windows without a text
-   field**. The key acts as whatever the vendor layer maps it to. Stock Settings has few config-safe activities
+   `KEYCODE_SHIFT_LEFT` (scanCode 54, the vendor "Shift key" mapping), and Plektra logged nothing for it. This is
+   Android by design, not a phone setting: a stock AlertDialog with no text-input view sets `FLAG_ALT_FOCUSABLE_IM`
+   (AOSP `AlertController`), so the window has no IME focus and `ImeFocusController` passes keys straight to the app
+   (`mServedView=null`; the `fallbackInputConnection` in dumpsys is only the client's registered fallback, not an IME
+   session). So **IME-level key remaps (Plektra's included) cannot act in such dialogs**; the key acts as whatever
+   the vendor layer maps it to. Remapping there would need an AccessibilityService with key filtering (consume) plus
+   injection (e.g. the Shizuku broker), as Key Mapper does. Plektra's scan-code rule (54) itself survives the vendor
+   rewrite to keycode 59. Stock Settings has few config-safe activities
    (homepage and Wi-Fi/network dialogs); Calculator, Keep, Clock, Contacts, Dialer and Files have none.
