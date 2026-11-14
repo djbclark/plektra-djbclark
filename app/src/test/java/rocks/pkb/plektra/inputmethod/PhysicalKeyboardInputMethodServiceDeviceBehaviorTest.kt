@@ -1948,6 +1948,103 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
         assertTrue(sentKeys(recorder).toString(), recorder.sentKeyEvents.isEmpty())
     }
 
+    /**
+     * Fn (vendor-mapped to Ctrl) held with S while [shiftDown] holds a Shift: the nav-mode arrow
+     * the IME sends for S is the DPAD_LEFT events this returns.
+     */
+    private fun navArrowsUnderHeldShift(shiftDown: () -> Unit): List<KeyEvent> {
+        SettingsManager.setNavModeCtrlHoldEnabled(RuntimeEnvironment.getApplication(), true)
+        val ctrlMeta = KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON
+        shiftDown()
+        val fn = tick()
+        service.onKeyDown(
+            KeyEvent.KEYCODE_CTRL_LEFT,
+            scanKey(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_CTRL_LEFT, 251, fn, fn, ctrlMeta)
+        )
+        val s = tick()
+        service.onKeyDown(
+            KeyEvent.KEYCODE_S,
+            scanKey(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_S, 31, s, s, ctrlMeta)
+        )
+        service.onKeyUp(
+            KeyEvent.KEYCODE_S,
+            scanKey(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_S, 31, s, tick(20L), ctrlMeta)
+        )
+        return recorder.sentKeyEvents.filter { it.keyCode == KeyEvent.KEYCODE_DPAD_LEFT }
+    }
+
+    @Test
+    fun navModeArrow_underARealHeldShift_extendsTheSelection() {
+        enableSwapInPlainTextField()
+        val arrows = navArrowsUnderHeldShift {
+            val down = tick()
+            service.onKeyDown(
+                KeyEvent.KEYCODE_SHIFT_LEFT,
+                scanKey(
+                    KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SHIFT_LEFT, 42, down, down,
+                    KeyEvent.META_SHIFT_LEFT_ON or KeyEvent.META_SHIFT_ON
+                )
+            )
+        }
+        assertEquals(2, arrows.size)
+        assertTrue(arrows.all { it.isShiftPressed })
+    }
+
+    @Test
+    fun navModeArrow_underEnterRemappedToAHeldShift_extendsTheSelection() {
+        enableSwapInPlainTextField()
+        val arrows = navArrowsUnderHeldShift {
+            val down = tick()
+            service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, down, down))
+        }
+        assertEquals(2, arrows.size)
+        assertTrue(sentKeys(recorder).toString(), arrows.all { it.isShiftPressed })
+        // The app reads Shift+arrow from the Shift DOWN it saw: it must still be down at the arrow.
+        val beforeArrow = recorder.sentKeyEvents.takeWhile { it.keyCode != KeyEvent.KEYCODE_DPAD_LEFT }
+        val trace = "all=${sentKeys(recorder)}"
+        assertTrue(trace, beforeArrow.any {
+            it.keyCode == KeyEvent.KEYCODE_SHIFT_RIGHT && it.action == KeyEvent.ACTION_DOWN
+        })
+        assertTrue(trace, beforeArrow.none {
+            it.keyCode == KeyEvent.KEYCODE_SHIFT_RIGHT && it.action == KeyEvent.ACTION_UP
+        })
+    }
+
+    @Test
+    fun navModeArrow_underEnterRemappedToAShiftHeldLongEnoughToRepeat_extendsTheSelection() {
+        enableSwapInPlainTextField()
+        val arrows = navArrowsUnderHeldShift {
+            val down = tick()
+            service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, down, down))
+            for (repeat in 1..12) {
+                val at = tick(50L)
+                val repeated = enterKey(KeyEvent.ACTION_DOWN, down, at, repeatCount = repeat)
+                if (repeat == 10) {
+                    service.onKeyLongPress(
+                        KeyEvent.KEYCODE_ENTER,
+                        KeyEvent.changeFlags(repeated, repeated.flags or KeyEvent.FLAG_LONG_PRESS)
+                    )
+                }
+                service.onKeyDown(KeyEvent.KEYCODE_ENTER, repeated)
+            }
+        }
+        assertEquals(2, arrows.size)
+        val trace = "all=${sentKeys(recorder)}"
+        assertTrue(trace, arrows.all { it.isShiftPressed })
+        val beforeArrow = recorder.sentKeyEvents.takeWhile { it.keyCode != KeyEvent.KEYCODE_DPAD_LEFT }
+        assertTrue(trace, beforeArrow.none {
+            it.keyCode == KeyEvent.KEYCODE_SHIFT_RIGHT && it.action == KeyEvent.ACTION_UP
+        })
+    }
+
+    @Test
+    fun navModeArrow_withNoShiftHeld_doesNotExtendTheSelection() {
+        enableSwapInPlainTextField()
+        val arrows = navArrowsUnderHeldShift {}
+        assertEquals(2, arrows.size)
+        assertTrue(arrows.none { it.isShiftPressed })
+    }
+
     @Test
     fun swapOn_tappedEnterArmsTheUsersOneShotShift_soTheNextEnterIsANewline() {
         enableSwapOnVendorShiftAsAlt()
