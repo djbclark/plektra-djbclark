@@ -13,6 +13,9 @@ Each fact: what, how it was established, date. Update in place; mark superseded 
    switches keyboards.
 4. stableDebug builds are debuggable: `adb exec-out run-as rocks.pkb.plektra.djb cat shared_prefs/plektra_prefs.xml`
    and `run-as ... sh -c 'cd files && find .'` work (2026-11-14).
+5. The system property `log.tag` is `I`, so every app `Log.d` (KeyProbe, Plektra's keyDelivery trace) is dropped at
+   write time and never reaches logcat. Before a capture: `adb shell setprop log.tag.KeyProbe D` and
+   `adb shell setprop log.tag.PlektraInputMethod D` (lasts until reboot). Found in QA S4, 2026-11-14.
 
 ## 2. Physical keys (scan codes; KeyProbe + `getevent -lt`, 2026-11-14)
 1. Keycaps are factory. Printed ⏎ Enter = scan 28. Printed right ⇧ = scan 54. Printed Fn = scan 251 (FUNC3).
