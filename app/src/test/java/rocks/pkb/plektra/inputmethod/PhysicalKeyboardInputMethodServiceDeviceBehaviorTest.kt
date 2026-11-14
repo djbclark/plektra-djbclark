@@ -1999,6 +1999,15 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
         }
         assertEquals(2, arrows.size)
         assertTrue(sentKeys(recorder).toString(), arrows.all { it.isShiftPressed })
+        // The app reads Shift+arrow from the Shift DOWN it saw: it must still be down at the arrow.
+        val beforeArrow = recorder.sentKeyEvents.takeWhile { it.keyCode != KeyEvent.KEYCODE_DPAD_LEFT }
+        val trace = "all=${sentKeys(recorder)}"
+        assertTrue(trace, beforeArrow.any {
+            it.keyCode == KeyEvent.KEYCODE_SHIFT_RIGHT && it.action == KeyEvent.ACTION_DOWN
+        })
+        assertTrue(trace, beforeArrow.none {
+            it.keyCode == KeyEvent.KEYCODE_SHIFT_RIGHT && it.action == KeyEvent.ACTION_UP
+        })
     }
 
     @Test
