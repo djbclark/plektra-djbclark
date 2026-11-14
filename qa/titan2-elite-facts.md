@@ -118,3 +118,7 @@ Each fact: what, how it was established, date. Update in place; mark superseded 
    injection (e.g. the Shizuku broker), as Key Mapper does. Plektra's scan-code rule (54) itself survives the vendor
    rewrite to keycode 59. Stock Settings has few config-safe activities
    (homepage and Wi-Fi/network dialogs); Calculator, Keep, Clock, Contacts, Dialer and Files have none.
+8. `config_preventImeStartupUnlessTextEditor` resolves to `false` on this phone (`adb shell cmd overlay lookup android
+   android:bool/config_preventImeStartupUnlessTextEditor`, overlays applied), so Android keeps the IME session in
+   ordinary non-text windows; only windows flagged `FLAG_ALT_FOCUSABLE_IM` (text-less AlertDialogs, list popups)
+   bypass the IME.
