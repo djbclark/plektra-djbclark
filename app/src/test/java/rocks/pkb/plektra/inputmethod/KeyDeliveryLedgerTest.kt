@@ -313,4 +313,61 @@ class KeyDeliveryLedgerTest {
         assertFalse(ledger.isDeliveredInsteadOfRemapped(standIn))
         assertFalse(ledger.isDeliveredBeforeThisConnection(standIn))
     }
+
+    private fun takeUps(nowMs: Long): List<String> {
+        val taken = mutableListOf<String>()
+        ledger.takeUpsSentByIme(nowMs, KeyDeliveryLedger.UP_WINDOW_MS) { taken += it }
+        return taken
+    }
+
+    @Test
+    fun anUpTheImeSent_isHandedBackOnce_atTheNextStart_andForgotten() {
+        ledger.onUpSentByIme(key, "up of key", atMs = 5_000L)
+        ledger.onUpSentByIme(otherDeviceKey, "up of other", atMs = 5_100L)
+
+        assertEquals(listOf("up of key", "up of other"), takeUps(5_200L))
+        assertEquals(emptyList<String>(), takeUps(5_200L))
+    }
+
+    @Test
+    fun anUpTheImeSent_longBeforeTheStart_isForgottenWithoutBeingHandedBack() {
+        ledger.onUpSentByIme(key, "old", atMs = 5_000L)
+        ledger.onUpSentByIme(otherDeviceKey, "edge", atMs = 5_001L)
+
+        assertEquals(listOf("edge"), takeUps(5_000L + KeyDeliveryLedger.UP_WINDOW_MS + 1L))
+        assertEquals(emptyList<String>(), takeUps(5_000L))
+    }
+
+    @Test
+    fun aNewPressOfTheKey_endsTheRecordOfItsEarlierUp() {
+        ledger.onUpSentByIme(key, "up", atMs = 5_000L)
+        ledger.onInitialDown(key)
+        assertEquals(emptyList<String>(), takeUps(5_010L))
+
+        ledger.onUpSentByIme(key, "up", atMs = 5_000L)
+        ledger.onSentByIme(key, KeyEvent.KEYCODE_SHIFT_RIGHT, "down")
+        assertEquals(emptyList<String>(), takeUps(5_010L))
+    }
+
+    @Test
+    fun anUnbind_andAGoneKeyboard_forgetTheUpsTheImeSent() {
+        ledger.onUpSentByIme(key, "up", atMs = 5_000L)
+        ledger.onUpSentByIme(otherDeviceKey, "other", atMs = 5_000L)
+
+        ledger.clearDevice(3)
+        assertEquals(listOf("other"), takeUps(5_010L))
+
+        ledger.onUpSentByIme(key, "up", atMs = 5_000L)
+        ledger.onClientGone()
+        assertEquals(emptyList<String>(), takeUps(5_010L))
+    }
+
+    @Test
+    fun aConnectionChange_leavesTheUpsTheImeSentToTheNextTake() {
+        ledger.onUpSentByIme(key, "up", atMs = 5_000L)
+        changeConnection()
+
+        assertEquals(emptyList<String>(), released)
+        assertEquals(listOf("up"), takeUps(5_010L))
+    }
 }

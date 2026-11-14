@@ -389,7 +389,7 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         /** The first condition of [mayEndInARestartFor] that fails, in words; null when none does. */
         fun whatKeepsItOutOfARestartFor(editor: EditorInfo?): String? = when {
             editor == null -> "no editor"
-            !isShiftCtrlOrAlt(down.keyCode) -> "not Shift, Ctrl or Alt"
+            !isShiftCtrlOrAlt -> "not Shift, Ctrl or Alt"
             packageName.isEmpty() -> "no package when it went down"
             packageName != editor.packageName -> "another package"
             fieldId <= 0 -> "no field id when it went down"
@@ -397,12 +397,13 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             else -> null
         }
 
-        private fun isShiftCtrlOrAlt(keyCode: Int): Boolean = when (keyCode) {
-            KeyEvent.KEYCODE_SHIFT_LEFT, KeyEvent.KEYCODE_SHIFT_RIGHT,
-            KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.KEYCODE_CTRL_RIGHT,
-            KeyEvent.KEYCODE_ALT_LEFT, KeyEvent.KEYCODE_ALT_RIGHT -> true
-            else -> false
-        }
+        val isShiftCtrlOrAlt: Boolean
+            get() = when (down.keyCode) {
+                KeyEvent.KEYCODE_SHIFT_LEFT, KeyEvent.KEYCODE_SHIFT_RIGHT,
+                KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.KEYCODE_CTRL_RIGHT,
+                KeyEvent.KEYCODE_ALT_LEFT, KeyEvent.KEYCODE_ALT_RIGHT -> true
+                else -> false
+            }
     }
     /** What the app saw go down for each key, so that its press goes on and ends as that key. */
     private val keyDeliveries = KeyDeliveryLedger<SentKey>()
@@ -4926,7 +4927,9 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
         if (!keyCodeRemapped && isModifier) return RemapDelivery.SYSTEM_DELIVERS
         val event = remappedEventForApp(remap, rawEvent, metaStateBefore)
         val connection = currentInputConnection
-        if (connection?.sendKeyEvent(event) == true) {
+        val taken = connection?.sendKeyEvent(event) == true
+        if (rawEvent.action == KeyEvent.ACTION_UP) rememberUpSentToApp(physicalKey, event, connection)
+        if (taken) {
             if (rawEvent.action == KeyEvent.ACTION_DOWN) {
                 // The editor is read now, while it is the one this connection was made for.
                 val editor = if (inputStarted) currentInputEditorInfo else null
@@ -4940,6 +4943,41 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             return RemapDelivery.INJECTED
         }
         return if (keyCodeRemapped && isModifier) RemapDelivery.SWALLOWED else RemapDelivery.RAW_FALLBACK
+    }
+
+    /**
+     * The IME sent the app this UP of a remapped key through [connection], the current one.
+     * Between the app's restartInput and the IME's start the current connection is still the old
+     * one: the app drops what arrives there, the connection says it took it, and the press is
+     * over for [keyDeliveries], so the app would hold the key down for good. A Shift, Ctrl or
+     * Alt UP is therefore kept until the next start ([sendCancelledUpsLostInTheGap]), with the
+     * editor it was sent in (read now, while it is the one this connection was made for). Any
+     * other key is no modifier whose press can stick that way.
+     */
+    private fun rememberUpSentToApp(physicalKey: Long, up: KeyEvent, connection: InputConnection?) {
+        if (connection == null || up.action != KeyEvent.ACTION_UP) return
+        val editor = if (inputStarted) currentInputEditorInfo else null
+        val sent = SentKey(up, connection, editor?.packageName.orEmpty(), editor?.fieldId ?: 0)
+        if (!sent.isShiftCtrlOrAlt) return
+        keyDeliveries.onUpSentByIme(physicalKey, sent, SystemClock.uptimeMillis())
+    }
+
+    /**
+     * A start is here. An UP sent in the last [KeyDeliveryLedger.UP_WINDOW_MS] through the
+     * connection before it, for the same editor as a restarting start, may have been dropped
+     * by the app: it is sent again through [connection], as a cancelled UP, once. An app that
+     * saw the first one takes the second as a repeat of an UP it has handled. A start that is
+     * not a restarting one, or is for another editor, only forgets them.
+     */
+    private fun sendCancelledUpsLostInTheGap(restarting: Boolean, info: EditorInfo?, connection: InputConnection?) {
+        keyDeliveries.takeUpsSentByIme(SystemClock.uptimeMillis(), KeyDeliveryLedger.UP_WINDOW_MS) { sent ->
+            if (!restarting || connection == null || !sent.mayEndInARestartFor(info)) return@takeUpsSentByIme
+            traceKeyDelivery {
+                "release of keyCode=${sent.down.keyCode} whose UP went through ${nameOf(sent.via)} in " +
+                    "package=${sent.packageName} fieldId=${sent.fieldId}: route=new (sent again)"
+            }
+            sendCancelledUpToApp(sent, connection)
+        }
     }
 
     /**
@@ -5010,6 +5048,8 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             }
             sendCancelledUpToApp(sent, if (intoThisStart) connection ?: sent.via else sent.via)
         }
+        // Also the UPs of keys already released, which this start may show were lost.
+        sendCancelledUpsLostInTheGap(restarting, info, connection)
     }
 
     /**
@@ -6263,21 +6303,23 @@ class PhysicalKeyboardInputMethodService : InputMethodService(), ClicksAccessibi
             // The app holds another key for this one, sent by the IME: that key's UP ends its
             // press, whatever the handler made of this event and whether or not the connection
             // still takes it. The raw key's UP would be the UP of a key the app never saw.
-            currentInputConnection?.sendKeyEvent(
-                if (remap != null && remap.keyCode == delivered) {
-                    remap.event
-                } else {
-                    event_.withKeyCodeAndMetaState(delivered, event_.metaState)
-                }
-            )
+            val connection = currentInputConnection
+            val up = if (remap != null && remap.keyCode == delivered) {
+                remap.event
+            } else {
+                event_.withKeyCodeAndMetaState(delivered, event_.metaState)
+            }
+            connection?.sendKeyEvent(up)
+            rememberUpSentToApp(physicalKey, up, connection)
             return true
         }
         if (handled) {
             // Consumed here, so the system delivers nothing: a DOWN the IME sent is the IME's to end.
             if (sentByIme) {
-                currentInputConnection?.sendKeyEvent(
-                    if (remap != null) remappedEventForApp(remap, event_, dispatch.metaStateBefore) else event_
-                )
+                val connection = currentInputConnection
+                val up = if (remap != null) remappedEventForApp(remap, event_, dispatch.metaStateBefore) else event_
+                connection?.sendKeyEvent(up)
+                rememberUpSentToApp(physicalKey, up, connection)
             } else if (insteadOfRemapped) {
                 // The app holds the raw key in place of a remapped one that could not be sent:
                 // the handler took the UP as the remapped key, which that raw key never was to

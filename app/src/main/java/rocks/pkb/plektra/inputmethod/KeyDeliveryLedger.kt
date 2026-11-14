@@ -51,6 +51,12 @@ import android.util.LongSparseArray
  *
  * A new press replaces the record before anything else and is handled as a first press.
  *
+ * An UP the IME sent is kept apart ([onUpSentByIme]) until the next start or [UP_WINDOW_MS], for
+ * a release lost in the gap between the app's restartInput and the IME's start: through the
+ * connection that is still the old one, the app drops that UP, and the IME is not told. The
+ * press is over as far as the entries above go, so only this record can send it again
+ * ([takeUpsSentByIme]).
+ *
  * [S] is the caller's record of a DOWN it sent: what it needs to send that key's UP later (the
  * event, and the connection that took it).
  */
@@ -74,6 +80,11 @@ internal class KeyDeliveryLedger<S : Any> {
     // One entry per key ever pressed, reused: bounded by the keys of the connected keyboards.
     private val entries = LongSparseArray<Entry<S>>()
     private var generation = 0
+
+    private class SentUp<S>(val sent: S, val atMs: Long)
+
+    // The last UP the IME sent for each key, until the next start: at most one per key.
+    private val upsSent = LongSparseArray<SentUp<S>>()
 
     /**
      * Whether the app still holds what [entry] says it saw go down: a key the IME sent, as long
@@ -107,6 +118,7 @@ internal class KeyDeliveryLedger<S : Any> {
      * UP.
      */
     fun onInitialDown(key: Long): S? {
+        upsSent.remove(key)
         val entry = entries.get(key)
         if (entry == null) {
             entries.put(key, Entry(generation))
@@ -123,6 +135,8 @@ internal class KeyDeliveryLedger<S : Any> {
      * [sent] is what it takes to release it.
      */
     fun onSentByIme(key: Long, keyCode: Int, sent: S) {
+        // A press after the UP: the UP is no longer the last word on this key.
+        upsSent.remove(key)
         val entry = entryFor(key)
         entry.seenGeneration = generation
         entry.seenKeyCode = keyCode
@@ -195,6 +209,31 @@ internal class KeyDeliveryLedger<S : Any> {
         return entry.downGeneration != generation
     }
 
+    /**
+     * The IME sent the app an UP of this key (through the current connection, taken or not) at
+     * [atMs]: [sent] is that UP, to send it again if a start shows it went to a connection the
+     * app had already replaced. Where the app did see it go up, the second UP is a duplicate
+     * that does no harm, so nothing here tries to tell the two apart.
+     */
+    fun onUpSentByIme(key: Long, sent: S, atMs: Long) {
+        upsSent.put(key, SentUp(sent, atMs))
+    }
+
+    /**
+     * A start is here: hands each UP sent within [windowMs] before [nowMs] to [resend], then
+     * forgets all of them, whether or not they were old enough. [resend] decides, by the editor
+     * of the start, which ones go out again.
+     */
+    fun takeUpsSentByIme(nowMs: Long, windowMs: Long, resend: (sent: S) -> Unit) {
+        val recent = ArrayList<S>(upsSent.size())
+        for (i in 0 until upsSent.size()) {
+            val up = upsSent.valueAt(i)
+            if (nowMs - up.atMs in 0..windowMs) recent += up.sent
+        }
+        upsSent.clear()
+        recent.forEach(resend)
+    }
+
     /** Ends the press: nothing is owed for this key any more. */
     fun onUp(key: Long) {
         entries.get(key)?.forget()
@@ -210,10 +249,14 @@ internal class KeyDeliveryLedger<S : Any> {
         for (i in entries.size() - 1 downTo 0) {
             if (!entries.valueAt(i).bySystem) entries.removeAt(i)
         }
+        upsSent.clear()
         generation++
     }
 
     fun clearDevice(deviceId: Int) {
+        for (i in upsSent.size() - 1 downTo 0) {
+            if (HardwareKeyRemapper.deviceIdOf(upsSent.keyAt(i)) == deviceId) upsSent.removeAt(i)
+        }
         for (i in entries.size() - 1 downTo 0) {
             if (HardwareKeyRemapper.deviceIdOf(entries.keyAt(i)) == deviceId) entries.removeAt(i)
         }
@@ -225,5 +268,13 @@ internal class KeyDeliveryLedger<S : Any> {
     companion object {
         /** No key: a raw key code can be 0 (an unknown key), so 0 is not free. */
         const val NONE = -1
+
+        /**
+         * How long an UP the IME sent counts as possibly lost in a restart gap. The gap between
+         * the app's restartInput and the IME's start is a few milliseconds on the device (S4,
+         * 2026-11-14); a second leaves room for a loaded system, and is short enough that a
+         * restart the key had nothing to do with finds no UP to repeat.
+         */
+        const val UP_WINDOW_MS = 1_000L
     }
 }
