@@ -108,6 +108,7 @@ object SettingLinkIds {
     const val ADVANCED_TRACKPAD_GESTURES = "advanced.trackpad_gestures"
     const val ADVANCED_BACKUP = "advanced.backup"
     const val ADVANCED_RESTORE = "advanced.restore"
+    const val ADVANCED_RESET_ALL = "advanced.reset_all"
     const val ADVANCED_SWIPE_INCREMENTAL_THRESHOLD = "advanced.swipe_incremental_threshold"
     const val ADVANCED_SENSITIVE_CLIPBOARD_RETENTION_TIME = "advanced.sensitive_clipboard_retention_time"
     const val ADVANCED_CLIPBOARD_RETENTION_TIME = "advanced.clipboard_retention_time"
@@ -695,6 +696,12 @@ object SettingLinkRegistry {
             destination = SettingsDestination.Advanced
         ),
         entry(
+            SettingLinkIds.ADVANCED_RESET_ALL,
+            R.string.reset_all_settings,
+            R.string.reset_all_settings_description,
+            destination = SettingsDestination.Advanced
+        ),
+        entry(
             SettingLinkIds.ADVANCED_SWIPE_INCREMENTAL_THRESHOLD,
             R.string.swipe_incremental_threshold_title,
             destination = SettingsDestination.Advanced
@@ -1128,6 +1135,7 @@ object SettingLinkRegistry {
         SettingLinkIds.AUTO_CORRECTION_ACCENT_MATCHING to R.string.kw_auto_correction_accent_matching,
         SettingLinkIds.AUTO_CORRECTION_EXACT_TYPING to R.string.kw_auto_correction_exact_typing,
         SettingLinkIds.ACCESSIBILITY_SUGGESTIONS_DELAY to R.string.kw_accessibility_suggestions_delay,
+        SettingLinkIds.ADVANCED_RESET_ALL to R.string.kw_advanced_reset_all,
         SettingLinkIds.ADVANCED_SWIPE_INCREMENTAL_THRESHOLD to R.string.kw_advanced_swipe_threshold,
         // djb/screen-trackpad: search synonyms
         SettingLinkIds.TRACKPAD_SCREEN_TRACKPAD to R.string.kw_screen_trackpad,

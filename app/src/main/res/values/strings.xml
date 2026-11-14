@@ -1441,6 +1441,19 @@ Each key can be configured as Keycode, Action, Native Ctrl, or None. Use overrid
     <string name="restore_device_change_message">This backup was created on %1$s and is being imported on %2$s. Adapting keeps this device’s detected keyboard profile and display-specific settings.</string>
     <string name="restore_device_change_adapt">Adapt for this device</string>
     <string name="restore_device_change_unchanged">Import unchanged</string>
+    <string name="reset_all_settings">Reset all settings</string>
+    <string name="reset_all_settings_description">Put every setting back to its default</string>
+    <string name="reset_backup_first_title">Back up first?</string>
+    <string name="reset_backup_first_message">A backup ZIP lets you undo this reset: restore it from Advanced → Restore from file. Back up now?</string>
+    <string name="reset_backup_now">Back up now</string>
+    <string name="reset_skip_backup">Skip backup</string>
+    <string name="reset_confirm_title">Reset all settings?</string>
+    <string name="reset_confirm_message">This puts every setting back to its default: preferences, key remaps, custom keyboard layouts, themes, the Ctrl shortcut mappings, variations and the custom typing sound.\n\nThis stays as it is: downloaded dictionaries, your user dictionary and words, auto-correct rules, snippets, notes, clipboard history, the Shizuku and Titan 2 Elite tool setup and anything those tools changed on the phone, and the setup tutorial. Plektra stays your keyboard.\n\nType “reset” to confirm.</string>
+    <string name="reset_confirm_field_label">Type reset</string>
+    <string name="reset_confirm_button">Reset</string>
+    <string name="reset_completed">Settings reset to defaults</string>
+    <string name="reset_failed">Reset failed: %1$s</string>
+    <string name="reset_backup_failed_not_reset">Backup failed, so nothing was reset: %1$s</string>
     
     <!-- Units -->
     <string name="dip_unit">DIP</string>
@@ -1769,7 +1782,8 @@ Each key can be configured as Keycode, Action, Native Ctrl, or None. Use overrid
     <string name="kw_status_bar_presentation">slim, normal, profile, profiles, minimal, compact</string>
     <string name="kw_main_app_language">language, app language, locale, translation</string>
     <string name="kw_main_customization">customize, customization, appearance</string>
-    <string name="kw_main_advanced">advanced, backup, restore, debug, expert</string>
+    <string name="kw_main_advanced">advanced, backup, restore, reset, defaults, debug, expert</string>
+    <string name="kw_advanced_reset_all">reset, reset all, defaults, factory, factory reset, restore defaults, clear settings</string>
     <string name="kw_main_accessibility">accessibility, delay, bounce keys, overlapping keys, screen reader</string>
     <string name="kw_main_about">about, version, support, ko-fi, donate</string>
     <string name="kw_text_input_auto_space_punctuation">spacing, space, punctuation</string>
