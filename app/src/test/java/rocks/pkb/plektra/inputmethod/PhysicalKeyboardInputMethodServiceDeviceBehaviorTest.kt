@@ -2011,6 +2011,33 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
     }
 
     @Test
+    fun navModeArrow_underEnterRemappedToAShiftHeldLongEnoughToRepeat_extendsTheSelection() {
+        enableSwapInPlainTextField()
+        val arrows = navArrowsUnderHeldShift {
+            val down = tick()
+            service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, down, down))
+            for (repeat in 1..12) {
+                val at = tick(50L)
+                val repeated = enterKey(KeyEvent.ACTION_DOWN, down, at, repeatCount = repeat)
+                if (repeat == 10) {
+                    service.onKeyLongPress(
+                        KeyEvent.KEYCODE_ENTER,
+                        KeyEvent.changeFlags(repeated, repeated.flags or KeyEvent.FLAG_LONG_PRESS)
+                    )
+                }
+                service.onKeyDown(KeyEvent.KEYCODE_ENTER, repeated)
+            }
+        }
+        assertEquals(2, arrows.size)
+        val trace = "all=${sentKeys(recorder)}"
+        assertTrue(trace, arrows.all { it.isShiftPressed })
+        val beforeArrow = recorder.sentKeyEvents.takeWhile { it.keyCode != KeyEvent.KEYCODE_DPAD_LEFT }
+        assertTrue(trace, beforeArrow.none {
+            it.keyCode == KeyEvent.KEYCODE_SHIFT_RIGHT && it.action == KeyEvent.ACTION_UP
+        })
+    }
+
+    @Test
     fun navModeArrow_withNoShiftHeld_doesNotExtendTheSelection() {
         enableSwapInPlainTextField()
         val arrows = navArrowsUnderHeldShift {}
