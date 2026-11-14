@@ -36,7 +36,10 @@ Each fact: what, how it was established, date. Update in place; mark superseded 
 4. djbclark's mapping as of 2026-11-14 03:25 (local snapshot):
    left ⇧ → Alt key (types 58), right ⇧ → Alt key (58), Alt → Shift key (59), Fn → Ctrl key (113),
    Sym → Sym (63), Recent → Tab (61), Func1/orange → Media (85), Home/Back programmable off.
-5. Plektra recommends Fn → Ctrl ("Map Fn to Ctrl … recommended for Titan 2 Elite", Toolbox, string
+5. Test baseline set 2026-11-14 05:0x (one key at a time, each checked with getprop): left ⇧ → Shift key (59),
+   right ⇧ → Shift key (59), Alt → Alt key (58 ALT_RIGHT), Fn → Ctrl (113), Sym, Recent → Tab, Func1 → Media kept.
+   Changes in the vendor screen take effect at once (property and `_function` update immediately, no reboot).
+6. Plektra recommends Fn → Ctrl ("Map Fn to Ctrl … recommended for Titan 2 Elite", Toolbox, string
    `fn_ctrl_map_description`). Plektra's nav mode then runs on held Fn-as-Ctrl (Fn+S = DPAD_LEFT).
 
 ## 4. Plektra storage
@@ -60,3 +63,15 @@ Each fact: what, how it was established, date. Update in place; mark superseded 
    user_dictionary_entries, tutorial/migration markers). `ctrl_key_mappings.json` reverted to the asset default;
    `user_defaults.json` unchanged. Restore of the 04:25 ZIP brings all 61 back.
 3. Pref/file snapshots before and after are kept locally with the QA run.
+
+## 6. Modifier behaviour observed with real keys (2026-11-14, after Reset all, swap on, baseline 3.5)
+1. A plain quick tap of printed Alt arms a one-shot Alt: a blue rounded line appears at the left edge of the screen
+   (most likely Plektra's modifier indicator), the next letter types its Alt symbol (`a` → `*`), and the line goes.
+2. Alt held over a quick tap of a Shift (printed left ⇧, or printed ⏎ remapped to Shift) then released behaves as
+   an Alt tap: the next `a` types `*`. Shift is a modifier, so the hold counts as a tap.
+3. Alt held over a quick tap of printed right ⇧ remapped to Enter (313 ms roll) types the new line and does NOT
+   arm Alt; the next `a` types `A` (auto-capitalise first letter defaults to on).
+4. So QA finding F2 (12a, injected run) does not reproduce as a remap bug with real keys; it was the default
+   one-shot-Alt-on-tap behaviour.
+5. When asking an operator to press a key, also say where it is: printed right ⇧ is on the right side of the
+   keyboard, printed left ⇧ in the bottom-left corner (2026-11-14: "printed right ⇧" alone was misread).
