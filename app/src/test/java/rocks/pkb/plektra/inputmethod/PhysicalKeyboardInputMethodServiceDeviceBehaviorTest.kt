@@ -1869,6 +1869,11 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
                 KeyEvent.META_ALT_RIGHT_ON or KeyEvent.META_ALT_ON
             )
         )
+        // Enter comes on release: the key is held back until it is known Fn does not join it.
+        service.onKeyUp(
+            KeyEvent.KEYCODE_ALT_RIGHT,
+            scanKey(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ALT_RIGHT, 54, 9_000L, 9_050L)
+        )
 
         assertEquals(
             "sent=${recorder.editorActions} text=${recorder.committedTexts}",
@@ -1891,6 +1896,10 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
                 KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ALT_RIGHT, 54, 9_100L, 9_200L,
                 KeyEvent.META_ALT_RIGHT_ON or KeyEvent.META_ALT_ON
             )
+        )
+        service.onKeyUp(
+            KeyEvent.KEYCODE_ALT_RIGHT,
+            scanKey(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ALT_RIGHT, 54, 9_100L, 9_250L)
         )
 
         assertTrue(
@@ -1919,6 +1928,10 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
                 KeyEvent.META_SHIFT_LEFT_ON or KeyEvent.META_SHIFT_ON or
                     KeyEvent.META_ALT_RIGHT_ON or KeyEvent.META_ALT_ON
             )
+        )
+        service.onKeyUp(
+            KeyEvent.KEYCODE_ALT_RIGHT,
+            scanKey(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ALT_RIGHT, 54, 9_300L, 9_450L, KeyEvent.META_SHIFT_LEFT_ON or KeyEvent.META_SHIFT_ON)
         )
 
         assertTrue(
@@ -2045,6 +2058,230 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
         assertTrue(arrows.none { it.isShiftPressed })
     }
 
+    // ---- The chord Fn + right Shift + S: the swapped key beside Fn is a Shift while nav mode is on ----
+
+    private val fnMeta = KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON
+
+    /** What the app saw or was told as an Enter, by any route. */
+    private fun enterWasTyped(connection: RecordingInputConnection): Boolean =
+        connection.committedTexts.contains("\n") || connection.editorActions.isNotEmpty() ||
+            connection.sentKeyEvents.any {
+                it.keyCode == KeyEvent.KEYCODE_ENTER || it.keyCode == KeyEvent.KEYCODE_DPAD_CENTER
+            }
+
+    private fun fnDown(metaState: Int = fnMeta): Long {
+        val at = tick()
+        service.onKeyDown(
+            KeyEvent.KEYCODE_CTRL_LEFT,
+            scanKey(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_CTRL_LEFT, 251, at, at, metaState)
+        )
+        return at
+    }
+
+    private fun fnUp(downTime: Long) {
+        service.onKeyUp(
+            KeyEvent.KEYCODE_CTRL_LEFT,
+            scanKey(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_CTRL_LEFT, 251, downTime, tick(20L))
+        )
+    }
+
+    /** The key at scan 54 goes down as [keyCode] (the vendor Key setting may make it Alt). */
+    private fun printedRightShiftDown(keyCode: Int = KeyEvent.KEYCODE_SHIFT_RIGHT, metaState: Int): Long {
+        val at = tick()
+        service.onKeyDown(keyCode, scanKey(KeyEvent.ACTION_DOWN, keyCode, 54, at, at, metaState))
+        return at
+    }
+
+    private fun printedRightShiftUp(downTime: Long, keyCode: Int = KeyEvent.KEYCODE_SHIFT_RIGHT, metaState: Int = 0) {
+        service.onKeyUp(keyCode, scanKey(KeyEvent.ACTION_UP, keyCode, 54, downTime, tick(20L), metaState))
+    }
+
+    private fun pressS(metaState: Int) {
+        val s = tick()
+        service.onKeyDown(KeyEvent.KEYCODE_S, scanKey(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_S, 31, s, s, metaState))
+        service.onKeyUp(KeyEvent.KEYCODE_S, scanKey(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_S, 31, s, tick(20L), metaState))
+    }
+
+    private fun assertSelectingArrow(trace: String, connection: RecordingInputConnection) {
+        val arrows = connection.sentKeyEvents.filter { it.keyCode == KeyEvent.KEYCODE_DPAD_LEFT }
+        assertEquals(trace, 2, arrows.size)
+        assertTrue(trace, arrows.all { it.isShiftPressed })
+        assertFalse(trace, enterWasTyped(connection))
+    }
+
+    @Test
+    fun swapOn_rightShiftHeldUnderFn_isAShiftSoNavArrowsSelect() {
+        enableSwapInPlainTextField()
+        SettingsManager.setNavModeCtrlHoldEnabled(RuntimeEnvironment.getApplication(), true)
+
+        val fn = fnDown()
+        val shift = printedRightShiftDown(metaState = fnMeta or rightShiftMeta)
+        pressS(fnMeta or rightShiftMeta)
+
+        assertSelectingArrow("all=${sentKeys(recorder)} text=${recorder.committedTexts}", recorder)
+        printedRightShiftUp(shift, metaState = fnMeta)
+        fnUp(fn)
+        assertFalse(enterWasTyped(recorder))
+    }
+
+    @Test
+    fun swapOn_vendorAltAtTheRightShiftKeyHeldUnderFn_isAlsoAShift() {
+        enableSwapInPlainTextField()
+        SettingsManager.setNavModeCtrlHoldEnabled(RuntimeEnvironment.getApplication(), true)
+        val altMeta = KeyEvent.META_ALT_RIGHT_ON or KeyEvent.META_ALT_ON
+
+        val fn = fnDown()
+        val shift = printedRightShiftDown(KeyEvent.KEYCODE_ALT_RIGHT, fnMeta or altMeta)
+        pressS(fnMeta or altMeta)
+
+        assertSelectingArrow("all=${sentKeys(recorder)} text=${recorder.committedTexts}", recorder)
+        printedRightShiftUp(shift, KeyEvent.KEYCODE_ALT_RIGHT, fnMeta)
+        fnUp(fn)
+        assertFalse(enterWasTyped(recorder))
+    }
+
+    @Test
+    fun swapOn_fnReleasedBeforeTheRightShift_endsAShiftNotAnEnter() {
+        enableSwapInPlainTextField()
+        SettingsManager.setNavModeCtrlHoldEnabled(RuntimeEnvironment.getApplication(), true)
+
+        val fn = fnDown()
+        val shift = printedRightShiftDown(metaState = fnMeta or rightShiftMeta)
+        pressS(fnMeta or rightShiftMeta)
+        fnUp(fn)
+        // Fn is up and the key still comes up as the Shift it went down as: no Enter, no stuck Shift.
+        printedRightShiftUp(shift)
+
+        val trace = "all=${sentKeys(recorder)} text=${recorder.committedTexts}"
+        assertFalse(trace, enterWasTyped(recorder))
+        assertFalse(trace, modifierController().shiftPressed)
+        assertFalse(trace, modifierController().shiftPhysicallyPressed)
+        // A Shift used in a chord does not arm a one-shot for the next letter.
+        assertEquals("a", typeA())
+    }
+
+    @Test
+    fun swapOn_rightShiftTappedAloneIsEnterOnceOnRelease() {
+        enableSwapInPlainTextField()
+        SettingsManager.setNavModeCtrlHoldEnabled(RuntimeEnvironment.getApplication(), true)
+
+        val shift = printedRightShiftDown(metaState = rightShiftMeta)
+        // Held back until it is known whether Fn comes down on top of it, with no auto-repeat.
+        for (repeat in 1..4) {
+            val at = tick(50L)
+            service.onKeyDown(
+                KeyEvent.KEYCODE_SHIFT_RIGHT,
+                scanKey(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SHIFT_RIGHT, 54, shift, at, rightShiftMeta, repeatCount = repeat)
+            )
+        }
+        assertFalse("all=${sentKeys(recorder)} text=${recorder.committedTexts}", enterWasTyped(recorder))
+
+        printedRightShiftUp(shift)
+
+        val trace = "all=${sentKeys(recorder)} text=${recorder.committedTexts} actions=${recorder.editorActions}"
+        assertTrue(trace, enterWasTyped(recorder))
+        assertTrue(trace, recorder.committedTexts.count { it == "\n" } <= 1)
+        assertTrue(trace, recorder.editorActions.size <= 1)
+        assertTrue(trace, recorder.sentKeyEvents.count {
+            it.keyCode == KeyEvent.KEYCODE_ENTER && it.action == KeyEvent.ACTION_DOWN
+        } <= 1)
+        assertFalse(trace, modifierController().shiftPhysicallyPressed)
+    }
+
+    @Test
+    fun swapOn_rightShiftThenAnotherKey_isEnterBeforeThatKey() {
+        enableSwapInPlainTextField()
+        SettingsManager.setNavModeCtrlHoldEnabled(RuntimeEnvironment.getApplication(), true)
+
+        val shift = printedRightShiftDown(metaState = rightShiftMeta)
+        assertFalse(enterWasTyped(recorder))
+        val a = tick()
+        service.onKeyDown(KeyEvent.KEYCODE_A, scanKey(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, 30, a, a))
+
+        assertTrue("all=${sentKeys(recorder)} text=${recorder.committedTexts}", enterWasTyped(recorder))
+        service.onKeyUp(KeyEvent.KEYCODE_A, scanKey(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_A, 30, a, tick(20L)))
+        printedRightShiftUp(shift)
+    }
+
+    @Test
+    fun swapOn_rightShiftFirstThenFn_becomesAShiftForThePressAndTypesNoEnter() {
+        enableSwapInPlainTextField()
+        SettingsManager.setNavModeCtrlHoldEnabled(RuntimeEnvironment.getApplication(), true)
+
+        val shift = printedRightShiftDown(metaState = rightShiftMeta)
+        val fn = fnDown(fnMeta or rightShiftMeta)
+        pressS(fnMeta or rightShiftMeta)
+
+        assertSelectingArrow("all=${sentKeys(recorder)} text=${recorder.committedTexts}", recorder)
+        printedRightShiftUp(shift, metaState = fnMeta)
+        fnUp(fn)
+        assertFalse("all=${sentKeys(recorder)} text=${recorder.committedTexts}", enterWasTyped(recorder))
+        assertFalse(modifierController().shiftPhysicallyPressed)
+    }
+
+    @Test
+    fun swapOn_rightShiftFirstThenFnReleasedFirst_endsAShiftNotAnEnter() {
+        enableSwapInPlainTextField()
+        SettingsManager.setNavModeCtrlHoldEnabled(RuntimeEnvironment.getApplication(), true)
+
+        val shift = printedRightShiftDown(metaState = rightShiftMeta)
+        val fn = fnDown(fnMeta or rightShiftMeta)
+        pressS(fnMeta or rightShiftMeta)
+        fnUp(fn)
+        printedRightShiftUp(shift)
+
+        val trace = "all=${sentKeys(recorder)} text=${recorder.committedTexts}"
+        assertFalse(trace, enterWasTyped(recorder))
+        assertFalse(trace, modifierController().shiftPressed)
+        assertFalse(trace, modifierController().shiftPhysicallyPressed)
+        assertEquals("a", typeA())
+    }
+
+    @Test
+    fun swapOn_navHoldSettingOff_rightShiftIsAnImmediateEnterOnDown() {
+        enableSwapInPlainTextField()
+        SettingsManager.setNavModeCtrlHoldEnabled(RuntimeEnvironment.getApplication(), false)
+
+        val shift = printedRightShiftDown(metaState = rightShiftMeta)
+
+        // As before the nav chord: the Enter goes on DOWN, nothing is held back, no Shift.
+        assertTrue("all=${sentKeys(recorder)} text=${recorder.committedTexts}", enterWasTyped(recorder))
+        assertFalse(modifierController().shiftPhysicallyPressed)
+        printedRightShiftUp(shift)
+    }
+
+    @Test
+    fun swapOn_latchedNavModeWithoutAnEditor_rightShiftHeldIsAShiftSoNavArrowsSelect() {
+        enableShiftEnterSwap()
+        val connection = keyEventField()
+        modifierController().ctrlLatchActive = true
+        modifierController().ctrlLatchFromNavMode = true
+
+        val shift = printedRightShiftDown(metaState = rightShiftMeta)
+        pressS(rightShiftMeta)
+        printedRightShiftUp(shift)
+
+        assertSelectingArrow("all=${sentKeys(connection)}", connection)
+    }
+
+    @Test
+    fun swapOn_latchedNavModeWithoutAnEditor_enterStillActsAsTheShiftOfTheSwap() {
+        enableShiftEnterSwap()
+        val connection = keyEventField()
+        modifierController().ctrlLatchActive = true
+        modifierController().ctrlLatchFromNavMode = true
+
+        // The printed Enter key (scan 28) is the swap's Shift: held, it shifts the arrow.
+        val down = tick()
+        service.onKeyDown(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_DOWN, down, down))
+        pressS(0)
+        service.onKeyUp(KeyEvent.KEYCODE_ENTER, enterKey(KeyEvent.ACTION_UP, down, tick(20L)))
+
+        val arrows = connection.sentKeyEvents.filter { it.keyCode == KeyEvent.KEYCODE_DPAD_LEFT }
+        assertEquals("all=${sentKeys(connection)}", 2, arrows.size)
+        assertTrue("all=${sentKeys(connection)}", arrows.all { it.isShiftPressed })
+    }
+
     @Test
     fun swapOn_tappedEnterArmsTheUsersOneShotShift_soTheNextEnterIsANewline() {
         enableSwapOnVendorShiftAsAlt()
@@ -2064,6 +2301,7 @@ class PhysicalKeyboardInputMethodServiceDeviceBehaviorTest {
             KeyEvent.KEYCODE_SHIFT_RIGHT,
             rightShiftKey(KeyEvent.ACTION_DOWN, enter, enter)
         )
+        service.onKeyUp(KeyEvent.KEYCODE_SHIFT_RIGHT, rightShiftKey(KeyEvent.ACTION_UP, enter, tick(40L)))
         assertTrue(
             "text=${recorder.committedTexts} sent=${recorder.editorActions}",
             recorder.committedTexts.contains("\n")

@@ -529,6 +529,9 @@ class InputEventRouter(
                     toggleMinimalUi = callbacks.toggleMinimalUi
                 )
             ) {
+                // A Shift held as part of a Ctrl chord (Fn+Shift+S selects) is a modifier of that
+                // chord: the tap its DOWN counted as must not arm a one-shot for the next letter.
+                if (params.shiftPressed) controllers.modifierStateController.consumeShiftOneShot()
                 return EditableFieldRoutingResult.Consume
             }
         }
