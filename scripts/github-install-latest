@@ -13,10 +13,28 @@ pkg=rocks.pkb.plektra.djb
 if [ -n "${ANDROID_SERIAL:-}" ]; then
   serial=$ANDROID_SERIAL
 else
+  # One candidate per physical phone: the same phone can be connected over two
+  # adb transports (Tailscale and LAN), both reporting one ro.serialno. The first
+  # transport in `adb devices` order wins. Parallel arrays (bash 3.2 on macOS has
+  # no associative arrays).
   candidates=()
+  hwserials=()
   for s in $(adb devices | gawk 'NR > 1 && $2 == "device" { print $1 }'); do
     if adb -s "$s" shell pm list packages "$pkg" 2>/dev/null | tr -d '\r' | grep -qx "package:$pkg"; then
-      candidates+=("$s")
+      hw=$(adb -s "$s" shell getprop ro.serialno 2>/dev/null | tr -d '\r' || true)
+      [ -n "$hw" ] || hw=$s # no hardware serial: treat the transport as its own device
+      dup=
+      for i in "${!hwserials[@]}"; do
+        if [ "${hwserials[$i]}" = "$hw" ]; then
+          echo "github-install-latest: $s is the same phone ($hw) as ${candidates[$i]}; using ${candidates[$i]}" >&2
+          dup=1
+          break
+        fi
+      done
+      if [ -z "$dup" ]; then
+        candidates+=("$s")
+        hwserials+=("$hw")
+      fi
     fi
   done
   if [ "${#candidates[@]}" -ne 1 ]; then
