@@ -17,6 +17,8 @@ from rich.table import Table
 from plektra_qa.controller import ScreenController
 
 POLL_S = 0.025
+STOP_CHECK_S = 1.0
+STOPPED = "stopped from the phone"
 
 
 class ChordTrial(BaseModel):
@@ -189,13 +191,27 @@ def run_chord_batch(
     previous_complete: float | None = None
     with gate if gate is not None else nullcontext():
         console.print(
-            "Inverted colors: hands off. Ordinary colors: the shade shows the action, then closes. Type that action."
+            "Inverted colors: hands off. Ordinary colors: the shade shows the action, then closes. "
+            "Type that action. The screen stays on until this command ends. "
+            "Swipe away the stop card to leave testing mode."
         )
         with Live(_table(results, ""), console=console, refresh_per_second=8) as live:
             results = _run_trials(
                 controller, trials, console, gate, device, live, results, previous_complete
             )
     return results
+
+
+def _phone_stopped(gate: Any | None) -> bool:
+    if gate is None:
+        return False
+    check = getattr(gate, "user_stopped", None)
+    if not callable(check):
+        return False
+    try:
+        return bool(check())
+    except Exception:
+        return False
 
 
 def _run_trials(
@@ -211,6 +227,8 @@ def _run_trials(
     for trial in trials:
         error = ""
         element = None
+        if _phone_stopped(gate):
+            error = STOPPED
         if gate is not None and error == "":
             try:
                 gate.hold("Preparing the field")
@@ -221,6 +239,8 @@ def _run_trials(
                 element = _open_target(controller, trial)
             except Exception as exc:
                 error = str(exc)
+        if error == "" and _phone_stopped(gate):
+            error = STOPPED
         if error == "" and gate is not None:
             try:
                 gate.yield_to_human(trial.shade or trial.prompt)
@@ -239,7 +259,14 @@ def _run_trials(
         observed = baseline
         deadline = ready + trial.timeout_s
         live.update(_table(results, "" if error else trial.prompt))
+        last_stop_check = ready
         while error == "" and time.perf_counter() < deadline:
+            now = time.perf_counter()
+            if now - last_stop_check >= STOP_CHECK_S:
+                last_stop_check = now
+                if _phone_stopped(gate):
+                    error = STOPPED
+                    break
             observed = _read_observed(trial, element, device, controller)
             changed = observed != baseline
             if changed and first is None and strip_sentinel(observed, trial.sentinel) != "":
@@ -271,4 +298,6 @@ def _run_trials(
         results.append(result)
         previous_complete = complete
         live.update(_table(results, ""))
+        if error == STOPPED:
+            break
     return results
