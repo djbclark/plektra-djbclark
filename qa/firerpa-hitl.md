@@ -1,28 +1,51 @@
-# FIRERPA setup and the HITL QA harness
+# Prompt: Plektra FIRERPA HITL QA harness
 
-Fork-only (never in an upstream PR). Incorporates `~/Downloads/plektra-qa.txt` (2026-11-15).
-That prompt assumed FireRPA was already running. This file is the setup that comes first,
-then the harness that prompt described. API names below are the lamda 10.12 client
-(`Device`, `Selector`, `clear_text_field`), checked against
-[djbclark/lamda](https://github.com/djbclark/lamda/commit/e91a88f5e75793ca22a1349855ab0096e7d06ab3).
+Fork-only (never in an upstream PR). This is the prompt. Incorporates `~/Downloads/plektra-qa.txt`
+(2026-11-15) and replaces its assumption that FireRPA is already running.
 
-The Python package is specified here and is not in the tree yet. Build it from sections 3–7
-in this worktree. Phone facts for the Titan 2 Elite stay in `qa/titan2-elite-facts.md`.
+You are an Android QA engineer working in this worktree. Build the harness in sections 3–7
+only after FIRERPA is installed and configured on the user's own Android device over adb.
+Do that device work yourself with `adb`. Do not stop at writing these steps down. Do not use
+a stayturgid checkout, the Ansible role, a fleet converge, Termux, Magisk, or the FIRERPA APK.
+The phone stays unrooted: `adb shell` is UID 2000.
 
-## 1. Install FIRERPA outside ~/ops
+API names below are the lamda 10.12 client (`Device`, `Selector`, `clear_text_field`), checked
+against [djbclark/lamda](https://github.com/djbclark/lamda/commit/e91a88f5e75793ca22a1349855ab0096e7d06ab3).
+Titan 2 Elite facts stay in `qa/titan2-elite-facts.md`.
 
-Copy the standalone installer into its own directory and run it there. This path does not
-use a stayturgid checkout, the Ansible role, or a fleet converge. It also does not use
-Termux, Magisk, or the FIRERPA APK. The phone stays unrooted (adb shell UID 2000).
+## 1. Install and configure the user's device over adb
 
-The installer is three files from stayturgid commit
+### 1.1 Choose the device
+
+```bash
+adb devices -l
+```
+
+One device in state `device`: that serial is `ADB_TARGET` (a USB serial or `host:port`).
+Several: ask the user which serial is theirs, then use only that one. None: stop and ask
+them to authorize USB debugging or connect wireless adb. Do not install on a serial they
+did not accept when more than one is listed.
+
+```bash
+adb -s "$ADB_TARGET" get-state          # device
+adb -s "$ADB_TARGET" shell id -u         # 2000
+adb -s "$ADB_TARGET" shell getprop ro.product.cpu.abi
+```
+
+Pixel 7a and the Titan 2 Elite are `arm64-v8a`. Set `FIRERPA_ARCH` to the property you just
+read. Refuse to push an arm64 tarball onto any other ABI.
+
+### 1.2 Host files, then the adb install
+
+Put the standalone installer in `$HOME/firerpa-nonroot`, outside `~/ops`. The three files
+come from stayturgid commit
 [7638f6e](https://github.com/djbclark/stayturgid/commit/7638f6e1dc847f820db61da40891cb43589025b1).
-Its own README is the long form:
+Long form:
 [examples/firerpa-nonroot/README.md](https://github.com/djbclark/stayturgid/blob/7638f6e1dc847f820db61da40891cb43589025b1/examples/firerpa-nonroot/README.md).
 
-Host tools: Bash, curl, OpenSSH, `just` 1.20+ (the installer is written for 1.59.0),
-Android platform tools, `python3.14`, and [`uv`](https://docs.astral.sh/uv/). lamda declares
-`Requires-Python <3.15`. On macOS: `brew install just android-platform-tools python@3.14 uv`.
+Host tools: Bash, curl, OpenSSH, `just` 1.20+ (written for 1.59.0), Android platform tools,
+`python3.14`, and [`uv`](https://docs.astral.sh/uv/). lamda declares `Requires-Python <3.15`.
+On macOS: `brew install just android-platform-tools python@3.14 uv`.
 
 ```bash
 mkdir -p "$HOME/firerpa-nonroot"
@@ -35,14 +58,14 @@ curl -fLO "${base}/README.md"
 cp .env.example .env
 ```
 
-`.env` needs the phone plus the pins that match the vetted 10.12 driver. `ADB_TARGET` is
-what `adb -s` accepts (USB serial or `host:port`). `FIRERPA_HOST` is the address SSH and
-gRPC use. They can differ. A Tailscale address is the right `FIRERPA_HOST` when the phone
-has one. Leave port 65000 off the public internet.
+Write `.env` with the serial from 1.1 and these pins. `FIRERPA_HOST` is the address SSH and
+gRPC use. Use the phone's Tailscale or LAN address when it has one. For a USB-only session,
+set `FIRERPA_HOST=127.0.0.1` and add the `adb forward` in 1.5. Leave port 65000 off the
+public internet.
 
 ```dotenv
-ADB_TARGET=YOUR_ADB_SERIAL
-FIRERPA_HOST=YOUR_DEVICE_IP_OR_DNS_NAME
+ADB_TARGET=<serial from adb devices -l>
+FIRERPA_HOST=<phone address, or 127.0.0.1 when using adb forward>
 FIRERPA_ARCH=arm64-v8a
 FIRERPA_PORT=65000
 FIRERPA_PYTHON=python3.14
@@ -53,50 +76,113 @@ UPSTREAM_SOURCE_REF=e91a88f5e75793ca22a1349855ab0096e7d06ab3
 
 `STAYTURGID_REF` is the stayturgid commit whose patcher lists 10.12
 ([3b6b618](https://github.com/djbclark/stayturgid/commit/3b6b618a4457e90c78f9181274ad6e7ab810c5c8)).
-`UPSTREAM_SOURCE_REF` is the lamda source tag for `tools/cert.py`. Pixel 7a and the Titan 2
-Elite are `arm64-v8a`. A 32-bit device sets `FIRERPA_ARCH=armeabi-v7a`; the arm64 mirror
-does not cover that ABI.
+`UPSTREAM_SOURCE_REF` is the lamda source tag for `tools/cert.py`. Upstream release:
+[v10.12](https://github.com/firerpa/lamda/releases/tag/v10.12). Arm64 fallback mirror:
+[v10.12-binaries](https://github.com/djbclark/lamda/releases/tag/v10.12-binaries).
+
+`just prepare` only builds host files: the verified server tarball, `certs/lamda.pem`, and
+the patched driver `.work/aab.zip.patched`. `just install` is what changes the phone. It
+runs the adb commands in 1.3 and 1.4, then checks 1.5. Run it. If you drive adb yourself,
+run those commands in this order and do not skip the signed-start then patched-swap.
 
 ```bash
 just config
 just doctor
+just prepare
 just install
-just status
+```
+
+### 1.3 What adb pushes and how the device is configured
+
+`ROOT=/data/local/tmp/firerpa`. Every `adb` call is `adb -s "$ADB_TARGET"`.
+
+1. `adb push .work/lamda-server-$FIRERPA_ARCH.tar.gz /data/local/tmp/firerpa-server.tar.gz`
+2. Over `adb shell`, stop any `lamda` process whose executable is under `$ROOT/server`,
+   remove `$ROOT/server` and `/data/local/tmp/usr`, extract the tarball into `$ROOT`, and
+   copy the signed `aab.zip` to `$ROOT/overrides/aab.zip.signed` (mode `0644`).
+3. `adb push` the patched driver to `$ROOT/overrides/aab.zip.patched`,
+   `firerpa_lifecycle.py` to `$ROOT/firerpa_lifecycle.py`, and `certs/lamda.pem` to
+   `$ROOT/server/lamda.pem`.
+4. Write `$ROOT/server/properties.local` and push it with adb. This is the server
+   configuration: SSH on, FIRERPA's own adb off, cron off, forwarding off, mDNS off,
+   WebRTC and remote-desktop video off.
+
+```text
+port=65000
+[sshd]
+sshd.enable=true
+[adb]
+adb.enable=false
+[cron]
+cron.enable=false
+[fwd]
+fwd.enable=false
+[tunnel2]
+tunnel2.enable=false
+[mdns]
+mdns.enable=false
+[webui]
+webui.darkmode=off
+webui.audio=off
+webui.webrtc=off
+webui.video.h264=off
+webui.share-clipboard=off
+```
+
+5. Over `adb shell`: `chmod 0600` the device `lamda.pem`, `0644` the patched driver and
+   `properties.local`, `0755` the lifecycle script.
+
+`certs/lamda.pem` is the gRPC client certificate and the SSH private identity. It holds an
+unencrypted private key. Keep the host copy mode `0600`, back it up, and never commit it.
+`adb.enable=false` turns off FIRERPA's embedded adb. It does not turn off Android's adbd.
+On the Titan 2 Elite, adb over TCP 5555 stays as `qa/titan2-elite-facts.md` section 1
+describes it.
+
+### 1.4 Start over adb, certificate required
+
+Start with the lifecycle helper, whose transport is `adb -s "$ADB_TARGET" shell`:
+
+```bash
+.work/venv/bin/python .work/firerpa_lifecycle.py start \
+  --adb-target "$ADB_TARGET" \
+  --root /data/local/tmp/firerpa \
+  --port 65000 \
+  --certificate /data/local/tmp/firerpa/server/lamda.pem
+```
+
+That adb session restores the signed `aab.zip`, then launches:
+
+```text
+cd /data/local/tmp/firerpa/server && nohup sh bin/launch.sh \
+  --port=65000 --certificate=/data/local/tmp/firerpa/server/lamda.pem
+```
+
+It waits until port 65000 is listening, so FIRERPA's integrity check has accepted the
+signed driver. It then swaps in `overrides/aab.zip.patched` and restarts only FIRERPA's
+UIAutomation helper processes. A hand-written `python -m lamda` that starts on the patched
+archive fails that check. A launch without `--certificate=` does not select `lamda.pem`.
+
+The active driver sha256 for 10.12 must be
+`ac0dcbf8d7528aae7770e8d8387152991d5a4690c45b37f9f8ab24a1a9139e2e`. An unvetted release
+stops before the first `adb push`.
+
+### 1.5 Prove it from adb, then open the client
+
+```bash
+adb -s "$ADB_TARGET" shell 'id -u; ss -ltn | grep ":65000 "; sha256sum /data/local/tmp/firerpa/server/lib/python3.*/site-packages/lamda/aab.zip'
+adb -s "$ADB_TARGET" forward tcp:65000 tcp:65000
 just ssh-id
 just grpc
 ```
 
-`just doctor` checks that adb sees the device as UID 2000 and that the ABI matches.
-`just install` resolves the pinned release, checks the published checksums, builds a
-private `certs/lamda.pem`, patches the accessibility driver, and starts the server under
-`/data/local/tmp/firerpa`. For arm64, a missing upstream asset falls back to the mirror
-[v10.12-binaries](https://github.com/djbclark/lamda/releases/tag/v10.12-binaries). Upstream
-release: [v10.12](https://github.com/firerpa/lamda/releases/tag/v10.12).
+`id` prints `2000`. `ss` shows port 65000. The hash is the 10.12 patched driver.
+`just ssh-id` logs in as `shell` with `ssh -i certs/lamda.pem -p 65000` and prints UID 2000.
+`just grpc` prints `FIRERPA v10.12` from
+`Device(FIRERPA_HOST, port=65000, certificate=certs/lamda.pem)`.
 
-`just ssh-id` must print UID 2000 for user `shell`. `just grpc` must print `FIRERPA v10.12`.
-`just status` must show the active `aab.zip` sha256
-`ac0dcbf8d7528aae7770e8d8387152991d5a4690c45b37f9f8ab24a1a9139e2e`. That hash is the vetted
-10.12 accessibility-coexistence driver (checked 2026-11-15 by disassembly and by `just patch`
-on the host). An unvetted release stops before the device is touched.
-
-`certs/lamda.pem` is the gRPC client certificate and the SSH private identity. It is mode
-`0600`, it holds an unencrypted private key, and it is never committed. Back it up. Pass
-`FIRERPA_CERTIFICATE` to reuse a cert that already exists. `just clean` deletes downloads
-and keeps `certs/`.
-
-The installed `properties.local` turns off FIRERPA's own adb, cron, forwarding, mDNS, and
-WebRTC, and leaves SSH on. Android's adbd is a different daemon. On the Titan 2 Elite, adb
-over TCP 5555 stays as `qa/titan2-elite-facts.md` section 1 describes it.
-
-After a reboot the server is down until `just start`, which needs adb. Removal is
-`just CONFIRM=YES uninstall`, which leaves the host certificate in place.
-
-A USB-only gRPC check, with no phone address, is `adb -s "$ADB_TARGET" forward tcp:65000 tcp:65000`
-and then `Device("127.0.0.1", port=65000, certificate=...)`. On the network, pass
-`FIRERPA_HOST` and skip the forward.
-
-This document's install has been checked as a host-side patch and as the published
-installer. It has not been run onto a phone from this file.
+Use the forward when `FIRERPA_HOST` is `127.0.0.1`. Skip the forward when `FIRERPA_HOST`
+is the phone's own address. After a reboot, repeat 1.4 with `just start` (it needs adb).
+Removal is `just CONFIRM=YES uninstall`, which leaves the host certificate in place.
 
 ## 2. What the harness is
 
@@ -231,7 +317,8 @@ Fill `package`, `activity`, and `resource_id` from a real screen before treating
 
 ## 8. Build order
 
-1. Section 1 on the phone that will run the suite. `just grpc` prints `FIRERPA v10.12` before any harness code is trusted.
+1. Section 1, on the user's device, over adb. `adb shell` shows UID 2000 and the patched
+   driver hash, and `just grpc` prints `FIRERPA v10.12`, before any harness code is trusted.
 2. `qa/pyproject.toml`, `controller.py`, and a connect check that prints `server_info().version`.
 3. `hitl_runner.py` and `suites/smoke_chords.yaml`, proven by one short batch with a person holding the keyboard.
 4. `mcp_server.py` and `just qa-mcp`.
