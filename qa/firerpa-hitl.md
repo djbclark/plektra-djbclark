@@ -1,5 +1,7 @@
 # Prompt: Plektra FIRERPA HITL QA harness
 
+People who want to use the harness: start with [README.md](README.md) ([Deutsch](README.de.md)). This file is the build specification, written as a prompt for an agent.
+
 Fork-only (never in an upstream PR). This is the prompt. Incorporates `~/Downloads/plektra-qa.txt`
 (2026-11-15) and replaces its assumption that FireRPA is already running.
 
@@ -186,9 +188,10 @@ Removal is `just CONFIRM=YES uninstall`, which leaves the host certificate in pl
 
 ## 2. What the harness is
 
-Hardware-in-the-loop QA for Plektra: a one-handed chording keyboard (ESP32-C6 / nRF52840,
-BLE and USB HID) against Android. The prompt names a Pixel 7a. The same harness reads
-`FIRERPA_HOST` and does not bake in a serial. Titan 2 Elite key facts stay in the other file.
+Hardware-in-the-loop QA for Plektra, the Android input method for phones with a physical
+keyboard: a person types on the phone's own keyboard (or a paired BLE / USB HID keyboard) and
+the harness scores what reaches the text field. The original prompt named a Pixel 7a; it was
+first proven on a Titan 2 Elite. The harness reads `FIRERPA_HOST` and does not bake in a serial. Titan 2 Elite key facts stay in the other file.
 
 Drive the phone with `lamda.client` over the certificate from section 1. Do not use Appium,
 Maestro, or `openatx/uiautomator2`. Host tooling is `uv`, a `Justfile`, and a FastMCP server
