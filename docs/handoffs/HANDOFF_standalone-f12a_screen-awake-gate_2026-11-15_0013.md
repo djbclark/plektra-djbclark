@@ -95,4 +95,4 @@ Confirm `adb devices -l` lists `TITAN20000040244` before that command. Tests, wi
 cd /Users/djbclark/src/plektra-djbclark-qa-wt/qa && uv run --python 3.14 pytest tests/test_hitl.py -q
 ```
 
-Publish code with `/Users/djbclark/.local/bin/git-commit-own` from the worktree. This handoff commit stays local until djbclark asks to push it.
+Publish code with `/Users/djbclark/.local/bin/git-commit-own` from the worktree. Handoff `d1ab2290` is on [origin plk/main](https://github.com/djbclark/plektra-djbclark/commit/d1ab22904be25a77d8f8e53bab8b90277cfb1091). His forks and repos are pushed without asking. Upstream [pkb-rocks/plektra](https://github.com/pkb-rocks/plektra) stays gated.
