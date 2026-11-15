@@ -136,6 +136,8 @@ class _Shell:
         self.scripts: list[str] = []
         self.stay_commands: list[str] = []
         self.lockscreen = False
+        self.snoozed_lines: list[str] = []
+        self.unsnoozed: list[str] = []
 
     def __call__(self, args):
         if args[:2] == ["settings", "get"]:
@@ -176,6 +178,12 @@ class _Shell:
             parts = args[-1].split("|")
             if len(parts) >= 4:
                 self.snoozed_tags.append(parts[3].strip())
+            return ""
+        if args[:3] == ["cmd", "notification", "snoozed"]:
+            return "".join(f"{line}\n" for line in self.snoozed_lines)
+        if args[:3] == ["cmd", "notification", "unsnooze"]:
+            self.unsnoozed.append(args[3])
+            self.snoozed_lines = [line for line in self.snoozed_lines if args[3] not in line]
             return ""
         if args[:3] == ["svc", "power", "stayon"]:
             self.stay_commands.append(args[3])
@@ -227,7 +235,34 @@ def test_gate_inverts_only_while_holding_and_restores_heads_up():
     assert "accessibility_display_inversion_enabled 0" in script
     assert "screen_off_timeout 120000" in script
     assert "svc power stayon false" in script
+    assert "seen=0" in script
+    assert 'if [ "$seen" -eq 0 ]; then' in script
     assert any("setsid" in line and AWAKE_SCRIPT in line for line in shell.scripts)
+
+
+def test_gate_unsnoozes_a_hidden_stop_card_and_refuses_if_it_stays_hidden():
+    shell = _Shell("bitpit.launcher")
+    shell.snoozed_lines = [
+        "0|com.android.shell|2020|plektra-qa-stop|2000 snoozed, time=1 context=null"
+    ]
+    gate = ScreenGate("SERIAL", shell=shell, sleep=shell.slept.append)
+    with gate:
+        assert shell.unsnoozed == ["0|com.android.shell|2020|plektra-qa-stop|2000"]
+        assert shell.slept == []
+
+    def hiding(args):
+        if args[:3] == ["cmd", "notification", "list"]:
+            return ""
+        return shell(args)
+
+    hidden = ScreenGate("SERIAL", shell=hiding, sleep=shell.slept.append)
+    try:
+        with hidden:
+            raise AssertionError("entered without a stop card")
+    except RuntimeError as exc:
+        assert "stop card did not appear" in str(exc)
+    assert shell.values[("system", TIMEOUT_KEY)] == "120000"
+    assert shell.values[("secure", INVERSION_KEY)] == "0"
 
 
 def test_gate_counts_down_when_another_app_is_in_front():

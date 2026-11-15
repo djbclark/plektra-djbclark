@@ -134,8 +134,10 @@ class ScreenGate:
             self._hold_awake()
             self._wake_and_unlock()
             self._shell(["sh", "-c", f"rm -f {AWAKE_STOPPED}"])
+            self._unsnooze_ours()
             self._notify(STOP_TEXT, STOP_TEXT, STOP_TAG)
             self._start_watcher()
+            self._wait_for_stop_card()
             self._collapse()
             self._gate()
         except Exception:
@@ -297,6 +299,7 @@ class ScreenGate:
             f"notes={AWAKE_NOTES}",
             f"echo $$ > {AWAKE_PID}",
             "missing=0",
+            "seen=0",
             "while true; do",
             '  if [ -f "$release" ]; then',
             "    echo release",
@@ -309,7 +312,11 @@ class ScreenGate:
             "  fi",
             '  cmd notification list > "$notes" || true',
             '  if grep -F "|$tag|" "$notes" >/dev/null; then',
+            "    seen=1",
             "    missing=0",
+            "    continue",
+            "  fi",
+            '  if [ "$seen" -eq 0 ]; then',
             "    continue",
             "  fi",
             '  if [ -f "$release" ]; then',
@@ -359,6 +366,46 @@ class ScreenGate:
 
     def _notify(self, title: str, body: str, tag: str = NOTIFY_TAG) -> None:
         self._shell(["cmd", "notification", "post", "-t", title, tag, body])
+
+    def _our_tag(self, tag: str) -> bool:
+        return tag in {STOP_TAG, NOTIFY_TAG} or tag.startswith(f"{STOP_TAG}-") or tag.startswith(
+            f"{NOTIFY_TAG}-"
+        )
+
+    def _unsnooze_ours(self) -> None:
+        # Exit snoozes these tags because this Android build has no cancel.
+        # A later post of a snoozed tag stays hidden, and a hidden stop card
+        # must not look like the person swiped it.
+        try:
+            listing = self._shell(["cmd", "notification", "snoozed"])
+        except Exception:
+            return
+        for line in listing.splitlines():
+            key = line.split(" snoozed", 1)[0].strip()
+            parts = [part.strip() for part in key.split("|")]
+            if len(parts) < 4 or not self._our_tag(parts[3]):
+                continue
+            try:
+                self._shell(["cmd", "notification", "unsnooze", key])
+            except Exception:
+                continue
+
+    def _tag_listed(self, tag: str) -> bool:
+        try:
+            listing = self._shell(["cmd", "notification", "list"])
+        except Exception:
+            return False
+        needle = f"|{tag}|"
+        return any(needle in line for line in listing.splitlines())
+
+    def _wait_for_stop_card(self) -> None:
+        for attempt in range(6):
+            if self._tag_listed(STOP_TAG):
+                return
+            self._unsnooze_ours()
+            self._notify(STOP_TEXT, STOP_TEXT, STOP_TAG)
+            self._sleep(0.4)
+        raise RuntimeError("stop card did not appear; refusing to control the screen")
 
     def _snooze_ours(self) -> None:
         try:
