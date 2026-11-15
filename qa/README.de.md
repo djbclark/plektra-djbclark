@@ -16,10 +16,11 @@ Stand: nur im Fork, nicht Teil von Upstream-Plektra. Erprobt auf einem Unihertz 
 4. [Eine Suite ausführen](#4-eine-suite-ausführen)
 5. [Ergebnisse lesen](#5-ergebnisse-lesen)
 6. [Eine eigene Suite schreiben](#6-eine-eigene-suite-schreiben)
-7. [Nutzung durch einen KI-Agenten (MCP)](#7-nutzung-durch-einen-ki-agenten-mcp)
-8. [Wenn etwas schiefgeht](#8-wenn-etwas-schiefgeht)
-9. [Am Harness entwickeln](#9-am-harness-entwickeln)
-10. [Erfahrungen mit dem Titan 2 Elite](#10-erfahrungen-mit-dem-titan-2-elite)
+7. [Tasten benennen](#7-tasten-benennen)
+8. [Nutzung durch einen KI-Agenten (MCP)](#8-nutzung-durch-einen-ki-agenten-mcp)
+9. [Wenn etwas schiefgeht](#9-wenn-etwas-schiefgeht)
+10. [Am Harness entwickeln](#10-am-harness-entwickeln)
+11. [Erfahrungen mit dem Titan 2 Elite](#11-erfahrungen-mit-dem-titan-2-elite)
 
 ## 1. Wie ein Durchlauf aussieht und klingt
 
@@ -62,6 +63,7 @@ Der Harness hält den Bildschirm während eines Durchlaufs an. Am Ende (normal, 
    ADB_TARGET=SERIENNUMMER_ODER_IP:5555  # ein Gerät, das `adb devices` gerade listet
    # PLEKTRA_QA_VOICE=auto          # auto, kokoro, say, espeak oder off
    # PLEKTRA_QA_VOICE_NAME=af_heart # eine Kokoro-Stimme; `kokoro voices` listet sie
+   # PLEKTRA_QA_KEYMAP=/pfad/zum/profil.yaml  # Tastenprofil, Standard keymaps/titan2-elite-baseline.yaml (Abschnitt 7)
    ```
 
    `ADB_TARGET` muss eine Verbindung nennen, die `adb devices` jetzt listet: die USB-Seriennummer oder `IP:5555` für adb über WLAN. Ein Durchlauf, der den Bildschirm steuert, startet ohne diesen Wert nicht.
@@ -84,7 +86,7 @@ Das Telefon in die Hand nehmen, dann:
 cd qa && just qa-run suites/smoke_chords.yaml
 ```
 
-Der Computer zeigt eine Live-Tabelle und die verwendete Stimme (`voice: kokoro`). Den Signalen aus Abschnitt 1 folgen. Strg-C am Computer beendet den Durchlauf und stellt das Telefon wieder her.
+Der Computer zeigt den verwendeten Keymap (`keymap: live ...` oder `keymap: profile ...`, Abschnitt 7), eine Live-Tabelle und die verwendete Stimme (`voice: kokoro`). Den Signalen aus Abschnitt 1 folgen. Strg-C am Computer beendet den Durchlauf und stellt das Telefon wieder her.
 
 ## 5. Ergebnisse lesen
 
@@ -123,9 +125,8 @@ phases:
         package: branislav667.pinnote
         activity: branislav667.pinnote.NotesActivity
         click_resource_id: branislav667.pinnote:id/notes_fab
-      - prompt: "Ctrl+A, Ctrl+C"
-        shade: "Press Ctrl+A, then Ctrl+C"
-        speak: "Press Control A, then Control C."
+      - prompt: "<Ctrl+A>, then <Ctrl+C>"      # Tasten sind Token, siehe Abschnitt 7
+        shade: "Press <Ctrl+A>, then <Ctrl+C>"
         expect: "a, b."
         verify_mode: clipboard   # die Zwischenablage statt des Felds prüfen
         clear_field: false       # den Text des vorigen Versuchs behalten
@@ -135,12 +136,62 @@ Alle Felder eines Versuchs: `prompt`, `expect`, `verify_mode` (`text` oder `clip
 
 Tipps:
 
-1. Satzzeichen in `speak` ausschreiben. Eine Stimme liest `,` und `.` als Pausen.
+1. Satzzeichen in `speak` ausschreiben. Eine Stimme liest `,` und `.` als Pausen. Tasten als Token schreiben (`<Ctrl+A>`), nie als bloße Namen: Abschnitt 7.
 2. Resource-IDs mit dem MCP-Werkzeug `inspect_ui_fast` oder `adb shell uiautomator dump` finden.
 3. Die exportierte Start-Activity einer App öffnen und mit `click_resource_id` in den Editor klicken. Nicht exportierte Activities lassen sich nicht direkt starten.
 4. Suchfelder als Ziel vermeiden: Enter schickt sie ab.
 
-## 7. Nutzung durch einen KI-Agenten (MCP)
+## 7. Tasten benennen
+
+Auf dem Titan 2 Elite durchläuft ein Tastendruck drei Schichten:
+
+1. Die aufgedruckte Taste, also das, was auf der Taste steht.
+2. Das Hersteller-Remapping (Einstellungen, Shortcut keys, Key setting; das Herstellerpaket `com.agui.shortcutsettings`). Es schreibt eine Taste um, bevor eine App sie sieht.
+3. Plektras eigenes Remapping (das Hardware-Tasten-Remapping, zum Beispiel "Swap right Shift and Enter").
+
+"Drücke Ctrl+A" ist deshalb mehrdeutig: Die Taste, die Ctrl macht, kann Fn, Alt oder etwas anderes sein, je nach beiden Remappings. Das Harness gibt darum jede Tastenanweisung, die ein Mensch sieht oder hört, in zwei Fassungen:
+
+1. Die "your"-Fassung, `your Ctrl`: die Taste, die nach beiden Remappings gerade Ctrl macht.
+2. Eine Tastenkappen-Fassung, `Keycaps: hold Fn, tap A.`: was zu drücken ist, allein nach den aufgedruckten Zeichen beurteilt.
+
+Einfacher Text in Anführungszeichen, etwa `type "42"`, bedeutet weiterhin Zeichen, die auf beliebige Weise erzeugt werden dürfen. Nur Tasten bekommen die Zwei-Fassungen-Form.
+
+**Tasten als Token schreiben.** In `prompt`, `shade` und `speak` einer Suite steht jede Taste oder jeder Akkord in spitzen Klammern, und zwar mit dem Namen der Funktion, nicht der Taste:
+
+| Schreiben | Bedeutung |
+| --- | --- |
+| `<Ctrl+A>` | Ein Akkord: die Taste halten, die Ctrl macht, und die Taste mit dem Aufdruck A tippen. Buchstaben und Ziffern sind Tasten dieses Zeichens. |
+| `<Tab>`, `<Enter>`, `<Backspace>`, `<Shift+Tab>` | Eine einzelne Taste oder ein Akkord. Namen: Ctrl, Shift, Alt, Meta, Sym, Fn, Tab, Enter, Backspace, Delete, Esc, Space, Back, Home, Recent, Media (auch Control, Return, Del und Escape; Groß- und Kleinschreibung egal). |
+| `<Ctrl+A>, then <Ctrl+C>` | Eine Abfolge sind getrennte Token, in Reihenfolge. |
+| `<Tab\|Enter>` | Eine der beiden Tasten genügt (in der Suite ein einfaches `|` schreiben). |
+
+Aus `Press <Ctrl+A>, then <Ctrl+C>` macht das Harness drei Texte. Mit dem Test-Baseline-Keymap:
+
+| Wo | Text |
+| --- | --- |
+| Bildschirm (die Tabelle am Computer) | `Press your Ctrl + A, then your Ctrl + C. Keycaps: hold Fn, tap A; then hold Fn, tap C.` |
+| Shade (die Benachrichtigung auf dem Telefon, kurz gehalten) | `Press your Ctrl + A, then your Ctrl + C. Keycaps: Fn+A, then Fn+C.` |
+| Gesprochen (nur Wörter, weil die Stimme Symbole als Pausen liest) | `Press your Control plus letter A, then your Control plus letter C. By keycaps, hold the key printed F N, tap letter A. Then hold the key printed F N, tap letter C.` |
+
+Der Bildschirm- und der gesprochene Text sagen auch, wo eine Taste sitzt, wenn das Profil es weiß (`left ⇧ (in the bottom left corner of the keyboard)`). Ein Versuch mit Token bekommt alle drei Texte aus `prompt`, `shade` und `speak` (der gesprochene Text kommt aus `speak`, sonst `shade`, sonst `prompt`). Die Keycaps-Zeile nicht von Hand schreiben.
+
+**Das Harness lehnt eine Suite ab** (oder eine MCP-Versuchsliste), wenn:
+
+1. Ein Tastenname ohne Token dasteht: `Ctrl`, `Control`, `Alt`, `Shift`, `Fn`, `Sym`, `Tab`, `Enter`, `Return`, `Backspace`, `Del`, `Delete`, `Esc`, `Escape`, `Meta`, `Home`, `Back` oder `Recent`, in beliebiger Schreibweise. Die Fehlermeldung nennt das Feld und schlägt das Token vor. Einige gewöhnliche Wendungen sind erlaubt (`home screen`, `back to`, `come back`, `return to`, `new tab`; die Liste ist `ALLOWED_PHRASES` in `plektra_qa/keys.py`).
+2. Ein Token fehlerhaft ist oder keine Taste benennt (`<Foo>`).
+3. Ein Token nicht zu einer Taste aufgelöst werden kann, zum Beispiel `<Esc>` auf einem Telefon ohne Taste, die Escape macht. Die Meldung nennt das Token. Es gibt nie einen Rückfall auf eine einzige Fassung.
+
+**Woher der Keymap kommt.** `plektra-qa run` und `render` geben am Anfang `keymap: ...` aus, wie `voice: kokoro`.
+
+1. Ist `ADB_TARGET` gesetzt, wird der Keymap nur lesend vom Telefon geholt: die Hersteller-Schicht mit `adb shell getprop` (`persist.sys.agui_programmable_<key>_key`) und Plektras Schicht aus seinen Einstellungen (`adb exec-out run-as <package> cat shared_prefs/plektra_prefs.xml`; dafür ist ein debugfähiger Build nötig; das Paket ist `PLEKTRA_QA_PACKAGE`, Standard `rocks.pkb.plektra.djb`). Lässt sich Plektras Schicht nicht lesen, springen die Regeln des Profils ein, und die Ausgabe sagt es.
+2. Sonst, oder mit `PLEKTRA_QA_KEYMAP_SOURCE=profile`, kommt er aus einem Profil: [keymaps/titan2-elite-baseline.yaml](keymaps/titan2-elite-baseline.yaml) (die Tasten ab Werk, die Hersteller-Test-Baseline und die Einstellung "Swap right Shift and Enter") oder die Datei aus `PLEKTRA_QA_KEYMAP=/pfad/zum/profil.yaml`. Die Baseline kopieren, um ein anderes Telefon oder ein anderes Remapping zu beschreiben.
+3. Weichen das Lesen vom Telefon und das Profil voneinander ab, gewinnt das Lesen vom Telefon, und die Ausgabe listet die Unterschiede. `PLEKTRA_QA_KEYMAP_SOURCE=live` besteht auf dem Telefon und scheitert, wenn es nicht gelesen werden kann.
+
+Der Keymap wird einmal am Anfang gelesen. Wer während eines Durchlaufs eine Tasteneinstellung ändert, hat veraltete Texte; dann neu starten.
+
+**Ausprobieren oder eine Fragekarte schreiben.** `just qa-keys "<Ctrl+A>, then <Ctrl+C>"` (oder `plektra-qa render "..."`; mit `--json` ein JSON-Objekt) gibt die Bildschirm-, Shade- und gesprochene Fassung aus, ohne das Telefon zu bedienen. Ein Agent, der außerhalb einer Suite einen Menschen bittet, Tasten zu drücken (eine Fragekarte für einen Geräte-Rundgang), fügt die Bildschirm-Fassung von hier ein, statt Tastennamen von Hand zu schreiben.
+
+## 8. Nutzung durch einen KI-Agenten (MCP)
 
 `just qa-mcp` stellt den MCP-Server `plektra-qa-mcp` über stdio bereit. Werkzeuge:
 
@@ -158,10 +209,11 @@ Regeln für Agenten:
 2. Nie für den Menschen tippen (`set_text` tippt über FIRERPA, nicht über die Tastatur).
 3. Nie die aktive Eingabemethode ändern und das Plektra-Paket nie mit `am force-stop` oder `am start -S` behandeln. Android würde die Tastatur wechseln.
 4. Keine unbekannten Dialoge anklicken, nicht Zurück drücken, „Nicht stören“ nicht ändern.
+5. Tasten in Versuchslisten und in Fragen an den Menschen als Token schreiben (`<Ctrl+A>`): `just qa-keys "<Ctrl+A>"` gibt den Text in beiden Fassungen zum Einfügen aus (Abschnitt 7).
 
 [firerpa-hitl.md](firerpa-hitl.md) (englisch) ist die vollständige Spezifikation, geschrieben als Bau-Anleitung für einen Agenten.
 
-## 8. Wenn etwas schiefgeht
+## 9. Wenn etwas schiefgeht
 
 Das Telefon von Hand wiederherstellen, wenn ein Durchlauf bei invertierten Farben abgebrochen ist. Das sind die Standardwerte des Titan 2 Elite; die eigenen Werte deines Telefons verwenden:
 
@@ -176,7 +228,7 @@ adb -s "$ADB_TARGET" shell settings put global heads_up_notifications_enabled 1
 2. Die Stimme spricht ein Zeichen falsch: dem Versuch eine `speak`-Zeile geben.
 3. Gesprochene Sätze liegen im Cache `~/.cache/plektra-qa/voice/`. Den Ordner löschen, damit sie neu erzeugt werden.
 
-## 9. Am Harness entwickeln
+## 10. Am Harness entwickeln
 
 ```bash
 cd qa && uv run --python 3.14 pytest tests -q
@@ -189,13 +241,15 @@ Die Tests nutzen Attrappen und brauchen kein Telefon.
 | `plektra_qa/hitl_runner.py` | Suite laden, Versuchsschleife, Bewertung, Erinnerungen. |
 | `plektra_qa/screen_gate.py` | Invertierte Farben, Benachrichtigungsleiste, Wachbleiben, Stopp-Benachrichtigung und der Wächter auf dem Telefon. Nur adb. |
 | `plektra_qa/speech.py` | Die Sprach-Backends und der Satz-Cache. |
+| `plektra_qa/keys.py` | Tasten-Token, der Keymap (live oder Profil), der Renderer und die Prüfung. |
 | `plektra_qa/controller.py` | Activities öffnen, Felder fokussieren und leeren, Text lesen. |
 | `plektra_qa/connection.py` | Die per Zertifikat authentifizierte FIRERPA-Verbindung. |
 | `plektra_qa/mcp_server.py` / `cli.py` | Der MCP-Server und der Befehl `plektra-qa`. |
 | `suites/` | Versuchs-Suiten. |
+| `keymaps/` | Tastenprofile: Tasten ab Werk plus Hersteller- und Plektra-Remapping. |
 | [titan2-elite-facts.md](titan2-elite-facts.md) (englisch) | Fakten zum Testtelefon: Tastencodes, Einstellungen, Speicherpfade. |
 
-## 10. Erfahrungen mit dem Titan 2 Elite
+## 11. Erfahrungen mit dem Titan 2 Elite
 
 1. Dieses Android-Build hat kein `cmd notification cancel`. Der Harness entfernt eine Benachrichtigung per Snooze und hebt den Snooze vor dem nächsten Posten auf. Ein gesnoozter Tag bleibt auch beim erneuten Posten verborgen.
 2. `adb shell` teilt einen mehrwortigen Benachrichtigungstitel in Tag und Text, außer der ganze Befehl ist ein einziges gequotetes Argument.

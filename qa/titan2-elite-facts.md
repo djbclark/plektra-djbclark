@@ -24,7 +24,11 @@ FIRERPA install and the HITL harness spec: `qa/firerpa-hitl.md`.
    Back = scan 158 (by convention the printed △ triangle and □ square are Back and Recent; not verified).
    Orange side key = ff_key 249 (vendor "Func1").
    Volume = gpio-keys 115/114. Power = ff_key 116.
-2. Name keys in prompts as "printed X (now acts as Y)" .
+2. Name keys in prompts, shades, speech and question cards with the harness convention (README "Naming keys"): key tokens
+   such as `<Ctrl+A>` that render as "your Ctrl" plus a "Keycaps: hold Fn, tap A." line, because a key passes three layers
+   (printed keycap, vendor remap 3, Plektra remap 4.2). `just qa-keys "<Ctrl+A>"` prints both versions; the keymap is read
+   from the phone (vendor `getprop` plus Plektra's stored rules, read-only) or from `qa/keymaps/titan2-elite-baseline.yaml`.
+   Keep the keycap table in that profile in step with 2.1 and 3.5 (djbclark, 2026-11-15).
 3. Input devices (`getevent -i`, 2026-11-14): event5 "TitanKey" (keys), event4 "touchPad" (the keyboard's touch surface:
    resting a finger on the keys produces BTN_TOUCH there), event6 "fts_ts" (screen), event7 "ff_key", event0 "gpio-keys"
    (volume), event1 "mtk-pmic-keys", event3 "hall_sensor". During a key batch, `adb shell input tap` on the screen sometimes

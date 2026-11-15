@@ -16,10 +16,11 @@ Status: fork-only, not part of upstream Plektra. Proven on a Unihertz Titan 2 El
 4. [Run a suite](#4-run-a-suite)
 5. [Read the results](#5-read-the-results)
 6. [Write your own suite](#6-write-your-own-suite)
-7. [Use it from an AI agent (MCP)](#7-use-it-from-an-ai-agent-mcp)
-8. [If something goes wrong](#8-if-something-goes-wrong)
-9. [Develop the harness](#9-develop-the-harness)
-10. [Lessons learned on the Titan 2 Elite](#10-lessons-learned-on-the-titan-2-elite)
+7. [Naming keys](#7-naming-keys)
+8. [Use it from an AI agent (MCP)](#8-use-it-from-an-ai-agent-mcp)
+9. [If something goes wrong](#9-if-something-goes-wrong)
+10. [Develop the harness](#10-develop-the-harness)
+11. [Lessons learned on the Titan 2 Elite](#11-lessons-learned-on-the-titan-2-elite)
 
 ## 1. What a run looks and sounds like
 
@@ -60,6 +61,7 @@ The harness keeps the screen on during a pass. When the pass ends (normally, aft
    ADB_TARGET=SERIAL_OR_IP:5555     # a device that `adb devices` lists right now
    # PLEKTRA_QA_VOICE=auto          # auto, kokoro, say, espeak or off
    # PLEKTRA_QA_VOICE_NAME=af_heart # a Kokoro voice; `kokoro voices` lists them
+   # PLEKTRA_QA_KEYMAP=/path/to/profile.yaml  # key profile, default keymaps/titan2-elite-baseline.yaml (section 7)
    ```
 
    `ADB_TARGET` must name a transport that `adb devices` lists now: the USB serial, or `IP:5555` for wireless adb. A run that drives the screen refuses to start without it.
@@ -82,7 +84,7 @@ Hold the phone, then:
 cd qa && just qa-run suites/smoke_chords.yaml
 ```
 
-The computer shows a live table and the voice in use (`voice: kokoro`). Follow the signals in section 1. Ctrl-C on the computer stops the pass and restores the phone.
+The computer shows the keymap in use (`keymap: live ...` or `keymap: profile ...`, section 7), a live table and the voice in use (`voice: kokoro`). Follow the signals in section 1. Ctrl-C on the computer stops the pass and restores the phone.
 
 ## 5. Read the results
 
@@ -121,9 +123,8 @@ phases:
         package: branislav667.pinnote
         activity: branislav667.pinnote.NotesActivity
         click_resource_id: branislav667.pinnote:id/notes_fab
-      - prompt: "Ctrl+A, Ctrl+C"
-        shade: "Press Ctrl+A, then Ctrl+C"
-        speak: "Press Control A, then Control C."
+      - prompt: "<Ctrl+A>, then <Ctrl+C>"      # keys are tokens, see section 7
+        shade: "Press <Ctrl+A>, then <Ctrl+C>"
         expect: "a, b."
         verify_mode: clipboard   # check the clipboard instead of the field
         clear_field: false       # keep the text from the previous trial
@@ -133,12 +134,62 @@ All trial fields: `prompt`, `expect`, `verify_mode` (`text` or `clipboard`), `se
 
 Tips:
 
-1. Spell symbols out in `speak`. A voice reads `,` and `.` as pauses.
+1. Spell symbols out in `speak`. A voice reads `,` and `.` as pauses. Write keys as tokens (`<Ctrl+A>`), never as bare names: section 7.
 2. Find resource ids with the MCP tool `inspect_ui_fast`, or `adb shell uiautomator dump`.
 3. Open an app's exported launcher activity, then click into the editor with `click_resource_id`. Activities that are not exported cannot be started directly.
 4. Avoid search boxes as targets: Enter submits them.
 
-## 7. Use it from an AI agent (MCP)
+## 7. Naming keys
+
+On the Titan 2 Elite a key press goes through three layers:
+
+1. The printed keycap, what is engraved on the key.
+2. The vendor remap (Settings, Shortcut keys, Key setting; the vendor package `com.agui.shortcutsettings`). It rewrites a key before any app sees it.
+3. Plektra's own remap (the hardware key remap, for example "Swap right Shift and Enter").
+
+So "press Ctrl+A" is ambiguous: the key that does Ctrl may be Fn, Alt, or something else, depending on both remaps. The harness therefore gives every key instruction a person sees or hears in two versions:
+
+1. The "your" version, `your Ctrl`: whichever key currently does Ctrl after both remaps.
+2. A keycaps version, `Keycaps: hold Fn, tap A.`: what to press judging only by the printed glyphs.
+
+Plain quoted text, such as `type "42"`, still means characters to produce by any means. Only keys use the two-version form.
+
+**Write keys as tokens.** In a suite's `prompt`, `shade` and `speak`, put each key or chord in angle brackets and name the function, not the keycap:
+
+| Write | Meaning |
+| --- | --- |
+| `<Ctrl+A>` | A chord: hold the key that does Ctrl, tap the key printed A. Letters and digits are keycaps of that letter. |
+| `<Tab>`, `<Enter>`, `<Backspace>`, `<Shift+Tab>` | A single key, or a chord. Names: Ctrl, Shift, Alt, Meta, Sym, Fn, Tab, Enter, Backspace, Delete, Esc, Space, Back, Home, Recent, Media (Control, Return, Del and Escape also work; case does not matter). |
+| `<Ctrl+A>, then <Ctrl+C>` | A sequence is separate tokens, in order. |
+| `<Tab\|Enter>` | Either key will do (write a plain `|` in the suite). |
+
+The harness turns `Press <Ctrl+A>, then <Ctrl+C>` into three texts. With the test baseline keymap:
+
+| Where | Text |
+| --- | --- |
+| Screen (the table on the computer) | `Press your Ctrl + A, then your Ctrl + C. Keycaps: hold Fn, tap A; then hold Fn, tap C.` |
+| Shade (the phone's notification, kept short) | `Press your Ctrl + A, then your Ctrl + C. Keycaps: Fn+A, then Fn+C.` |
+| Spoken (words only, because the voice reads symbols as pauses) | `Press your Control plus letter A, then your Control plus letter C. By keycaps, hold the key printed F N, tap letter A. Then hold the key printed F N, tap letter C.` |
+
+The screen and spoken texts also say where a key is when the profile knows it (`left ⇧ (in the bottom left corner of the keyboard)`). A trial that uses a token gets all three texts filled in from `prompt`, `shade` and `speak` (the spoken text comes from `speak`, else `shade`, else `prompt`). Do not write the keycaps line yourself.
+
+**The harness refuses a suite** (or an MCP trial list) when:
+
+1. A key name stands bare outside a token: `Ctrl`, `Control`, `Alt`, `Shift`, `Fn`, `Sym`, `Tab`, `Enter`, `Return`, `Backspace`, `Del`, `Delete`, `Esc`, `Escape`, `Meta`, `Home`, `Back` or `Recent`, in any case. The error names the field and suggests the token. A few ordinary phrases are allowed (`home screen`, `back to`, `come back`, `return to`, `new tab`; the list is `ALLOWED_PHRASES` in `plektra_qa/keys.py`).
+2. A token is malformed or names no key (`<Foo>`).
+3. A token cannot be resolved to a keycap, for example `<Esc>` on a phone with no key that does Escape. The error names the token. There is never a one-version fallback.
+
+**Where the keymap comes from.** `plektra-qa run` and `render` print `keymap: ...` at the start, like `voice: kokoro`.
+
+1. With `ADB_TARGET` set, the keymap is read from the phone, read-only: the vendor layer from `adb shell getprop` (`persist.sys.agui_programmable_<key>_key`) and Plektra's layer from its preferences (`adb exec-out run-as <package> cat shared_prefs/plektra_prefs.xml`, which needs a debuggable build; the package is `PLEKTRA_QA_PACKAGE`, default `rocks.pkb.plektra.djb`). If Plektra's layer cannot be read, the profile's rules stand in and the output says so.
+2. Otherwise, or with `PLEKTRA_QA_KEYMAP_SOURCE=profile`, it comes from a profile: [keymaps/titan2-elite-baseline.yaml](keymaps/titan2-elite-baseline.yaml) (the factory keycaps, the vendor test baseline and the "Swap right Shift and Enter" setting), or the file named by `PLEKTRA_QA_KEYMAP=/path/to/profile.yaml`. Copy the baseline to describe another phone or another remap.
+3. If the live read and the profile disagree, the live read wins, and the output lists the differences. `PLEKTRA_QA_KEYMAP_SOURCE=live` insists on the phone and fails if it cannot be read.
+
+The keymap is read once at the start. Change a key setting during a run and the texts are stale; run again.
+
+**Try it, or write a question card.** `just qa-keys "<Ctrl+A>, then <Ctrl+C>"` (or `plektra-qa render "..."`; add `--json` for one JSON object) prints the screen, shade and spoken versions without driving the phone. An agent that asks a person to press keys outside a suite (a device-walk question card) should paste the screen version from here instead of writing key names by hand.
+
+## 8. Use it from an AI agent (MCP)
 
 `just qa-mcp` serves the MCP server `plektra-qa-mcp` on stdio. Tools:
 
@@ -156,10 +207,11 @@ Rules for agents:
 2. Never type for the person (`set_text` types through FIRERPA, not the keyboard).
 3. Never change the active input method, and never `am force-stop` or `am start -S` the Plektra package. Android would switch keyboards.
 4. Do not click dialogs the harness has not seen before, press Back, or change Do Not Disturb.
+5. Name keys with tokens (`<Ctrl+A>`) in trial lists and in questions to the person: `just qa-keys "<Ctrl+A>"` prints the two-version text to paste (section 7).
 
 [firerpa-hitl.md](firerpa-hitl.md) is the full specification. It is written as a build prompt for an agent.
 
-## 8. If something goes wrong
+## 9. If something goes wrong
 
 Restore the phone by hand if a pass died while the colors were inverted. These are the Titan 2 Elite's defaults; use your phone's own values:
 
@@ -174,7 +226,7 @@ adb -s "$ADB_TARGET" shell settings put global heads_up_notifications_enabled 1
 2. The voice says the wrong thing for a symbol: add a `speak` line to that trial.
 3. Spoken phrases are cached in `~/.cache/plektra-qa/voice/`. Delete the folder to render them again.
 
-## 9. Develop the harness
+## 10. Develop the harness
 
 ```bash
 cd qa && uv run --python 3.14 pytest tests -q
@@ -187,13 +239,15 @@ The tests use fakes and need no phone.
 | `plektra_qa/hitl_runner.py` | Suite loading, the trial loop, scoring, reminders. |
 | `plektra_qa/screen_gate.py` | Inverted colors, the shade, stay-awake, the stop card and the phone-side watcher. adb only. |
 | `plektra_qa/speech.py` | The voice backends and the phrase cache. |
+| `plektra_qa/keys.py` | Key tokens, the keymap (live or profile), the renderer and the lint. |
 | `plektra_qa/controller.py` | Opening activities, focusing and clearing fields, reading text. |
 | `plektra_qa/connection.py` | The certificate-authenticated FIRERPA connection. |
 | `plektra_qa/mcp_server.py` / `cli.py` | The MCP server and the `plektra-qa` command. |
 | `suites/` | Trial suites. |
+| `keymaps/` | Key profiles: factory keycaps plus the vendor and Plektra remaps. |
 | [titan2-elite-facts.md](titan2-elite-facts.md) | Facts about the test phone: key codes, settings, storage paths. |
 
-## 10. Lessons learned on the Titan 2 Elite
+## 11. Lessons learned on the Titan 2 Elite
 
 1. This Android build has no `cmd notification cancel`. The harness removes a card by snoozing it, and unsnoozes it before posting it again. A snoozed tag stays hidden even when posted again.
 2. `adb shell` splits a multi-word notification title into tag and text unless the whole command is one quoted argument.
