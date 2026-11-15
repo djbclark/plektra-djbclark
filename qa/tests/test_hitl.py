@@ -13,7 +13,7 @@ from plektra_qa.hitl_runner import (
     trial_matched,
     words_per_minute,
 )
-from plektra_qa.screen_gate import HEADS_UP_KEY, INVERSION_KEY, ScreenGate
+from plektra_qa.screen_gate import HEADS_UP_KEY, INVERSION_KEY, ScreenGate, shell_line
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = ROOT / "plektra_qa"
@@ -26,6 +26,8 @@ def test_suite_drops_null_overrides_and_keeps_phase_name():
     assert trials[0].resource_id == "branislav667.pinnote:id/pin_text"
     assert trials[0].package == "branislav667.pinnote"
     assert trials[0].click_resource_id == "branislav667.pinnote:id/notes_fab"
+    assert trials[0].shade == "Type hello"
+    assert trials[-2].shade == "Press Tab or Enter, then type beta"
     assert trials[0].sentinel == "\n"
     clipboard = trials[-1]
     assert clipboard.verify_mode == "clipboard"
@@ -111,6 +113,7 @@ class _Shell:
         self.package = package
         self.slept: list[float] = []
         self.notes: list[tuple[str, str]] = []
+        self.statusbar: list[str] = []
         self.snoozed = False
 
     def __call__(self, args):
@@ -122,6 +125,7 @@ class _Shell:
         if args[:2] == ["dumpsys", "activity"]:
             return f"topResumedActivity=ActivityRecord{{x u0 {self.package}/.Main t1}}\n"
         if args[:2] == ["cmd", "statusbar"]:
+            self.statusbar.append(args[2])
             return ""
         if args[:3] == ["cmd", "notification", "post"]:
             self.notes.append((args[4], args[6]))
@@ -141,10 +145,13 @@ def test_gate_inverts_only_while_holding_and_restores_heads_up():
         assert shell.slept == []
         gate.hold("Preparing the field")
         assert shell.values[("secure", INVERSION_KEY)] == "1"
-        assert shell.notes[-1][0] == "Hands off"
-        gate.yield_to_human("alpha: hello")
+        assert shell.notes[-1] == ("Hands off", "Hands off")
+        assert shell.statusbar[-1] == "collapse"
+        gate.yield_to_human("Type hello")
         assert shell.values[("secure", INVERSION_KEY)] == "0"
-        assert shell.notes[-1] == ("Your turn", "alpha: hello")
+        assert shell.notes[-1] == ("Type hello", "Type hello")
+        assert shell.statusbar[-2:] == ["expand-notifications", "collapse"]
+        assert shell.slept == [4]
     assert shell.values[("secure", INVERSION_KEY)] == "0"
     assert shell.values[("global", HEADS_UP_KEY)] == "1"
     assert shell.snoozed
@@ -244,6 +251,13 @@ def test_batch_holds_the_screen_then_yields_for_typing():
         ("yield", "alpha: hello"),
         "exit",
     ]
+
+
+def test_shell_line_keeps_a_spaced_action_as_one_word():
+    line = shell_line(
+        ["cmd", "notification", "post", "-t", "Type hello", "plektra-qa-presence", "Type hello"]
+    )
+    assert line == "cmd notification post -t 'Type hello' plektra-qa-presence 'Type hello'"
 
 
 def test_package_never_types_through_firerpa_or_replaces_the_ime():

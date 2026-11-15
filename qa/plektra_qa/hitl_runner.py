@@ -32,6 +32,7 @@ class ChordTrial(BaseModel):
     click_resource_id: str | None = None
     clear_field: bool = True
     cue_on_device: bool = False
+    shade: str | None = None
     phase: str = ""
 
 
@@ -188,7 +189,7 @@ def run_chord_batch(
     previous_complete: float | None = None
     with gate if gate is not None else nullcontext():
         console.print(
-            "Inverted colors: hands off. Ordinary colors: type the row marked typing."
+            "Inverted colors: hands off. Ordinary colors: the shade shows the action, then closes. Type that action."
         )
         with Live(_table(results, ""), console=console, refresh_per_second=8) as live:
             results = _run_trials(
@@ -222,7 +223,7 @@ def _run_trials(
                 error = str(exc)
         if error == "" and gate is not None:
             try:
-                gate.yield_to_human(trial.prompt)
+                gate.yield_to_human(trial.shade or trial.prompt)
             except Exception as exc:
                 error = str(exc)
         ready = time.perf_counter()

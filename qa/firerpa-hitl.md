@@ -257,13 +257,13 @@ No model call between chords. `run_chord_batch(trials)` polls the already-open g
 `qa-run` and any MCP tool that taps or starts an activity take the screen through `plektra_qa.screen_gate.ScreenGate`. This uses adb on `ADB_TARGET`. It does not install or import anything from an ops repo.
 
 1. While the harness drives the phone, `settings put secure accessibility_display_inversion_enabled 1`. Ordinary colors are the person's turn. The harness refuses to tap when inversion does not read back as `1`.
-2. `cmd notification post` carries `Hands off` or `Your turn` plus the prompt. This Android build has no `cmd notification cancel`, so exit snoozes tag `plektra-qa-presence`.
-3. `settings put global heads_up_notifications_enabled 0` for the session, and the saved value is restored on exit. `cmd statusbar collapse` runs at each hold. A banner that is already up is collapsed. The harness does not click dialogs it has not seen.
+2. The notification shade carries only the action. `Hands off` while the harness has the screen. On the person's turn the shade opens with the trial's `shade` line (or the prompt when `shade` is unset), stays up for 4 seconds, then closes before the bell so keys reach the field. `adb shell` receives one quoted command, because the phone splits a multi-word title into the tag and the text. This Android build has no `cmd notification cancel`, so exit snoozes tag `plektra-qa-presence`.
+3. `settings put global heads_up_notifications_enabled 0` for the session, and the saved value is restored on exit. `cmd statusbar collapse` runs at each hold and after the shade has been read. A banner that is already up is collapsed. The harness does not click dialogs it has not seen.
 4. The gate reads `dumpsys activity activities`. A launcher or the suite's own package proceeds. Any other foreground package gets inversion, the notification, and a 10 second wait. Ctrl-C on the computer refuses, and exit still restores the phone.
 
 Each trial:
 
-1. `hold`, then optional `teleport_to_activity` or a selector `click`, then `focus_and_clear`. `yield_to_human` turns inversion off before the bell. A prepare error is printed and that trial does not wait out the timeout.
+1. `hold`, then optional `teleport_to_activity` or a selector `click`, then `focus_and_clear`. `yield_to_human` turns inversion off, opens the shade on the action line, closes it, then the bell rings. A prepare error is printed and that trial does not wait out the timeout.
 2. Print the prompt with `rich`: the string, chord sequence, or shortcut (Copy, Paste, layer switch). Cue the human with the terminal bell. Call `d.beep()` only when the trial sets `cue_on_device`.
 3. Poll `element.get_text()`, or `d.get_clipboard()` when `verify_mode == "clipboard"`.
 4. Record `time.perf_counter()`:
@@ -272,7 +272,7 @@ Each trial:
    3. `t_complete`: target matched, or the sentinel (default `\n`, or a trailing space, or the trial's sentinel), or timeout.
 5. Score pass or fail, the character diff, the gap since the previous trial, and WPM from `t_first_input` to `t_complete`. Advance within 50 ms. The human does not touch the host keyboard or mouse during the batch.
 
-A trial is a pydantic model: `prompt`, `expect`, `verify_mode` (`text` or `clipboard`), `sentinel`, `timeout_s`, optional `package` / `activity` / `resource_id` / `click_resource_id`, `clear_field` (default true; false on a clipboard trial that must copy the text just typed), optional `cue_on_device`.
+A trial is a pydantic model: `prompt`, `expect`, `verify_mode` (`text` or `clipboard`), `sentinel`, `timeout_s`, optional `shade` (the action the phone shade shows; the prompt stays on the computer), optional `package` / `activity` / `resource_id` / `click_resource_id`, `clear_field` (default true; false on a clipboard trial that must copy the text just typed), optional `cue_on_device`.
 
 ## 6. MCP server (`qa/plektra_qa/mcp_server.py`)
 
@@ -299,24 +299,31 @@ phases:
     resource_id: branislav667.pinnote:id/pin_text
     trials:
       - prompt: "alpha: hello"
+        shade: "Type hello"
         expect: "hello"
         package: branislav667.pinnote
         activity: branislav667.pinnote.NotesActivity
         click_resource_id: branislav667.pinnote:id/notes_fab
       - prompt: "digits: 42"
+        shade: "Type 42"
         expect: "42"
       - prompt: "punctuation: a, b."
+        shade: "Type a, b."
         expect: "a, b."
       - prompt: "backspace the previous word, then type ok"
+        shade: "Backspace the previous word, then type ok"
         expect: "ok"
   - name: two_fields
     trials:
       - prompt: "field A: alpha"
+        shade: "Type alpha"
         expect: "alpha"
         resource_id: branislav667.pinnote:id/pin_text
       - prompt: "Tab or Enter on Plektra, then field B: beta"
+        shade: "Press Tab or Enter, then type beta"
         expect: "beta"
       - prompt: "Ctrl+A, Ctrl+C on Plektra"
+        shade: "Press Ctrl+A, then Ctrl+C"
         expect: "beta"
         verify_mode: clipboard
         clear_field: false
