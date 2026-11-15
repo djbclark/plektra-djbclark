@@ -1,0 +1,26 @@
+# FIRERPA HITL harness. Run from this directory.
+# FIRERPA_CERT is the lamda.pem from the standalone installer. Never commit it.
+
+set dotenv-load
+set shell := ["bash", "-uc"]
+
+FIRERPA_VERSION := env_var_or_default("FIRERPA_VERSION", "10.12")
+
+default:
+    @just --list
+
+# Prove the certificate-authenticated gRPC channel and the expected version.
+qa-connect:
+    cd "{{ justfile_directory() }}" && uv run --python 3.14 plektra-qa connect
+
+# Zero animator duration and enable the UI watcher loop.
+qa-prep:
+    cd "{{ justfile_directory() }}" && uv run --python 3.14 plektra-qa prep
+
+# Run one YAML suite. The human chords; this process only watches the field.
+qa-run suite:
+    cd "{{ justfile_directory() }}" && uv run --python 3.14 plektra-qa run "{{ suite }}"
+
+# MCP server on stdio for an agent session.
+qa-mcp:
+    cd "{{ justfile_directory() }}" && uv run --python 3.14 plektra-qa mcp

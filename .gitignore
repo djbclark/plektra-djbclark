@@ -48,3 +48,7 @@ __pycache__/
 
 # Local STT credentials
 /.env
+
+# FIRERPA HITL harness: local env holds the certificate path, never the key.
+/qa/.env
+/qa/.venv

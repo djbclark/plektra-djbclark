@@ -1,0 +1,29 @@
+name: smoke_chords
+timeout_s: 30
+sentinel: "\n"
+phases:
+  - name: one_screen
+    # One field. The human chords the whole list without a screen change.
+    resource_id: null
+    trials:
+      - prompt: "alpha: hello"
+        expect: "hello"
+      - prompt: "digits: 42"
+        expect: "42"
+      - prompt: "punctuation: a, b."
+        expect: "a, b."
+      - prompt: "backspace the previous word, then type ok"
+        expect: "ok"
+  - name: two_fields
+    trials:
+      - prompt: "field A: alpha"
+        expect: "alpha"
+        package: null
+        activity: null
+        resource_id: null
+      - prompt: "Tab or Enter on Plektra, then field B: beta"
+        expect: "beta"
+        resource_id: null
+      - prompt: "Ctrl+A, Ctrl+C on Plektra"
+        expect: "beta"
+        verify_mode: clipboard

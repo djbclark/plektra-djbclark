@@ -279,7 +279,7 @@ Tools:
 
 ## 7. Sample suite (`qa/suites/smoke_chords.yaml`)
 
-Two phases. The runner loads this file. It does not exist until the package is built.
+Two phases. The runner loads `qa/suites/smoke_chords.yaml`.
 
 ```yaml
 name: smoke_chords
