@@ -3,11 +3,15 @@ timeout_s: 30
 sentinel: "\n"
 phases:
   - name: one_screen
-    # One field. The human chords the whole list without a screen change.
-    resource_id: null
+    # Pinnote's body field. The first trial opens the list and adds a note
+    # when that field is not already on screen.
+    resource_id: branislav667.pinnote:id/pin_text
     trials:
       - prompt: "alpha: hello"
         expect: "hello"
+        package: branislav667.pinnote
+        activity: branislav667.pinnote.NotesActivity
+        click_resource_id: branislav667.pinnote:id/notes_fab
       - prompt: "digits: 42"
         expect: "42"
       - prompt: "punctuation: a, b."
@@ -18,12 +22,10 @@ phases:
     trials:
       - prompt: "field A: alpha"
         expect: "alpha"
-        package: null
-        activity: null
-        resource_id: null
+        resource_id: branislav667.pinnote:id/pin_text
       - prompt: "Tab or Enter on Plektra, then field B: beta"
         expect: "beta"
-        resource_id: null
       - prompt: "Ctrl+A, Ctrl+C on Plektra"
         expect: "beta"
         verify_mode: clipboard
+        clear_field: false

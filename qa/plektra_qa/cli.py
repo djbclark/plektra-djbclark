@@ -11,6 +11,7 @@ from plektra_qa.connection import connect as open_device
 from plektra_qa.connection import require_version
 from plektra_qa.controller import ScreenController
 from plektra_qa.hitl_runner import load_suite, run_chord_batch
+from plektra_qa.screen_gate import ScreenGate, require_serial
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 console = Console()
@@ -57,8 +58,15 @@ def run(suite: Path) -> None:
     """Run a YAML chord suite. A person types on the keyboard; the host does not."""
     trials = load_suite(suite)
     controller = ScreenController(open_device())
-    results = run_chord_batch(controller, trials, console)
-    failed = [item.prompt for item in results if not item.passed]
+    packages = {trial.package for trial in trials if trial.package}
+    gate = ScreenGate(require_serial(), allowed_packages=packages)
+    results = run_chord_batch(controller, trials, console, gate)
+    failed = [item for item in results if not item.passed]
+    for item in failed:
+        console.print(
+            f"fail {item.phase} | {item.prompt} | expect={item.expect!r} "
+            f"observed={item.observed!r} error={item.error}"
+        )
     if failed:
         raise typer.Exit(code=1)
 

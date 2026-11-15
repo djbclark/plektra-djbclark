@@ -13,6 +13,7 @@ from mcp.server.mcpserver import MCPServer
 from plektra_qa.connection import connect, server_status
 from plektra_qa.controller import ScreenController, obj_info
 from plektra_qa.hitl_runner import ChordTrial, run_chord_batch
+from plektra_qa.screen_gate import ScreenGate, require_serial
 
 mcp = MCPServer("plektra-qa-mcp")
 _device: Any = None
@@ -83,9 +84,12 @@ def device_status() -> dict[str, object]:
 def teleport_and_prep_input(package: str, activity: str, field_resource_id: str) -> dict[str, object]:
     """Jump to an activity and focus and clear the named input."""
     _device, controller = _session()
-    controller.teleport_to_activity(package, activity)
-    element = controller.focus_and_clear(resource_id=field_resource_id)
-    return obj_info(element.info())
+    with ScreenGate(require_serial(), allowed_packages={package}) as gate:
+        gate.hold(f"Opening {package}")
+        controller.teleport_to_activity(package, activity)
+        element = controller.focus_and_clear(resource_id=field_resource_id)
+        info = obj_info(element.info())
+    return info
 
 
 @mcp.tool()
@@ -112,12 +116,16 @@ def execute_ui_action(action: str, selector_kwargs: dict[str, Any]) -> str:
     device, _controller = _session()
     if action == "press_key":
         key_name = str(selector_kwargs.get("key", ""))
-        device.press_key(_key(key_name))
+        with ScreenGate(require_serial()) as gate:
+            gate.hold(f"Pressing {key_name}")
+            device.press_key(_key(key_name))
         return f"pressed {key_name}"
     if action not in {"click", "long_click", "clear_text_field"}:
         raise ValueError(f"unsupported action {action}")
-    element = device(**selector_kwargs)
-    getattr(element, action)()
+    with ScreenGate(require_serial()) as gate:
+        gate.hold(action)
+        element = device(**selector_kwargs)
+        getattr(element, action)()
     return action
 
 
@@ -127,7 +135,9 @@ def request_human_chord_batch(trials_json: str) -> str:
     _device, controller = _session()
     raw = json.loads(trials_json)
     trials = [ChordTrial.model_validate(item) for item in raw]
-    results = run_chord_batch(controller, trials)
+    packages = {trial.package for trial in trials if trial.package}
+    gate = ScreenGate(require_serial(), allowed_packages=packages)
+    results = run_chord_batch(controller, trials, gate=gate)
     return json.dumps([item.model_dump() for item in results])
 
 
