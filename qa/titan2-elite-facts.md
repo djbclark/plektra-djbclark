@@ -2,6 +2,7 @@
 
 Fork-only (never in an upstream PR). Maintained by agents during QA runs on the maintainer's Titan 2 Elite.
 Each fact: what, how it was established, date. Update in place; mark superseded facts instead of deleting.
+FIRERPA install and the HITL harness spec: `qa/firerpa-hitl.md`.
 
 ## 1. Device access
 1. adb: over TCP 5555 (Tailscale and LAN) and USB; addresses and serial are in the maintainer's local agent notes,
