@@ -1,5 +1,8 @@
 name: smoke_chords
 timeout_s: 30
+# Spoken prompts: quiet seconds before the action is said again, and how often.
+start_wait_s: 10
+max_reprompts: 3
 sentinel: "\n"
 phases:
   - name: one_screen
@@ -15,9 +18,11 @@ phases:
         click_resource_id: branislav667.pinnote:id/notes_fab
       - prompt: "digits: 42"
         shade: "Type 42"
+        speak: "Type the digits four, two."
         expect: "42"
       - prompt: "punctuation: a, b."
         shade: "Type a, b."
+        speak: "Type: a, comma, space, b, period."
         expect: "a, b."
       - prompt: "backspace the previous word, then type ok"
         shade: "Backspace the previous word, then type ok"
@@ -33,6 +38,7 @@ phases:
         expect: "beta"
       - prompt: "Ctrl+A, Ctrl+C on Plektra"
         shade: "Press Ctrl+A, then Ctrl+C"
+        speak: "Press Control A, then Control C."
         expect: "beta"
         verify_mode: clipboard
         clear_field: false

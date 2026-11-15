@@ -15,10 +15,15 @@ from rich.live import Live
 from rich.table import Table
 
 from plektra_qa.controller import ScreenController
+from plektra_qa.speech import Speaker
 
 POLL_S = 0.025
 STOP_CHECK_S = 1.0
 STOPPED = "stopped from the phone"
+NOT_STARTED = "never started after the spoken prompts"
+HANDS_OFF = "Hands off. Get ready."
+FINISHED = "Testing finished."
+REPROMPT = "Still waiting. "
 
 
 class ChordTrial(BaseModel):
@@ -35,6 +40,14 @@ class ChordTrial(BaseModel):
     clear_field: bool = True
     cue_on_device: bool = False
     shade: str | None = None
+    # Spoken action; defaults to `shade`, then `prompt`. Spell out symbols
+    # here ("comma", "period") because a voice reads them as pauses.
+    speak: str | None = None
+    # Quiet seconds after the spoken prompt ends before it is said again,
+    # and how many times. With a voice, `timeout_s` counts from the first
+    # key that changes the field, not from the prompt.
+    start_wait_s: float = 10
+    max_reprompts: int = 3
     phase: str = ""
 
 
@@ -58,12 +71,16 @@ def load_suite(path: Path) -> list[ChordTrial]:
     data = yaml.safe_load(path.read_text())
     timeout_s = float(data.get("timeout_s", 30))
     sentinel = data.get("sentinel", "\n")
+    start_wait_s = float(data.get("start_wait_s", 10))
+    max_reprompts = int(data.get("max_reprompts", 3))
     trials: list[ChordTrial] = []
     for phase in data.get("phases", []):
         phase_name = str(phase.get("name", ""))
         for raw in phase.get("trials", []):
             fields: dict[str, Any] = {
                 "timeout_s": phase.get("timeout_s", timeout_s),
+                "start_wait_s": phase.get("start_wait_s", start_wait_s),
+                "max_reprompts": phase.get("max_reprompts", max_reprompts),
                 "sentinel": phase.get("sentinel", sentinel),
                 "resource_id": phase.get("resource_id"),
                 "package": phase.get("package"),
@@ -184,8 +201,14 @@ def run_chord_batch(
     trials: list[ChordTrial],
     console: Console | None = None,
     gate: Any | None = None,
+    speaker: Speaker | None = None,
 ) -> list[TrialResult]:
     console = console or Console()
+    if speaker is not None:
+        phrases = [HANDS_OFF]
+        for trial in trials:
+            phrases += [spoken_action(trial), REPROMPT + spoken_action(trial)]
+        speaker.prepare([*phrases, FINISHED])
     device = controller.device
     results: list[TrialResult] = []
     previous_complete: float | None = None
@@ -196,10 +219,68 @@ def run_chord_batch(
             "Swipe away the stop card to leave testing mode."
         )
         with Live(_table(results, ""), console=console, refresh_per_second=8) as live:
-            results = _run_trials(
-                controller, trials, console, gate, device, live, results, previous_complete
-            )
+            try:
+                results = _run_trials(
+                    controller,
+                    trials,
+                    console,
+                    gate,
+                    device,
+                    live,
+                    results,
+                    previous_complete,
+                    speaker,
+                )
+            finally:
+                if speaker is not None:
+                    speaker.say(FINISHED)
     return results
+
+
+def spoken_action(trial: ChordTrial) -> str:
+    return trial.speak or trial.shade or trial.prompt
+
+
+class _Reprompter:
+    """Say the action, then say it again after a human-length quiet spell."""
+
+    def __init__(self, speaker: Speaker | None, trial: ChordTrial) -> None:
+        self.speaker = speaker if speaker is not None and speaker.enabled else None
+        self.text = spoken_action(trial)
+        self.wait_s = trial.start_wait_s
+        self.left = trial.max_reprompts
+        self.quiet_since: float | None = None
+
+    @property
+    def active(self) -> bool:
+        return self.speaker is not None
+
+    def start(self) -> None:
+        if self.speaker is not None:
+            self.speaker.say(self.text)
+
+    def tick(self, now: float) -> bool:
+        """False once every reprompt has had its quiet spell and nobody started."""
+        if self.speaker is None:
+            return True
+        if self.speaker.speaking():
+            self.quiet_since = None
+            return True
+        if self.quiet_since is None:
+            self.quiet_since = now
+            return True
+        if now - self.quiet_since < self.wait_s:
+            return True
+        if self.left <= 0:
+            return False
+        self.left -= 1
+        self.quiet_since = None
+        self.speaker.say(REPROMPT + self.text)
+        return True
+
+    def started(self) -> None:
+        if self.speaker is not None and self.speaker.speaking():
+            self.speaker.stop()
 
 
 def _phone_stopped(gate: Any | None) -> bool:
@@ -223,13 +304,16 @@ def _run_trials(
     live: Live,
     results: list[TrialResult],
     previous_complete: float | None,
+    speaker: Speaker | None = None,
 ) -> list[TrialResult]:
-    for trial in trials:
+    for index, trial in enumerate(trials):
         error = ""
         element = None
         if _phone_stopped(gate):
             error = STOPPED
         if gate is not None and error == "":
+            if index == 0 and speaker is not None:
+                speaker.say(HANDS_OFF)
             try:
                 gate.hold("Preparing the field")
             except Exception as exc:
@@ -247,17 +331,20 @@ def _run_trials(
             except Exception as exc:
                 error = str(exc)
         ready = time.perf_counter()
+        voice = _Reprompter(speaker, trial)
         if error == "":
             console.bell()
             if trial.cue_on_device:
                 device.beep()
+            voice.start()
         baseline = ""
         if error == "" and element is not None:
             baseline = _read_observed(trial, element, device, controller)
         first: float | None = None
         complete: float | None = None
         observed = baseline
-        deadline = ready + trial.timeout_s
+        # With a voice the human gets reprompts instead of a fixed start window.
+        deadline = float("inf") if voice.active else ready + trial.timeout_s
         live.update(_table(results, "" if error else trial.prompt))
         last_stop_check = ready
         while error == "" and time.perf_counter() < deadline:
@@ -271,8 +358,14 @@ def _run_trials(
             changed = observed != baseline
             if changed and first is None and strip_sentinel(observed, trial.sentinel) != "":
                 first = time.perf_counter()
+                voice.started()
+                if voice.active:
+                    deadline = first + trial.timeout_s
             if trial_matched(observed, trial.expect, trial.sentinel):
                 complete = time.perf_counter()
+                break
+            if first is None and not voice.tick(now):
+                error = NOT_STARTED
                 break
             time.sleep(POLL_S)
         if complete is None:
@@ -298,6 +391,6 @@ def _run_trials(
         results.append(result)
         previous_complete = complete
         live.update(_table(results, ""))
-        if error == STOPPED:
+        if error in (STOPPED, NOT_STARTED):
             break
     return results

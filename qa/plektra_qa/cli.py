@@ -12,6 +12,7 @@ from plektra_qa.connection import require_version
 from plektra_qa.controller import ScreenController
 from plektra_qa.hitl_runner import load_suite, run_chord_batch
 from plektra_qa.screen_gate import ScreenGate, require_serial
+from plektra_qa.speech import Speaker
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 console = Console()
@@ -60,7 +61,9 @@ def run(suite: Path) -> None:
     controller = ScreenController(open_device())
     packages = {trial.package for trial in trials if trial.package}
     gate = ScreenGate(require_serial(), allowed_packages=packages)
-    results = run_chord_batch(controller, trials, console, gate)
+    speaker = Speaker()
+    console.print(f"voice: {speaker.backend} (PLEKTRA_QA_VOICE=auto|kokoro|say|espeak|off)")
+    results = run_chord_batch(controller, trials, console, gate, speaker)
     failed = [item for item in results if not item.passed]
     for item in failed:
         console.print(
