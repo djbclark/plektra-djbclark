@@ -15,6 +15,7 @@ from rich.live import Live
 from rich.table import Table
 
 from plektra_qa.controller import ScreenController
+from plektra_qa.keys import Keymap, localise_texts, resolve_keymap
 from plektra_qa.speech import Speaker
 
 POLL_S = 0.025
@@ -67,8 +68,13 @@ class TrialResult(BaseModel):
     error: str = ""
 
 
-def load_suite(path: Path) -> list[ChordTrial]:
+def load_suite(path: Path, keymap: Keymap | None = None) -> list[ChordTrial]:
+    """Read a suite. Key tokens in prompt/shade/speak are expanded with `keymap`
+    (default: the live or profile keymap, see `keys.resolve_keymap`); a bare key
+    name or a token no keycap can produce refuses the whole suite."""
     data = yaml.safe_load(path.read_text())
+    if keymap is None:
+        keymap = resolve_keymap().keymap
     timeout_s = float(data.get("timeout_s", 30))
     sentinel = data.get("sentinel", "\n")
     start_wait_s = float(data.get("start_wait_s", 10))
@@ -90,6 +96,9 @@ def load_suite(path: Path) -> list[ChordTrial]:
             for key, value in raw.items():
                 if value is not None:
                     fields[key] = value
+            fields = localise_texts(
+                fields, keymap, f"{path.name}, phase '{phase_name}', trial {len(trials) + 1}"
+            )
             trials.append(ChordTrial.model_validate(fields))
     return trials
 

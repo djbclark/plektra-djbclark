@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import typer
@@ -11,6 +12,7 @@ from plektra_qa.connection import connect as open_device
 from plektra_qa.connection import require_version
 from plektra_qa.controller import ScreenController
 from plektra_qa.hitl_runner import load_suite, run_chord_batch
+from plektra_qa.keys import Flavor, KeyNamingError, KeyResolutionError, LiveReadError, render, resolve_keymap
 from plektra_qa.screen_gate import ScreenGate, require_serial
 from plektra_qa.speech import Speaker
 
@@ -57,7 +59,13 @@ def prep() -> None:
 @app.command()
 def run(suite: Path) -> None:
     """Run a YAML chord suite. A person types on the keyboard; the host does not."""
-    trials = load_suite(suite)
+    try:
+        resolved = resolve_keymap(on_live_failure="error")
+        console.print(resolved.describe(), markup=False)
+        trials = load_suite(suite, resolved.keymap)
+    except (KeyNamingError, KeyResolutionError, LiveReadError, ValueError) as exc:
+        typer.echo(f"refused: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
     controller = ScreenController(open_device())
     packages = {trial.package for trial in trials if trial.package}
     gate = ScreenGate(require_serial(), allowed_packages=packages)
@@ -80,3 +88,29 @@ def mcp() -> None:
     from plektra_qa.mcp_server import main
 
     main()
+
+
+@app.command("render")
+def render_keys(
+    text: str = typer.Argument(..., help='Text with key tokens, e.g. "<Ctrl+A>, then <Ctrl+C>"'),
+    as_json: bool = typer.Option(False, "--json", help="Print one JSON object instead of lines."),
+) -> None:
+    """Print the screen, shade and spoken versions of text with key tokens.
+
+    Uses the phone's live keymap when ADB_TARGET is set (read-only), else the
+    profile (PLEKTRA_QA_KEYMAP, default qa/keymaps/titan2-elite-baseline.yaml).
+    """
+    try:
+        resolved = resolve_keymap()
+        versions = {
+            flavor.value: render(text, resolved.keymap, flavor) for flavor in Flavor
+        }
+    except (KeyNamingError, KeyResolutionError, LiveReadError, ValueError) as exc:
+        typer.echo(f"refused: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    if as_json:
+        typer.echo(json.dumps({"keymap": resolved.describe(), **versions}, ensure_ascii=False))
+        return
+    typer.echo(resolved.describe())
+    for name, value in versions.items():
+        typer.echo(f"{name}: {value}")

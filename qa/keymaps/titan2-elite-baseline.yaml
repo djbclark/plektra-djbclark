@@ -1,0 +1,112 @@
+# Key profile for the QA harness: the Unihertz Titan 2 Elite in the test baseline.
+#
+# A key goes through three layers: printed keycap -> vendor remap
+# (com.agui.shortcutsettings) -> Plektra's own remap (HardwareKeyRemap).
+# This file describes all three so the harness can say what "your Ctrl" is.
+# A live read from the phone (ADB_TARGET set) wins over this file.
+# Sources: qa/titan2-elite-facts.md sections 2 (keycaps), 3.5 (vendor baseline)
+# and 6/9 (Plektra "Swap right Shift and Enter" on).
+# Use another profile with PLEKTRA_QA_KEYMAP=/path/to/profile.yaml.
+name: titan2-elite-baseline
+device: Unihertz Titan 2 Elite
+# Plektra's id for this keyboard in the stored remap rules.
+remap_profile: titan2elite_qwerty
+
+# Factory keycaps. Order matters: when two keys act as the same function,
+# a key that is that function by factory wins, then the one listed first.
+#   screen / spoken  how the key is named on screen / aloud
+#   where            optional place hint, shown only in the full texts
+#   native           what the key does before any remap: an Android key code,
+#                    or a function name when it has no key code (Fn)
+#   scan             Linux scan code (Plektra's scan rules match it)
+#   vendor           the name in persist.sys.agui_programmable_<name>_key
+keycaps:
+  - id: fn
+    screen: "Fn"
+    spoken: "the key printed F N"
+    native: Fn
+    scan: 251
+    vendor: fn
+  - id: sym
+    screen: "Sym"
+    spoken: "the key printed Sym"
+    native: 63
+    scan: 253
+    vendor: sym
+  - id: shift_l
+    screen: "left ⇧"
+    spoken: "the key printed left shift"
+    where: "in the bottom left corner of the keyboard"
+    native: 59
+    scan: 42
+    vendor: shift_l
+  - id: shift_r
+    screen: "right ⇧"
+    spoken: "the key printed right shift"
+    where: "on the right side of the keyboard"
+    native: 60
+    scan: 54
+    vendor: shift_r
+  - id: enter
+    screen: "⏎"
+    spoken: "the key printed Enter"
+    native: 66
+    scan: 28
+  - id: alt
+    screen: "Alt"
+    spoken: "the key printed Alt"
+    native: 57
+    vendor: alt_l
+  - id: backspace
+    screen: "⌫"
+    spoken: "the backspace key"
+    native: 67
+  - id: space
+    screen: "Space"
+    spoken: "the space bar"
+    native: 62
+  - id: recent
+    # The glyph on this keycap is not verified (facts section 2.1): named by function.
+    screen: "Recent"
+    spoken: "the Recent key"
+    native: 187
+    scan: 580
+    vendor: recent
+  - id: home
+    screen: "○"
+    spoken: "the key printed circle"
+    native: 3
+    scan: 102
+    vendor: home
+  - id: back
+    # The glyph on this keycap is not verified (facts section 2.1): named by function.
+    screen: "Back"
+    spoken: "the Back key"
+    native: 4
+    scan: 158
+    vendor: back
+  - id: func1
+    screen: "orange side key"
+    spoken: "the orange side key"
+    native: Func1
+    scan: 249
+    vendor: func1
+
+# Vendor layer: the Android key code each key types now (a function name works
+# too). A key not listed here, or typing 0, still does its native job.
+# Facts section 3.5, set 2026-11-14.
+vendor:
+  fn: 113        # Ctrl
+  sym: 63        # Sym
+  shift_l: 59    # Shift
+  shift_r: 59    # Shift
+  alt: 58        # Alt
+  recent: 61     # Tab
+  func1: 85      # Media
+
+# Plektra's remap layer, as stored in the hardware_key_remaps pref. A scan
+# rule beats a key rule; a key rule matches the key code the vendor layer
+# delivers. This is the "Swap right Shift and Enter" setting, on.
+plektra_remap:
+  - {match: scan, scan: 54, key: 60, to: 66}   # printed right shift types Enter
+  - {match: key, key: 66, to: 60}              # printed Enter types Shift

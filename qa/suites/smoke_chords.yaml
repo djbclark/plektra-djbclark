@@ -24,8 +24,9 @@ phases:
         shade: "Type a, b."
         speak: "Type: a, comma, space, b, period."
         expect: "a, b."
-      - prompt: "backspace the previous word, then type ok"
-        shade: "Backspace the previous word, then type ok"
+      # Keys are tokens: <Ctrl+A>, <Tab|Enter> (either). See README, "Naming keys".
+      - prompt: "use <Backspace> on the previous word, then type ok"
+        shade: "Use <Backspace> on the previous word, then type ok"
         expect: "ok"
   - name: two_fields
     trials:
@@ -33,12 +34,11 @@ phases:
         shade: "Type alpha"
         expect: "alpha"
         resource_id: branislav667.pinnote:id/pin_text
-      - prompt: "Tab or Enter on Plektra, then field B: beta"
-        shade: "Press Tab or Enter, then type beta"
+      - prompt: "<Tab|Enter> on Plektra, then field B: beta"
+        shade: "Press <Tab|Enter>, then type beta"
         expect: "beta"
-      - prompt: "Ctrl+A, Ctrl+C on Plektra"
-        shade: "Press Ctrl+A, then Ctrl+C"
-        speak: "Press Control A, then Control C."
+      - prompt: "<Ctrl+A>, then <Ctrl+C> on Plektra"
+        shade: "Press <Ctrl+A>, then <Ctrl+C>"
         expect: "beta"
         verify_mode: clipboard
         clear_field: false

@@ -41,7 +41,7 @@ def test_suite_drops_null_overrides_and_keeps_phase_name():
     assert trials[0].package == "branislav667.pinnote"
     assert trials[0].click_resource_id == "branislav667.pinnote:id/notes_fab"
     assert trials[0].shade == "Type hello"
-    assert trials[-2].shade == "Press Tab or Enter, then type beta"
+    assert trials[-2].shade.startswith("Press your Tab or your Enter, then type beta.")
     assert trials[0].sentinel == "\n"
     clipboard = trials[-1]
     assert clipboard.verify_mode == "clipboard"

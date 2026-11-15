@@ -13,6 +13,7 @@ from mcp.server.mcpserver import MCPServer
 from plektra_qa.connection import connect, server_status
 from plektra_qa.controller import ScreenController, obj_info
 from plektra_qa.hitl_runner import ChordTrial, run_chord_batch
+from plektra_qa.keys import localise_texts, resolve_keymap
 from plektra_qa.screen_gate import ScreenGate, require_serial
 from plektra_qa.speech import Speaker
 
@@ -135,7 +136,11 @@ def request_human_chord_batch(trials_json: str) -> str:
     """Block while a person chords the batch. Returns the per-trial report."""
     _device, controller = _session()
     raw = json.loads(trials_json)
-    trials = [ChordTrial.model_validate(item) for item in raw]
+    keymap = resolve_keymap(on_live_failure="error").keymap
+    trials = [
+        ChordTrial.model_validate(localise_texts(item, keymap, f"trial {index}"))
+        for index, item in enumerate(raw, start=1)
+    ]
     packages = {trial.package for trial in trials if trial.package}
     gate = ScreenGate(require_serial(), allowed_packages=packages)
     results = run_chord_batch(controller, trials, gate=gate, speaker=Speaker())

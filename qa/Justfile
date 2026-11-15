@@ -21,6 +21,11 @@ qa-prep:
 qa-run suite:
     cd "{{ justfile_directory() }}" && uv run --python 3.14 plektra-qa run "{{ suite }}"
 
+# Print the screen, shade and spoken versions of key tokens, e.g. just qa-keys "<Ctrl+A>, then <Ctrl+C>".
+# Live keymap from the phone when ADB_TARGET is set, else the profile.
+qa-keys text:
+    cd "{{ justfile_directory() }}" && uv run --python 3.14 plektra-qa render {{ quote(text) }}
+
 # MCP server on stdio for an agent session.
 qa-mcp:
     cd "{{ justfile_directory() }}" && uv run --python 3.14 plektra-qa mcp
