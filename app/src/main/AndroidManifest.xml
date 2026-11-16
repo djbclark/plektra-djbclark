@@ -34,7 +34,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-    <!-- djb/sym-shortcuts: open the notification shade / quick settings from a key command -->
+    <!-- open the notification shade / quick settings from a key command -->
     <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
 
     <!-- djb/toolbox: write Settings.System (Fn -> Ctrl on the Titan 2 Elite). The user grants it on the
@@ -269,6 +269,7 @@
         <!-- Servizio di immissione per tastiera fisica -->
         <service
             android:name=".inputmethod.PhysicalKeyboardInputMethodService"
+            android:directBootAware="true"
             android:label="${imeLabel}"
             android:permission="android.permission.BIND_INPUT_METHOD"
             android:exported="true">
@@ -397,6 +398,16 @@
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_provider_paths" />
+        </provider>
+        <!-- Plektra loads its bundled emoji font itself (EmojiRendering); no downloadable font. -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+                tools:node="remove" />
         </provider>
     </application>
 

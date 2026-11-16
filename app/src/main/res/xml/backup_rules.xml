@@ -12,6 +12,7 @@
          Restored device values stay stale until a matching GATT serial is freshly validated. -->
     <include domain="sharedpref" path="."/>
     <exclude domain="device_sharedpref" path="direct_boot_keyboard_config.xml"/>
+    <exclude domain="device_file" path="direct_boot_files/"/>
     <exclude domain="sharedpref" path="recent_emojis_prefs.xml"/>
     <exclude domain="sharedpref" path="speech_credentials.xml"/>
     <!-- The embedded ADB private key and broker state belong to this phone's pairing. -->
@@ -28,4 +29,7 @@
 
     <!-- Include default/user dictionary file stored in app-private files -->
     <include domain="file" path="user_defaults.json"/>
+
+    <!-- Theme photos referenced by keyboard themes in the shared preferences -->
+    <include domain="file" path="theme-images/"/>
 </full-backup-content>

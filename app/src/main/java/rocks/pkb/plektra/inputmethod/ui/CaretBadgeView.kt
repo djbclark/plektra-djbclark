@@ -40,6 +40,7 @@ class CaretBadgeView(context: Context) : View(context) {
 
     enum class Shape {
         ARROW,
+        CONTROL,
 
         /** The option/alt key symbol, with a spelled-out fallback if the font has no glyph for it. */
         ALT,
@@ -150,7 +151,11 @@ class CaretBadgeView(context: Context) : View(context) {
         }
 
     private fun itemWidth(item: Item): Float =
-        if (item.shape == Shape.ARROW) arrowWidth else glyphPaint(item).measureText(labelOf(item))
+        when (item.shape) {
+            Shape.ARROW -> arrowWidth
+            Shape.CONTROL -> glyphHeight
+            else -> glyphPaint(item).measureText(labelOf(item))
+        }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         var width = 0f
@@ -172,7 +177,9 @@ class CaretBadgeView(context: Context) : View(context) {
         val baseline = haloWidth * 2f + ascent
         for (item in items) {
             val width = itemWidth(item)
-            if (item.shape == Shape.ARROW) {
+            if (item.shape == Shape.CONTROL) {
+                drawControl(canvas, x, baseline - glyphHeight * 0.6f - dp(2f), item)
+            } else if (item.shape == Shape.ARROW) {
                 // Hung from the baseline so the arrow's foot and the words' feet agree.
                 drawArrow(canvas, x, baseline - glyphHeight, item)
             } else {
@@ -207,6 +214,23 @@ class CaretBadgeView(context: Context) : View(context) {
         path.lineTo(x + w * 0.30f, top + h)
         path.lineTo(x + w * 0.30f, headBottom)
         path.lineTo(x, headBottom)
+        path.close()
+        canvas.drawPath(path, halo)
+        fill.color = tint(source)
+        canvas.drawPath(path, fill)
+    }
+
+    private fun drawControl(canvas: Canvas, x: Float, top: Float, source: Item) {
+        val w = glyphHeight
+        val h = glyphHeight * 0.6f
+        val stroke = glyphHeight * 0.14f
+        path.reset()
+        path.moveTo(x, top + h)
+        path.lineTo(x + w / 2f, top)
+        path.lineTo(x + w, top + h)
+        path.lineTo(x + w - stroke, top + h)
+        path.lineTo(x + w / 2f, top + stroke * 1.5f)
+        path.lineTo(x + stroke, top + h)
         path.close()
         canvas.drawPath(path, halo)
         fill.color = tint(source)

@@ -49,6 +49,9 @@ __pycache__/
 # Local STT credentials
 /.env
 
+# Debug-install backups with app data and credentials (scripts/debug_device.py)
+/.local-work/device-backups/
+
 # FIRERPA HITL harness: local env holds the certificate path, never the key.
 /qa/.env
 /qa/.venv

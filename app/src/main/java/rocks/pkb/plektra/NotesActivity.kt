@@ -43,6 +43,9 @@ open class NotesActivity : Activity() {
     private val notePrefs by lazy { getSharedPreferences(notesPreferencesName, MODE_PRIVATE) }
     private val notes by lazy { NotesRepository(notePrefs) }
     private lateinit var selectedNote: NotesRepository.Note
+    private val noteCollectionListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == "collection") closeRemovedNote()
+    }
     private var loadingNote = false
     private val undo = ArrayDeque<String>()
     private val redo = ArrayDeque<String>()
@@ -146,7 +149,8 @@ open class NotesActivity : Activity() {
             tabs.addView(tab)
         }
         navigation.addView(tabs, LinearLayout.LayoutParams(-2, dp(48)))
-        navigation.addView(iconAction(R.drawable.ic_notes_add, R.string.notes_new) { switchNote(notes.create(), focusHeading = true) })
+        navigation.addView(iconAction(R.drawable.ic_notes_add, R.string.notes_new) { switchNote(notes.create(), focusHeading = true) }
+            .apply { id = R.id.notes_new })
         navigation.addView(iconAction(R.drawable.ic_notes_more, R.string.notes_title) { showNotes() })
         var titleOnSeparateLine = false
         root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
@@ -323,6 +327,25 @@ open class NotesActivity : Activity() {
         super.onSaveInstanceState(outState)
     }
 
+    override fun onStart() {
+        super.onStart()
+        notePrefs.registerOnSharedPreferenceChangeListener(noteCollectionListener)
+    }
+
+    override fun onStop() {
+        notePrefs.unregisterOnSharedPreferenceChangeListener(noteCollectionListener)
+        super.onStop()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        closeRemovedNote()
+    }
+
+    private fun closeRemovedNote() {
+        if (!isFinishing && (!notePrefs.contains("collection") || notes.all().none { it.id == selectedNote.id })) finish()
+    }
+
     override fun onPause() {
         saveNote()
         super.onPause()
@@ -341,7 +364,7 @@ open class NotesActivity : Activity() {
     }
 
     private fun saveNote() {
-        if (loadingNote) return
+        if (loadingNote || (!notePrefs.contains("collection") || notes.all().none { it.id == selectedNote.id })) return
         val target = if (heading.hasFocus() || (viewMode == ViewMode.PREVIEW && restoreHeadingFocus)) heading else editor
         notePrefs.edit().putString("heading", heading.text.toString()).putString("body", editor.text.toString())
             .putInt("focus", target.id).putInt("cursor", target.selectionStart.coerceAtLeast(0))

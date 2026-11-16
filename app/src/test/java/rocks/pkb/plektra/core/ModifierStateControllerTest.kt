@@ -32,6 +32,237 @@ class ModifierStateControllerTest {
     }
 
     @Test
+    fun automaticCapsLock_becomesUserOwnedAfterAnyShiftChange() {
+        val controller = ModifierStateController(doubleTapThreshold)
+
+        controller.requestFieldCapsLock()
+        assertTrue(controller.capsLockEnabled)
+        assertTrue(controller.capsLockAutomatic)
+
+        val held = controller.captureLogicalState()
+        controller.capsLockEnabled = false
+        assertFalse(controller.capsLockAutomatic)
+        controller.restoreLogicalState(held)
+        assertTrue(controller.capsLockAutomatic)
+
+        controller.capsLockEnabled = true
+        assertTrue(controller.capsLockEnabled)
+        assertFalse(controller.capsLockAutomatic)
+    }
+
+    @Test
+    fun automaticOneShot_onlyAutoCapOwnsIt() {
+        val controller = ModifierStateController(doubleTapThreshold)
+
+        assertTrue(controller.requestShiftOneShotFromAutoCap())
+        assertTrue(controller.shiftOneShotAutomatic)
+        assertTrue(controller.clearAutomaticShiftOneShot())
+        assertFalse(controller.shiftOneShot)
+
+        controller.handleShiftKeyDown(KeyEvent.KEYCODE_SHIFT_LEFT)
+        controller.handleShiftKeyUp(KeyEvent.KEYCODE_SHIFT_LEFT)
+        assertTrue(controller.shiftOneShot)
+        assertFalse(controller.shiftOneShotAutomatic)
+        // Auto-cap asking again keeps the user's one-shot user-owned, and cannot withdraw it.
+        assertFalse(controller.requestShiftOneShotFromAutoCap())
+        assertFalse(controller.shiftOneShotAutomatic)
+        assertFalse(controller.clearAutomaticShiftOneShot())
+        assertTrue(controller.shiftOneShot)
+
+        controller.consumeShiftOneShot()
+        controller.shiftOneShot = true
+        assertFalse(controller.shiftOneShotAutomatic)
+    }
+
+    @Test
+    fun automaticOneShot_originEndsWithConsumeResetOrCapsLock() {
+        val controller = ModifierStateController(doubleTapThreshold)
+
+        controller.requestShiftOneShotFromAutoCap()
+        controller.consumeShiftOneShot()
+        assertFalse(controller.shiftOneShotAutomatic)
+
+        controller.requestShiftOneShotFromAutoCap()
+        controller.resetModifiers(preserveNavMode = false, onNavModeCancelled = {})
+        assertFalse(controller.shiftOneShotAutomatic)
+
+        controller.requestShiftOneShotFromAutoCap()
+        controller.clearShiftState()
+        assertFalse(controller.shiftOneShotAutomatic)
+
+        controller.requestShiftOneShotFromAutoCap()
+        controller.capsLockEnabled = true
+        assertFalse(controller.shiftOneShotAutomatic)
+        assertFalse(controller.requestShiftOneShotFromAutoCap())
+        assertEquals(ShiftState.CAPS, controller.shiftState)
+    }
+
+    @Test
+    fun holdRestore_keepsOneShotOrigin() {
+        val controller = ModifierStateController(doubleTapThreshold)
+
+        controller.requestShiftOneShotFromAutoCap()
+        val automatic = controller.captureLogicalState()
+        controller.consumeShiftOneShot()
+        controller.restoreLogicalState(automatic)
+        assertTrue(controller.shiftOneShot)
+        assertTrue(controller.shiftOneShotAutomatic)
+
+        controller.consumeShiftOneShot()
+        controller.handleShiftKeyDown(KeyEvent.KEYCODE_SHIFT_LEFT)
+        controller.handleShiftKeyUp(KeyEvent.KEYCODE_SHIFT_LEFT)
+        val manual = controller.captureLogicalState()
+        controller.consumeShiftOneShot()
+        controller.restoreLogicalState(manual)
+        assertTrue(controller.shiftOneShot)
+        assertFalse(controller.shiftOneShotAutomatic)
+
+        // A field restart during the hold restores the one-shot with its origin.
+        controller.clearFieldCapsLockRequest()
+        controller.restoreLogicalState(automatic)
+        assertTrue(controller.shiftOneShotAutomatic)
+        controller.clearFieldCapsLockRequest()
+        controller.restoreLogicalState(manual)
+        assertTrue(controller.shiftOneShot)
+        assertFalse(controller.shiftOneShotAutomatic)
+    }
+
+    @Test
+    fun uncasedLayout_dropsAutomaticOneShotAndItsOrigin() {
+        var cased = true
+        val controller = ModifierStateController(doubleTapThreshold) { cased }
+
+        controller.requestShiftOneShotFromAutoCap()
+        cased = false
+        controller.onLayoutChanged()
+
+        assertFalse(controller.shiftOneShot)
+        assertFalse(controller.shiftOneShotAutomatic)
+    }
+
+    @Test
+    fun fieldCapsLock_keepsUserCapsLockUserOwned() {
+        val controller = ModifierStateController(doubleTapThreshold)
+        controller.capsLockEnabled = true
+
+        controller.requestFieldCapsLock()
+
+        assertTrue(controller.capsLockEnabled)
+        assertFalse(controller.capsLockAutomatic)
+    }
+
+    @Test
+    fun fieldCapsLock_waitsForCasedLayoutAndUserCapsLockStays() {
+        var cased = false
+        val controller = ModifierStateController(doubleTapThreshold) { cased }
+
+        controller.requestFieldCapsLock()
+        assertFalse(controller.capsLockEnabled)
+
+        cased = true
+        controller.onLayoutChanged()
+        assertTrue(controller.capsLockAutomatic)
+
+        cased = false
+        controller.onLayoutChanged()
+        assertFalse(controller.capsLockEnabled)
+
+        controller.capsLockEnabled = true
+        cased = true
+        controller.onLayoutChanged()
+        cased = false
+        controller.onLayoutChanged()
+        assertTrue(controller.capsLockEnabled)
+        assertFalse(controller.capsLockAutomatic)
+    }
+
+    @Test
+    fun restoreAfterLayoutChange_appliesFieldCapsLockToCurrentLayout() {
+        var cased = true
+        val controller = ModifierStateController(doubleTapThreshold) { cased }
+        controller.requestFieldCapsLock()
+
+        val held = controller.captureLogicalState()
+        controller.capsLockEnabled = false
+        cased = false
+        controller.onLayoutChanged()
+        controller.restoreLogicalState(held)
+        assertFalse(controller.capsLockEnabled)
+
+        val heldOnUncased = controller.captureLogicalState()
+        controller.shiftOneShot = true
+        cased = true
+        controller.onLayoutChanged()
+        controller.restoreLogicalState(heldOnUncased)
+        assertTrue(controller.capsLockAutomatic)
+    }
+
+    @Test
+    fun restoreAfterLayoutChange_dropsOneShotOnUncasedLayout() {
+        var cased = true
+        val controller = ModifierStateController(doubleTapThreshold) { cased }
+        controller.requestShiftOneShotFromAutoCap()
+
+        val held = controller.captureLogicalState()
+        controller.shiftOneShot = false
+        cased = false
+        controller.onLayoutChanged()
+        controller.restoreLogicalState(held)
+
+        assertEquals(ShiftState.OFF, controller.shiftState)
+    }
+
+    @Test
+    fun restoreAfterFieldRestart_appliesTheCurrentFieldRequestInsteadOfTheCapturedOne() {
+        var cased = false
+        val controller = ModifierStateController(doubleTapThreshold) { cased }
+        controller.requestFieldCapsLock()
+
+        // Suspended request captured on an uncased layout, then the field drops it.
+        val heldOnUncased = controller.captureLogicalState()
+        controller.clearFieldCapsLockRequest()
+        controller.restoreLogicalState(heldOnUncased)
+        cased = true
+        controller.onLayoutChanged()
+        assertFalse(controller.capsLockEnabled)
+
+        // Automatic Caps Lock captured on a cased layout, then the field drops it.
+        controller.requestFieldCapsLock()
+        assertTrue(controller.capsLockAutomatic)
+        val heldOnCased = controller.captureLogicalState()
+        controller.capsLockEnabled = false
+        controller.clearFieldCapsLockRequest()
+        controller.restoreLogicalState(heldOnCased)
+        assertFalse(controller.capsLockEnabled)
+
+        // A restart that keeps the request applies it to the current layout.
+        controller.requestFieldCapsLock()
+        val heldBeforeRestart = controller.captureLogicalState()
+        controller.capsLockEnabled = false
+        controller.clearFieldCapsLockRequest()
+        controller.requestFieldCapsLock()
+        cased = false
+        controller.onLayoutChanged()
+        controller.restoreLogicalState(heldBeforeRestart)
+        assertFalse(controller.capsLockEnabled)
+        cased = true
+        controller.onLayoutChanged()
+        assertTrue(controller.capsLockAutomatic)
+    }
+
+    @Test
+    fun restoreAfterFieldRestart_keepsUserCapsLock() {
+        val controller = ModifierStateController(doubleTapThreshold)
+        controller.capsLockEnabled = true
+        val held = controller.captureLogicalState()
+        controller.capsLockEnabled = false
+        controller.clearFieldCapsLockRequest()
+        controller.restoreLogicalState(held)
+        assertTrue(controller.capsLockEnabled)
+        assertFalse(controller.capsLockAutomatic)
+    }
+
+    @Test
     fun testShiftTransitions() {
         val controller = ModifierStateController(doubleTapThreshold)
         
@@ -475,65 +706,55 @@ class ModifierStateControllerTest {
     }
 
     @Test
-    fun userTapOneShot_isRemembered_andConsumeClearsIt() {
+    fun userTapOneShot_isNotAutomatic_andConsumeClearsIt() {
         val controller = ModifierStateController(doubleTapThreshold)
         controller.handleShiftKeyDown(KeyEvent.KEYCODE_SHIFT_RIGHT)
         controller.handleShiftKeyUp(KeyEvent.KEYCODE_SHIFT_RIGHT)
-        controller.markShiftOneShotFromUserTap(true)
 
         assertTrue(controller.shiftOneShot)
-        assertTrue(controller.shiftOneShotFromUserTap)
+        assertFalse(controller.shiftOneShotAutomatic)
 
         assertTrue(controller.consumeShiftOneShot())
-        assertFalse(controller.shiftOneShotFromUserTap)
+        assertFalse(controller.shiftOneShot)
+        // Nothing to withdraw: the one-shot was the user's, not auto-capitalization's.
+        assertFalse(controller.clearAutomaticShiftOneShot())
     }
 
     @Test
-    fun autoCapRearm_afterUserTapConsumed_isNotAUserOneShot() {
+    fun autoCapRearm_afterUserTapConsumed_isAutomaticAgain() {
         val controller = ModifierStateController(doubleTapThreshold)
         controller.handleShiftKeyDown(KeyEvent.KEYCODE_SHIFT_RIGHT)
         controller.handleShiftKeyUp(KeyEvent.KEYCODE_SHIFT_RIGHT)
-        controller.markShiftOneShotFromUserTap(true)
-        // A touch cursor move consumes the one-shot and auto-capitalization arms it again.
+        // A touch cursor move consumes the user's one-shot and auto-capitalization arms it again.
         controller.consumeShiftOneShot()
         assertTrue(controller.requestShiftOneShotFromAutoCap())
 
         assertTrue(controller.shiftOneShot)
-        assertFalse(controller.shiftOneShotFromUserTap)
+        assertTrue(controller.shiftOneShotAutomatic)
     }
 
     @Test
-    fun userOriginMark_needsAnArmedOneShot_andDiesWithEveryStateChange() {
+    fun automaticOrigin_needsAnArmedOneShot() {
         val controller = ModifierStateController(doubleTapThreshold)
-        controller.markShiftOneShotFromUserTap(true)
-        assertFalse(controller.shiftOneShotFromUserTap)
-
-        controller.shiftOneShot = true
-        controller.markShiftOneShotFromUserTap(true)
-        assertTrue(controller.shiftOneShotFromUserTap)
-        controller.capsLockEnabled = true
-        controller.capsLockEnabled = false
-        controller.shiftOneShot = true
-        assertFalse(controller.shiftOneShotFromUserTap)
-
-        controller.markShiftOneShotFromUserTap(true)
-        controller.clearShiftState()
-        controller.shiftOneShot = true
-        assertFalse(controller.shiftOneShotFromUserTap)
+        // Auto-capitalization asks while Caps Lock is on: nothing is armed, so nothing is automatic.
+        controller.requestFieldCapsLock()
+        assertFalse(controller.requestShiftOneShotFromAutoCap())
+        assertFalse(controller.shiftOneShotAutomatic)
     }
 
     @Test
     fun restoredLogicalState_keepsTheOriginOfItsOneShot() {
         val controller = ModifierStateController(doubleTapThreshold)
-        controller.shiftOneShot = true
-        controller.markShiftOneShotFromUserTap(true)
+        assertTrue(controller.requestShiftOneShotFromAutoCap())
         val captured = controller.captureLogicalState()
+        // A Shift tap after the snapshot makes the current one-shot the user's.
         controller.consumeShiftOneShot()
-        controller.shiftOneShot = true
-        assertFalse(controller.shiftOneShotFromUserTap)
+        controller.handleShiftKeyDown(KeyEvent.KEYCODE_SHIFT_LEFT)
+        controller.handleShiftKeyUp(KeyEvent.KEYCODE_SHIFT_LEFT)
+        assertFalse(controller.shiftOneShotAutomatic)
 
         controller.restoreLogicalState(captured)
 
-        assertTrue(controller.shiftOneShotFromUserTap)
+        assertTrue(controller.shiftOneShotAutomatic)
     }
 }

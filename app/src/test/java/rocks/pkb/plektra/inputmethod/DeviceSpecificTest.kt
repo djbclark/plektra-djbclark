@@ -3,6 +3,7 @@ package rocks.pkb.plektra.inputmethod
 import android.view.KeyEvent
 import android.view.InputDevice
 import rocks.pkb.plektra.data.layout.LayoutMappingRepository
+import rocks.pkb.plektra.data.mappings.KeyMappingLoader
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -275,6 +276,75 @@ class DeviceSpecificTest {
 
         val remapped = DeviceSpecific.remapHardwareKeyEvent(KeyEvent.KEYCODE_A, input)
         assertEquals(KeyEvent.KEYCODE_A, remapped.keyCode)
+        assertSame(input, remapped.event)
+    }
+
+    @Test
+    fun q25QwertzPositions_keepLettersAndDeviceSymbolsTogether() {
+        DeviceSpecific.setBuildFingerprintForTests(
+            brand = "zinwa",
+            manufacturer = "zinwa",
+            model = "Q25",
+            device = "Q25",
+            product = "q25"
+        )
+        val context = RuntimeEnvironment.getApplication()
+        val symbols = KeyMappingLoader.loadStringMappings(
+            context.assets,
+            "devices/Q25/device_sym_key_mappings.json"
+        )
+
+        try {
+            LayoutMappingRepository.loadLayout(context.assets, "german_multitap_qwertz", context)
+            for (profile in listOf<String?>(null, "Q25")) {
+                for (action in listOf(KeyEvent.ACTION_DOWN, KeyEvent.ACTION_UP)) {
+                    for ((scanCode, reportedKeyCode, canonicalKeyCode) in listOf(
+                        Triple(21, KeyEvent.KEYCODE_Z, KeyEvent.KEYCODE_Y),
+                        Triple(44, KeyEvent.KEYCODE_Y, KeyEvent.KEYCODE_Z)
+                    )) {
+                        val input = keyEvent(action, reportedKeyCode, 0, scanCode)
+                        val remapped = DeviceSpecific.remapHardwareKeyEvent(reportedKeyCode, input, profile)
+                        assertEquals(canonicalKeyCode, remapped.keyCode)
+                        assertEquals(canonicalKeyCode, remapped.event?.keyCode)
+                        assertEquals(scanCode, remapped.event?.scanCode)
+                        assertEquals(action, remapped.event?.action)
+                        assertEquals(
+                            if (scanCode == 21) 'z' else 'y',
+                            LayoutMappingRepository.getCharacter(remapped.keyCode, isShift = false)
+                        )
+                        assertEquals(if (scanCode == 21) ")" else "7", symbols[remapped.keyCode])
+                    }
+                }
+            }
+        } finally {
+            LayoutMappingRepository.loadLayout(context.assets, "qwerty", context)
+        }
+    }
+
+    @Test
+    fun q25PositionNormalization_preservesModifierRemapping() {
+        val input = keyEvent(
+            KeyEvent.ACTION_DOWN,
+            KeyEvent.KEYCODE_Y,
+            KeyEvent.META_SHIFT_RIGHT_ON or KeyEvent.META_ALT_RIGHT_ON,
+            scanCode = 44
+        )
+        val remapped = DeviceSpecific.remapHardwareKeyEvent(KeyEvent.KEYCODE_Y, input, "Q25")
+        assertEquals(KeyEvent.KEYCODE_Z, remapped.keyCode)
+        val event = remapped.event ?: error("Expected remapped event")
+        assertEquals(KeyEvent.KEYCODE_Z, event.keyCode)
+        assertEquals(44, event.scanCode)
+        assertTrue(event.isCtrlPressed)
+        assertTrue((event.metaState and KeyEvent.META_SYM_ON) != 0)
+        assertFalse(event.isShiftPressed)
+        assertFalse(event.isAltPressed)
+    }
+
+    @Test
+    fun q25UnknownScanCode_preservesReportedKey() {
+        val input = keyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_Y, 0, scanCode = 0)
+        val remapped = DeviceSpecific.remapHardwareKeyEvent(KeyEvent.KEYCODE_Y, input, "Q25")
+        assertEquals(KeyEvent.KEYCODE_Y, remapped.keyCode)
         assertSame(input, remapped.event)
     }
 

@@ -16,6 +16,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.size
@@ -46,11 +48,20 @@ internal fun VirtualKeyboardBehaviorSettingsScreen(
     var numberRowEnabled by remember {
         mutableStateOf(SettingsManager.getSoftwareKeyboardNumberRowEnabled(context))
     }
+    var emojiPageInCycle by remember {
+        mutableStateOf(SettingsManager.getSoftwareKeyboardEmojiPageInCycle(context))
+    }
+    var hardwareKeypadAutoOpen by remember {
+        mutableStateOf(SettingsManager.getHardwareKeypadAutoOpen(context))
+    }
     var leftModifierKey by remember {
         mutableStateOf(SettingsManager.getSoftwareKeyboardLeftModifierKey(context))
     }
     var rightModifierKey by remember {
         mutableStateOf(SettingsManager.getSoftwareKeyboardRightModifierKey(context))
+    }
+    var keyHintsEnabled by remember {
+        mutableStateOf(SettingsManager.getSoftwareKeyboardKeyHintsEnabled(context))
     }
     var showSoftwareKeyboardLayoutStyleMenu by remember { mutableStateOf(false) }
     var ctrlShortcutDisplay by remember { mutableStateOf(SettingsManager.getSoftwareCtrlShortcutDisplay(context)) }
@@ -72,6 +83,9 @@ internal fun VirtualKeyboardBehaviorSettingsScreen(
                 "software_keyboard_long_press_layer_popup_enabled" -> {
                     longPressLayerPopupEnabled =
                         SettingsManager.getSoftwareKeyboardLongPressLayerPopupEnabled(context)
+                }
+                SettingsManager.KEY_SOFTWARE_KEYBOARD_KEY_HINTS_ENABLED -> {
+                    keyHintsEnabled = SettingsManager.getSoftwareKeyboardKeyHintsEnabled(context)
                 }
                 "software_keyboard_long_press_layer_popup_below_key" -> {
                     longPressLayerPopupBelowKey =
@@ -253,6 +267,28 @@ internal fun VirtualKeyboardBehaviorSettingsScreen(
                 }
             )
 
+            ModifierTapLatchRow(
+                title = stringResource(R.string.software_keyboard_emoji_page_in_cycle_title),
+                linkId = "on_screen.emoji_page_in_cycle",
+                description = stringResource(R.string.software_keyboard_emoji_page_in_cycle_description),
+                checked = emojiPageInCycle,
+                onCheckedChange = { enabled ->
+                    emojiPageInCycle = enabled
+                    SettingsManager.setSoftwareKeyboardEmojiPageInCycle(context, enabled)
+                }
+            )
+
+            ModifierTapLatchRow(
+                title = stringResource(R.string.hardware_keypad_auto_open_title),
+                linkId = "on_screen.hardware_keypad_auto_open",
+                description = stringResource(R.string.hardware_keypad_auto_open_description),
+                checked = hardwareKeypadAutoOpen,
+                onCheckedChange = { enabled ->
+                    hardwareKeypadAutoOpen = enabled
+                    SettingsManager.setHardwareKeypadAutoOpen(context, enabled)
+                }
+            )
+
             Text(
                 text = stringResource(R.string.software_keyboard_modifier_keys_title),
                 style = MaterialTheme.typography.titleSmall,
@@ -328,6 +364,17 @@ internal fun VirtualKeyboardBehaviorSettingsScreen(
             }
 
             VirtualKeyboardSectionTitle(stringResource(R.string.on_screen_keyboard_section_appearance))
+            ModifierTapLatchRow(
+                title = stringResource(R.string.software_keyboard_key_hints_title),
+                linkId = "on_screen.key_hints",
+                wrapText = true,
+                description = stringResource(R.string.software_keyboard_key_hints_description),
+                checked = keyHintsEnabled,
+                onCheckedChange = { enabled ->
+                    keyHintsEnabled = enabled
+                    SettingsManager.setSoftwareKeyboardKeyHintsEnabled(context, enabled)
+                }
+            )
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -451,17 +498,19 @@ private fun ModifierTapLatchRow(
     description: String,
     checked: Boolean,
     indent: Boolean = false,
+    wrapText: Boolean = false,
     onCheckedChange: (Boolean) -> Unit
 ) {
     Surface(
         modifier = Modifier.settingRow(linkId)
             .fillMaxWidth()
-            .height(74.dp)
+            .then(if (wrapText) Modifier.heightIn(min = 74.dp) else Modifier.height(74.dp))
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = if (indent) 52.dp else 16.dp, end = 16.dp),
+                .padding(start = if (indent) 52.dp else 16.dp, end = 16.dp)
+                .then(if (wrapText) Modifier.padding(vertical = 12.dp) else Modifier),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -478,16 +527,17 @@ private fun ModifierTapLatchRow(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Medium,
-                    maxLines = 1
+                    maxLines = if (wrapText) Int.MAX_VALUE else 1
                 )
                 Text(
                     text = description,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2
+                    maxLines = if (wrapText) Int.MAX_VALUE else 2
                 )
             }
             Switch(
+                modifier = if (wrapText) Modifier.semantics { contentDescription = title } else Modifier,
                 checked = checked,
                 onCheckedChange = onCheckedChange
             )

@@ -2,6 +2,7 @@
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="device_sharedpref" path="direct_boot_keyboard_config.xml"/>
+        <exclude domain="device_file" path="direct_boot_files/"/>
         <!-- Include SharedPreferences for cloud backup, including Clicks snapshots and learned
              SOC calibration. Restored device values remain stale until GATT validates identity. -->
         <include domain="sharedpref" path="."/>
@@ -21,9 +22,13 @@
 
         <!-- Include default/user dictionary file stored in app-private files -->
         <include domain="file" path="user_defaults.json"/>
+
+        <!-- Theme photos referenced by keyboard themes in the shared preferences -->
+        <include domain="file" path="theme-images/"/>
     </cloud-backup>
     <device-transfer>
         <exclude domain="device_sharedpref" path="direct_boot_keyboard_config.xml"/>
+        <exclude domain="device_file" path="direct_boot_files/"/>
         <exclude domain="sharedpref" path="speech_credentials.xml"/>
         <exclude domain="sharedpref" path="embedded_adb.xml"/>
     </device-transfer>

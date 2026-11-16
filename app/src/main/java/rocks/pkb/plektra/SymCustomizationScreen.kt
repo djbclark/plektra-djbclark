@@ -72,6 +72,9 @@ fun SymCustomizationScreen(
     var emojiPickerExpandedHeight by remember {
         mutableStateOf(SettingsManager.getEmojiPickerExpandedHeight(context))
     }
+    var emojiPickerStaysOpen by remember {
+        mutableStateOf(SettingsManager.getEmojiPickerStaysOpen(context))
+    }
 
     val titan2LayoutEnabled = remember {
         SettingsManager.isTitan2LayoutEnabled(context)
@@ -644,6 +647,8 @@ fun SymCustomizationScreen(
             }
         }
 
+        EmojiPagesSettingsSection()
+
         HorizontalDivider()
 
         }
@@ -651,18 +656,39 @@ fun SymCustomizationScreen(
         if (editingLayerPage != null) {
         // Customizable keyboard grid - uses the same layout as the real keyboard
         val statusBarController = remember { StatusBarController(context) }
+        // With the layer's pages on, Q and P turn them: shown on the grid and explained, their
+        // own mappings kept
+        val pagedLayer = remember(editingLayerPage) {
+            if (editingLayerPage == 2) EmojiPagesSettings.symbolPagesEnabled(context) else EmojiPagesSettings.emojiPagesEnabled(context)
+        }
+        val navigationKeys = if (pagedLayer) {
+            mapOf(
+                rocks.pkb.plektra.core.SymPagedLayer.PREVIOUS_KEY to rocks.pkb.plektra.core.SymPagedLayer.PREVIOUS_LABEL,
+                rocks.pkb.plektra.core.SymPagedLayer.NEXT_KEY to rocks.pkb.plektra.core.SymPagedLayer.NEXT_LABEL
+            )
+        } else {
+            emptyMap()
+        }
+        if (pagedLayer) {
+            Text(
+                text = stringResource(R.string.sym_paged_navigation_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+        }
 
         // Show the grid based on the selected tab
         when (editingLayerPage) {
             1 -> {
                 // Emoji tab
-                key(symMappingsPage1, titan2LayoutEnabled) {
+                key(symMappingsPage1, titan2LayoutEnabled, pagedLayer) {
                     AndroidView(
                         factory = { ctx ->
                             statusBarController.createCustomizableEmojiKeyboard(symMappingsPage1, { keyCode, emoji ->
                                 selectedKeyCode = keyCode
                                 showEmojiPicker = true
-                            }, page = 1)
+                            }, page = 1, navigationKeys = navigationKeys)
                         },
                         update = { _ ->
                             // The key(titan2LayoutEnabled) will trigger a full recomposition/re-factory
@@ -673,13 +699,13 @@ fun SymCustomizationScreen(
             }
             2 -> {
                 // Characters tab
-                key(symMappingsPage2, titan2LayoutEnabled) {
+                key(symMappingsPage2, titan2LayoutEnabled, pagedLayer) {
                     AndroidView(
                         factory = { ctx ->
                             statusBarController.createCustomizableEmojiKeyboard(symMappingsPage2, { keyCode, character ->
                                 selectedKeyCode = keyCode
                                 showCharacterPicker = true
-                            }, page = 2)
+                            }, page = 2, navigationKeys = navigationKeys)
                         },
                         update = { _ ->
                             // The key(titan2LayoutEnabled) will trigger a full recomposition/re-factory
@@ -753,6 +779,48 @@ fun SymCustomizationScreen(
                     onCheckedChange = { enabled ->
                         emojiPickerExpandedHeight = enabled
                         SettingsManager.setEmojiPickerExpandedHeight(context, enabled)
+                    }
+                )
+            }
+        }
+
+        HorizontalDivider()
+
+        Surface(
+            modifier = Modifier.settingRow("sym.emoji_picker_stays_open")
+                .fillMaxWidth()
+                .heightIn(min = 64.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Keyboard,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.emoji_picker_stays_open_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = stringResource(R.string.emoji_picker_stays_open_description),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = emojiPickerStaysOpen,
+                    onCheckedChange = { enabled ->
+                        emojiPickerStaysOpen = enabled
+                        SettingsManager.setEmojiPickerStaysOpen(context, enabled)
                     }
                 )
             }

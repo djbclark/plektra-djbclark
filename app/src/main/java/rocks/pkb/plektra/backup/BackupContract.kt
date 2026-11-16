@@ -255,8 +255,13 @@ internal object BackupPreferenceContract {
             "caret_modifier_badge" to PreferenceValueType.BOOLEAN,
             "caret_badge_armed_color" to PreferenceValueType.INT,
             "caret_badge_locked_color" to PreferenceValueType.INT,
+            "caret_badge_custom_colors" to PreferenceValueType.BOOLEAN,
             "auto_show_keyboard" to PreferenceValueType.BOOLEAN,
+            "auto_show_respect_app_visibility" to PreferenceValueType.BOOLEAN,
+            "hardware_keypad_auto_open" to PreferenceValueType.BOOLEAN,
+            "software_keyboard_emoji_page_in_cycle" to PreferenceValueType.BOOLEAN,
             "keyboard_bar_show_on_launcher" to PreferenceValueType.BOOLEAN,
+            "keyboard_bar_hidden_apps" to PreferenceValueType.STRING_SET,
             "accessibility_live_announcements_enabled" to PreferenceValueType.BOOLEAN,
             "accessibility_read_second_row_enabled" to PreferenceValueType.BOOLEAN,
             "accessibility_suggestions_announcement_delay_ms" to PreferenceValueType.LONG,
@@ -316,6 +321,14 @@ internal object BackupPreferenceContract {
             "alt_modifier_binding" to PreferenceValueType.STRING,
             "sym_auto_close" to PreferenceValueType.BOOLEAN,
             "emoji_picker_expanded_height" to PreferenceValueType.BOOLEAN,
+            "emoji_picker_stays_open" to PreferenceValueType.BOOLEAN,
+            "emoji_style" to PreferenceValueType.STRING,
+            "emoji_default_skin_tone" to PreferenceValueType.INT,
+            "emoji_layer_pages" to PreferenceValueType.BOOLEAN,
+            "symbols_layer_pages" to PreferenceValueType.BOOLEAN,
+            "kaomoji_pages_placement" to PreferenceValueType.STRING,
+            "emoji_picker_symbols_kaomoji" to PreferenceValueType.BOOLEAN,
+            "keyboard_bar_text_scale" to PreferenceValueType.FLOAT,
             "swipe_incremental_threshold" to PreferenceValueType.FLOAT,
             "static_variation_bar_mode" to PreferenceValueType.BOOLEAN,
             "static_variation_bar_preset" to PreferenceValueType.STRING,
@@ -385,6 +398,7 @@ internal object BackupPreferenceContract {
             "software_keyboard_layout_style" to PreferenceValueType.STRING,
             "software_ctrl_shortcut_display" to PreferenceValueType.STRING,
             "software_keyboard_number_row_enabled" to PreferenceValueType.BOOLEAN,
+            "software_keyboard_key_hints_enabled" to PreferenceValueType.BOOLEAN,
             "software_keyboard_nearest_key_touch_enabled" to PreferenceValueType.BOOLEAN,
             "software_keyboard_left_modifier_key" to PreferenceValueType.STRING,
             "software_keyboard_right_modifier_key" to PreferenceValueType.STRING,
@@ -451,7 +465,7 @@ internal object BackupPreferenceContract {
             "shift_backspace_delete" to PreferenceValueType.BOOLEAN,
             "alt_backspace_delete" to PreferenceValueType.BOOLEAN,
             "backspace_at_start_delete" to PreferenceValueType.BOOLEAN,
-            // djb/sym-shortcuts: Sym+C/V/X/A edit shortcuts toggle
+            // Sym+C/V/X/A edit shortcuts toggle
             "sym_edit_shortcuts" to PreferenceValueType.BOOLEAN
         ),
         dynamicKeys = listOf(
@@ -498,6 +512,7 @@ internal object BackupPreferenceContract {
         // another phone's record could put a stale value back on this one.
         "ring_backlight_prev_captured" to "transient runtime state",
         "ring_backlight_prev" to "transient runtime state",
+        "compact_software_key_height_migrated_v1" to "migration marker",
         "last_seen_whats_new_version" to "release UI state",
         "nav_mode_default_mappings_version" to "default-migration marker",
         "nav_mode_mappings_updated" to "runtime refresh marker",
@@ -511,6 +526,7 @@ internal object BackupPreferenceContract {
         "variations_updated" to "runtime refresh marker",
         "slim_mode_active" to "runtime-derived state",
         "software_keyboard_mode_runtime_override" to "runtime-derived state",
+        "field_scoped_virtual_previous_override" to "runtime-derived state",
         "typing_sound_updated_at" to "runtime refresh marker",
         "clicks_bluetooth_permission_explained" to "permission UI state",
         "clicks_manual_charging_until" to "transient runtime state"
@@ -570,6 +586,7 @@ object PreferenceSchemas {
         "nav_mode_mappings_updated" to PreferenceValueType.LONG,
         "slim_mode_active" to PreferenceValueType.BOOLEAN,
         "software_keyboard_mode_runtime_override" to PreferenceValueType.STRING,
+        "field_scoped_virtual_previous_override" to PreferenceValueType.STRING,
         // Accepted only when importing backups written before the Slim mode rename.
         "pastierina_mode_override" to PreferenceValueType.STRING,
         "pastierina_status_bar_slots_left" to PreferenceValueType.STRING,

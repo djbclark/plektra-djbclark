@@ -183,7 +183,17 @@ object DeviceSpecific {
         keyCode: Int,
         event: KeyEvent?
     ): RemappedHardwareEvent {
-        return patchKeyCodeIfNeeded(keyCode, event, canonicalPositionKeyCode(model, keyCode, event))
+        val usesCanonicalAlphabeticPositions =
+            model == KeyboardModel.KEY2 || model == KeyboardModel.Q25 ||
+                model == KeyboardModel.CLICKS_POWER
+        if (!usesCanonicalAlphabeticPositions) {
+            return RemappedHardwareEvent(keyCode, event)
+        }
+
+        val canonicalKeyCode = PhysicalKeyPositionNormalizer
+            .canonicalAlphabeticKeyCode(event?.scanCode ?: -1)
+            ?: keyCode
+        return patchKeyCodeIfNeeded(keyCode, event, canonicalKeyCode)
     }
 
     private fun q25NormalizedKeyCode(keyCode: Int): Int = when (keyCode) {

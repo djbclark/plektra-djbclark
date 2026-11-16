@@ -8,6 +8,7 @@ import rocks.pkb.plektra.DeviceIdentitySnapshot
 import rocks.pkb.plektra.AppBroadcastActions
 import rocks.pkb.plektra.SettingsManager
 import rocks.pkb.plektra.inputmethod.DeviceSpecific
+import rocks.pkb.plektra.inputmethod.DirectBootKeyboardConfig
 import rocks.pkb.plektra.inputmethod.subtype.AdditionalSubtypeUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -94,52 +95,62 @@ object RestoreManager {
             val (metadata, prefsData) = readAndValidateBackup(extractedDir)
             val filesDir = File(extractedDir, "files")
 
-            val snapshot = RestoreSnapshot(context, File(workingDir, "rollback"))
-            try {
-                val fileSummary = FileBackupHelper.restoreFiles(context, filesDir)
-                val excludedKeys = BackupPreferencePolicy.runtimeDerivedKeys +
-                    if (importMode == ImportMode.ADAPT_TO_CURRENT_DEVICE) {
-                        BackupPreferencePolicy.targetDeviceDerivedKeys
-                    } else {
-                        emptySet()
-                    }
-                val prefsSummary = PreferencesBackupHelper.restorePreferences(
-                    context,
-                    prefsData,
-                    excludedKeys = excludedKeys,
-                    hasRestoredTypingSoundPack = fileSummary.restoredFiles.any { path ->
-                        path.startsWith(
-                            "${SettingsManager.TYPING_SOUND_CUSTOM_DIR}/" +
-                                "${SettingsManager.TYPING_SOUND_CUSTOM_PACK_DIR}/"
-                        )
-                    }
-                )
-                // A backup from a build that allowed both may carry Screen trackpad and
-                // Trackpad Gestures on together; keep exactly one (Screen trackpad wins).
-                rocks.pkb.plektra.TrackpadFeatureExclusivity.reconcile(context)
-                val postRestoreActions = collectTriggeredPostRestoreActions(prefsSummary, fileSummary)
-                notifyPostRestoreEffects(context, postRestoreActions)
-                if (fileSummary.restoredFiles.any { it.startsWith("dictionaries_serialized/") }) {
-                    rocks.pkb.plektra.dictionaries.DictionaryRepositoryManager.notifyDictionariesChanged(context)
-                }
-
-                RestoreResult.Success(
-                    metadata = metadata,
-                    preferencesSummary = prefsSummary,
-                    fileSummary = fileSummary,
-                    postActionsTriggered = postRestoreActions
-                )
-            } catch (failure: Exception) {
+            // Rollback state, import, publication and any rollback form one transaction: no other change
+            // of the keyboard sources falls in between, and no half-restored state is published.
+            val (fileSummary, prefsSummary) = DirectBootKeyboardConfig.sourceTransaction(context) { publish ->
+                val snapshot = RestoreSnapshot(context, File(workingDir, "rollback"))
                 try {
-                    snapshot.rollback()
-                } catch (rollbackFailure: Exception) {
-                    failure.addSuppressed(rollbackFailure)
-                    retainRecoveryData = true
-                    throw IOException("Import failed and recovery is incomplete. Recovery data retained in " +
-                        "cache/${workingDir.name}/rollback", failure)
+                    val ordinaryFiles = FileBackupHelper.restoreFiles(context, filesDir)
+                    val imageFiles = ThemeImageBackup.restore(context, File(extractedDir, "theme-images"))
+                    val fileSummary = ordinaryFiles.copy(restoredFiles = ordinaryFiles.restoredFiles + imageFiles)
+                    val excludedKeys = BackupPreferencePolicy.runtimeDerivedKeys +
+                        if (importMode == ImportMode.ADAPT_TO_CURRENT_DEVICE) {
+                            BackupPreferencePolicy.targetDeviceDerivedKeys
+                        } else {
+                            emptySet()
+                        }
+                    val prefsSummary = PreferencesBackupHelper.restorePreferences(
+                        context,
+                        prefsData,
+                        excludedKeys = excludedKeys,
+                        hasRestoredTypingSoundPack = fileSummary.restoredFiles.any { path ->
+                            path.startsWith(
+                                "${SettingsManager.TYPING_SOUND_CUSTOM_DIR}/" +
+                                    "${SettingsManager.TYPING_SOUND_CUSTOM_PACK_DIR}/"
+                            )
+                        }
+                    )
+                    // A backup from a build that allowed both may carry Screen trackpad and
+                    // Trackpad Gestures on together; keep exactly one (Screen trackpad wins).
+                    rocks.pkb.plektra.TrackpadFeatureExclusivity.reconcile(context)
+                    // Restored layout files bypass LayoutFileStore; the keyboard used before unlock must match.
+                    if (!publish()) throw IOException("The keyboard copy for use before unlock could not be updated")
+                    fileSummary to prefsSummary
+                } catch (failure: Exception) {
+                    try {
+                        snapshot.rollback()
+                        if (!publish()) throw IOException("The keyboard copy for use before unlock could not be rolled back")
+                    } catch (rollbackFailure: Exception) {
+                        failure.addSuppressed(rollbackFailure)
+                        retainRecoveryData = true
+                        throw IOException("Import failed and recovery is incomplete. Recovery data retained in " +
+                            "cache/${workingDir.name}/rollback", failure)
+                    }
+                    throw failure
                 }
-                throw failure
             }
+            val postRestoreActions = collectTriggeredPostRestoreActions(prefsSummary, fileSummary)
+            notifyPostRestoreEffects(context, postRestoreActions)
+            if (fileSummary.restoredFiles.any { it.startsWith("dictionaries_serialized/") }) {
+                rocks.pkb.plektra.dictionaries.DictionaryRepositoryManager.notifyDictionariesChanged(context)
+            }
+
+            RestoreResult.Success(
+                metadata = metadata,
+                preferencesSummary = prefsSummary,
+                fileSummary = fileSummary,
+                postActionsTriggered = postRestoreActions
+            )
         } catch (e: Exception) {
             Log.e(TAG, "Restore failed", e)
             RestoreResult.Failure(e.message ?: "Restore failed")
@@ -157,7 +168,13 @@ object RestoreManager {
         require(!metadataFile.exists() || metadata != null) { "Invalid backup metadata" }
         val prefs = PreferencesBackupHelper.readPreferencesFromBackup(File(extractedDir, "prefs"))
         val fileCount = FileBackupHelper.validateRestoreFiles(File(extractedDir, "files"))
-        require(prefs.values.any { it.isNotEmpty() } || fileCount > 0) {
+        val images = ThemeImageBackup.validate(File(extractedDir, "theme-images"))
+        val themeValues = prefs["plektra_prefs"].orEmpty().filterKeys { it.startsWith("keyboard_theme_") }
+            .values.mapNotNull { it.value as? String }
+        // A dangling reference falls back to the theme's colours, so it is logged rather than rejected.
+        val missing = rocks.pkb.plektra.ThemeTextureModel.referencedAssets(themeValues) - images.toSet()
+        if (missing.isNotEmpty()) Log.w(TAG, "Backup lacks ${missing.size} referenced theme image(s)")
+        require(prefs.values.any { it.isNotEmpty() } || fileCount > 0 || images.isNotEmpty()) {
             "Backup contains no supported settings or user files"
         }
         return metadata to prefs
@@ -167,7 +184,7 @@ object RestoreManager {
         private val preferenceFiles = listOf("plektra_prefs", "notes").associateWith { name ->
             context.getSharedPreferences(name, Context.MODE_PRIVATE).all.mapValues { (_, value) -> PreferenceValue.fromAny(value)!! }
         }
-        private val roots = FileBackupHelper.managedRestoreRoots()
+        private val roots = FileBackupHelper.managedRestoreRoots() + "theme-images"
 
         init {
             directory.mkdirs()
@@ -206,6 +223,7 @@ object RestoreManager {
                 }
                 check(editor.commit()) { "Unable to roll back restored preferences" }
             }
+            rocks.pkb.plektra.ThemeTextureStore.invalidate()
         }
 
         private fun copy(source: File, target: File) {

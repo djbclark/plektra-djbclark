@@ -69,6 +69,7 @@ object SettingsManager {
     private const val KEY_SWIPE_TO_DELETE = "swipe_to_delete"
     private const val KEY_SWIPE_TO_DELETE_PROVIDER = "swipe_to_delete_provider"
     private const val KEY_AUTO_SHOW_KEYBOARD = "auto_show_keyboard"
+    private const val KEY_AUTO_SHOW_RESPECT_APP_VISIBILITY = "auto_show_respect_app_visibility"
     const val KEY_EXPERIMENTAL_SMOOTH_CARET = "experimental_smooth_caret"
     private const val KEY_CLEAR_ALT_ON_SPACE = "clear_alt_on_space"
     private const val KEY_ALT_CTRL_SPEECH_SHORTCUT = "alt_ctrl_speech_shortcut"
@@ -110,6 +111,7 @@ object SettingsManager {
     private const val KEY_ALT_SHIFT_DEFAULT_INITIALIZED = "alt_shift_default_initialized"
     private const val KEY_TITAN2_ELITE_ROUNDED_CORNERS_ENFORCED_V1 =
         "titan2_elite_rounded_corners_enforced_v1"
+    private const val KEY_COMPACT_SOFTWARE_KEY_HEIGHT_MIGRATED_V1 = "compact_software_key_height_migrated_v1"
     private const val KEY_ALT_ENTER_LAYOUT_SWITCH = "alt_enter_layout_switch" // Enable Alt+Enter shortcut for layout cycling
     private const val KEY_CTRL_SPACE_LAYOUT_SWITCH = "ctrl_space_layout_switch" // Enable Ctrl+Space shortcut for layout cycling
     private const val KEY_PHYSICAL_KEYBOARD_PROFILE_OVERRIDE = "physical_keyboard_profile_override" // auto | key2 | Q25 | titan | titan2 | titan2elite_qwerty | mp01 | clicks_razr | clicks_pixel | clicks_power
@@ -149,6 +151,7 @@ object SettingsManager {
     private const val KEY_ALT_LATCH_STAYS_ON_SPACE = "alt_latch_stays_on_space"
     private const val KEY_CTRL_LATCH_STAYS_ON_SPACE = "ctrl_latch_stays_on_space"
     private const val KEY_EMOJI_PICKER_EXPANDED_HEIGHT = "emoji_picker_expanded_height"
+    private const val KEY_EMOJI_PICKER_STAYS_OPEN = "emoji_picker_stays_open" // Full emoji picker stays open after an emoji
     private const val KEY_DISMISSED_RELEASES = "dismissed_releases" // Set of release tag_names that were dismissed
     private const val KEY_TUTORIAL_COMPLETED = "tutorial_completed" // Whether the first-run tutorial has been completed
     private const val KEY_LAST_SEEN_WHATS_NEW_VERSION = "last_seen_whats_new_version"
@@ -180,6 +183,10 @@ object SettingsManager {
     const val KEY_SOFTWARE_KEYBOARD_MODE_RUNTIME_OVERRIDE = "software_keyboard_mode_runtime_override"
     private const val KEY_SOFTWARE_KEYBOARD_LAYOUT_STYLE = "software_keyboard_layout_style" // compact | extended_iso | full_ansi | full_iso
     private const val KEY_SOFTWARE_KEYBOARD_NUMBER_ROW_ENABLED = "software_keyboard_number_row_enabled"
+    const val KEY_SOFTWARE_KEYBOARD_KEY_HINTS_ENABLED = "software_keyboard_key_hints_enabled"
+    const val KEY_SOFTWARE_KEYBOARD_EMOJI_PAGE_IN_CYCLE = "software_keyboard_emoji_page_in_cycle"
+    const val KEY_HARDWARE_KEYPAD_AUTO_OPEN = "hardware_keypad_auto_open"
+    private const val KEY_FIELD_SCOPED_VIRTUAL_PREVIOUS_OVERRIDE = "field_scoped_virtual_previous_override"
     private const val KEY_SOFTWARE_KEYBOARD_NEAREST_KEY_TOUCH_ENABLED = "software_keyboard_nearest_key_touch_enabled"
     private const val KEY_SOFTWARE_KEYBOARD_LEFT_MODIFIER_KEY = "software_keyboard_left_modifier_key"
     private const val KEY_SOFTWARE_KEYBOARD_RIGHT_MODIFIER_KEY = "software_keyboard_right_modifier_key"
@@ -396,6 +403,7 @@ object SettingsManager {
     private const val DEFAULT_BOUNCE_KEYS_BACKSPACE_ENABLED = true
     private const val DEFAULT_OVERLAPPING_KEYS_ENABLED = false
     private const val DEFAULT_EMOJI_PICKER_EXPANDED_HEIGHT = true
+    private const val DEFAULT_EMOJI_PICKER_STAYS_OPEN = true
     private val DEFAULT_SYM_PAGES_CONFIG = SymPagesConfig()
     private const val SYM_PAGES_SCHEMA_VERSION = 2
     private const val DEFAULT_STATIC_VARIATION_BAR_MODE = false
@@ -512,29 +520,33 @@ object SettingsManager {
         val keyPopupAttached: Boolean = true,
         val keyPopupTailEnabled: Boolean = true,
         val keyPreviewAfterLongPress: Boolean = false,
-        val keyAlternatesPopupEnabled: Boolean = true
+        val keyAlternatesPopupEnabled: Boolean = true,
+        val textures: Map<String, KeyboardThemeTexture> = emptyMap()
     ) {
         fun toKeyboardThemeColors(): KeyboardThemeColors =
-            KeyboardThemeColors(
-                background = background,
-                divider = divider,
-                normalKey = normalKey,
-                specialKey = specialKey,
-                textAndIcons = textAndIcons,
-                ledInactive = ledInactive,
-                ledActive = ledActive,
-                ledLocked = ledLocked,
-                accent = accent,
-                cursorSwipe = cursorSwipe,
-                keyPopup = keyPopup,
-                keyPopupSelected = keyPopupSelected,
-                suggestion = suggestion,
-                statusBarButton = statusBarButton,
-                keyCornerRadiusRatio = keyCornerRadiusRatio,
-                chromeCornerRadiusRatio = chromeCornerRadiusRatio,
-                suggestionsHeightScale = suggestionsHeightScale,
-                variationsHeightScale = variationsHeightScale
-            )
+            textures.renderable().let { shown ->
+                KeyboardThemeColors(
+                    background = background,
+                    divider = divider,
+                    normalKey = shown.surfaceColour(normalKey),
+                    specialKey = shown.surfaceColour(specialKey),
+                    textAndIcons = textAndIcons,
+                    ledInactive = ledInactive,
+                    ledActive = ledActive,
+                    ledLocked = ledLocked,
+                    accent = accent,
+                    cursorSwipe = cursorSwipe,
+                    keyPopup = keyPopup,
+                    keyPopupSelected = keyPopupSelected,
+                    suggestion = shown.surfaceColour(suggestion),
+                    statusBarButton = shown.surfaceColour(statusBarButton),
+                    keyCornerRadiusRatio = keyCornerRadiusRatio,
+                    chromeCornerRadiusRatio = chromeCornerRadiusRatio,
+                    suggestionsHeightScale = suggestionsHeightScale,
+                    variationsHeightScale = variationsHeightScale,
+                    textures = shown
+                )
+            }
     }
 
     data class NamedKeyboardTheme(
@@ -672,6 +684,83 @@ object SettingsManager {
         getPreferences(context).edit()
             .putBoolean(KEY_SOFTWARE_KEYBOARD_NUMBER_ROW_ENABLED, enabled)
             .apply()
+    }
+
+    /** Corner hints on regular keys: long-press alternative top right, Alt/SYM output bottom left. */
+    fun getSoftwareKeyboardKeyHintsEnabled(context: Context): Boolean =
+        getPreferences(context).getBoolean(KEY_SOFTWARE_KEYBOARD_KEY_HINTS_ENABLED, true)
+
+    fun setSoftwareKeyboardKeyHintsEnabled(context: Context, enabled: Boolean) {
+        getPreferences(context).edit()
+            .putBoolean(KEY_SOFTWARE_KEYBOARD_KEY_HINTS_ENABLED, enabled)
+            .apply()
+    }
+
+    /** The emoji key-layer page is reachable directly but stays out of the on-screen SYM cycle by default. */
+    fun getSoftwareKeyboardEmojiPageInCycle(context: Context): Boolean =
+        getPreferences(context).getBoolean(KEY_SOFTWARE_KEYBOARD_EMOJI_PAGE_IN_CYCLE, false)
+
+    fun setSoftwareKeyboardEmojiPageInCycle(context: Context, enabled: Boolean) {
+        getPreferences(context).edit()
+            .putBoolean(KEY_SOFTWARE_KEYBOARD_EMOJI_PAGE_IN_CYCLE, enabled)
+            .apply()
+    }
+
+    /** Opens the compact keypad automatically in number and phone fields on hardware keyboards. */
+    fun getHardwareKeypadAutoOpen(context: Context): Boolean =
+        getPreferences(context).getBoolean(KEY_HARDWARE_KEYPAD_AUTO_OPEN, false)
+
+    fun setHardwareKeypadAutoOpen(context: Context, enabled: Boolean) {
+        getPreferences(context).edit()
+            .putBoolean(KEY_HARDWARE_KEYPAD_AUTO_OPEN, enabled)
+            .apply()
+    }
+
+    /**
+     * Switches a hardware-keyboard device to the on-screen surface for the current editor. The
+     * previous runtime override is persisted so that it is restored even after a process restart.
+     */
+    fun beginFieldScopedVirtualKeyboard(context: Context) {
+        val prefs = getPreferences(context)
+        if (!prefs.contains(KEY_FIELD_SCOPED_VIRTUAL_PREVIOUS_OVERRIDE)) {
+            prefs.edit().putString(
+                KEY_FIELD_SCOPED_VIRTUAL_PREVIOUS_OVERRIDE,
+                getSoftwareKeyboardModeRuntimeOverride(context)?.storageValue.orEmpty()
+            ).apply()
+        }
+        setSoftwareKeyboardModeRuntimeOverride(context, SoftwareKeyboardMode.FORCE_VIRTUAL)
+    }
+
+    /** Restores the override from before [beginFieldScopedVirtualKeyboard]; true if one was active. */
+    fun endFieldScopedVirtualKeyboard(context: Context): Boolean {
+        val prefs = getPreferences(context)
+        val previous = prefs.getString(KEY_FIELD_SCOPED_VIRTUAL_PREVIOUS_OVERRIDE, null) ?: return false
+        prefs.edit().remove(KEY_FIELD_SCOPED_VIRTUAL_PREVIOUS_OVERRIDE).apply()
+        // A mode the user switched in the meantime stays.
+        if (getSoftwareKeyboardModeRuntimeOverride(context) == SoftwareKeyboardMode.FORCE_VIRTUAL) {
+            setSoftwareKeyboardModeRuntimeOverride(
+                context,
+                SoftwareKeyboardMode.values().firstOrNull { it.storageValue == previous && it != SoftwareKeyboardMode.AUTO }
+            )
+        }
+        return true
+    }
+
+    /**
+     * Pages that the on-screen SYM key and chooser cycle through. The on-screen keyboard leaves out
+     * the emoji key layer unless enabled; the physical SYM key uses [getSymPagesConfig] in every
+     * surface mode, and direct access to every page is unaffected.
+     */
+    fun getOnScreenSymPageCycleConfig(context: Context): SymPagesConfig {
+        val config = getSymPagesConfig(context)
+        return if (
+            resolveEffectiveSoftwareKeyboardMode(context) == SoftwareKeyboardMode.FORCE_VIRTUAL &&
+            !getSoftwareKeyboardEmojiPageInCycle(context)
+        ) {
+            config.copy(emojiEnabled = false)
+        } else {
+            config
+        }
     }
 
     fun getSoftwareKeyboardNearestKeyTouchEnabled(context: Context): Boolean =
@@ -924,7 +1013,8 @@ object SettingsManager {
                 keyPopupAttached = json.optBoolean("key_popup_attached", defaults.keyPopupAttached),
                 keyPopupTailEnabled = json.optBoolean("key_popup_tail_enabled", defaults.keyPopupTailEnabled),
                 keyPreviewAfterLongPress = json.optBoolean("key_preview_after_long_press", defaults.keyPreviewAfterLongPress),
-                keyAlternatesPopupEnabled = json.optBoolean("key_alternates_popup_enabled", defaults.keyAlternatesPopupEnabled)
+                keyAlternatesPopupEnabled = json.optBoolean("key_alternates_popup_enabled", defaults.keyAlternatesPopupEnabled),
+                textures = ThemeTextureModel.decode(json.optJSONObject("textures"))
             )
         } catch (error: Exception) {
             Log.e(TAG, "Fehler beim Laden des Keyboard-Themes", error)
@@ -1392,7 +1482,8 @@ object SettingsManager {
             keyPopupAttached = json.optBoolean("key_popup_attached", defaults.keyPopupAttached),
             keyPopupTailEnabled = json.optBoolean("key_popup_tail_enabled", defaults.keyPopupTailEnabled),
             keyPreviewAfterLongPress = json.optBoolean("key_preview_after_long_press", defaults.keyPreviewAfterLongPress),
-            keyAlternatesPopupEnabled = json.optBoolean("key_alternates_popup_enabled", defaults.keyAlternatesPopupEnabled)
+            keyAlternatesPopupEnabled = json.optBoolean("key_alternates_popup_enabled", defaults.keyAlternatesPopupEnabled),
+                textures = ThemeTextureModel.decode(json.optJSONObject("textures"))
         )
 
     private fun keyboardThemeToJson(theme: KeyboardThemeSettings): JSONObject =
@@ -1427,6 +1518,7 @@ object SettingsManager {
             put("key_popup_tail_enabled", theme.keyPopupTailEnabled)
             put("key_preview_after_long_press", theme.keyPreviewAfterLongPress)
             put("key_alternates_popup_enabled", theme.keyAlternatesPopupEnabled)
+            if (theme.textures.isNotEmpty()) put("textures", ThemeTextureModel.encode(theme.textures))
         }
 
     private fun normalizeKeyboardThemePopupStyle(value: String): String =
@@ -1534,6 +1626,46 @@ object SettingsManager {
             }
             putBoolean(KEY_TITAN2_ELITE_ROUNDED_CORNERS_ENFORCED_V1, true)
         }.apply()
+    }
+
+    /**
+     * Moves every stored theme that still has the former software key height to the compact
+     * default, once. Heights the user set themselves stay untouched.
+     */
+    fun migrateCompactSoftwareKeyHeightOnce(context: Context) {
+        val prefs = getPreferences(context)
+        if (prefs.getBoolean(KEY_COMPACT_SOFTWARE_KEY_HEIGHT_MIGRATED_V1, false)) return
+        val editor = prefs.edit()
+        listOf(
+            KEY_KEYBOARD_THEME_HARDWARE, KEY_KEYBOARD_THEME_SOFTWARE,
+            KEY_KEYBOARD_THEME_LIGHT_HARDWARE, KEY_KEYBOARD_THEME_LIGHT_SOFTWARE,
+            KEY_KEYBOARD_THEME_DARK_HARDWARE, KEY_KEYBOARD_THEME_DARK_SOFTWARE,
+            KEY_KEYBOARD_THEME_SAVED_THEMES, KEY_KEYBOARD_THEME_DRAFTS
+        ).forEach { key ->
+            prefs.getString(key, null)?.let(::withCompactSoftwareKeyHeight)?.let { editor.putString(key, it) }
+        }
+        editor.putBoolean(KEY_COMPACT_SOFTWARE_KEY_HEIGHT_MIGRATED_V1, true).apply()
+    }
+
+    /** The stored theme JSON with legacy default key heights replaced, or null when nothing changed. */
+    internal fun withCompactSoftwareKeyHeight(stored: String): String? {
+        val root = runCatching { org.json.JSONTokener(stored).nextValue() }.getOrNull() ?: return null
+        var changed = false
+        fun walk(value: Any?) {
+            when (value) {
+                is JSONObject -> {
+                    val height = value.optDouble("key_height_scale", Double.NaN)
+                    if (kotlin.math.abs(height - LEGACY_SOFTWARE_THEME_DEFAULT_KEY_HEIGHT) < 1e-4) {
+                        value.put("key_height_scale", SOFTWARE_THEME_DEFAULT_KEY_HEIGHT.toDouble())
+                        changed = true
+                    }
+                    value.keys().asSequence().toList().forEach { walk(value.opt(it)) }
+                }
+                is JSONArray -> for (index in 0 until value.length()) walk(value.opt(index))
+            }
+        }
+        walk(root)
+        return if (changed) root.toString() else null
     }
 
     /**
@@ -2229,10 +2361,45 @@ object SettingsManager {
         getPreferences(context).edit().putBoolean("keyboard_bar_show_on_launcher", enabled).apply()
     }
 
+    // Apps in which the keyboard bar never appears, regardless of every other visibility setting.
+    const val KEY_KEYBOARD_BAR_HIDDEN_APPS = "keyboard_bar_hidden_apps"
+
+    fun getKeyboardBarHiddenPackages(context: Context): Set<String> =
+        getPreferences(context).getStringSet(KEY_KEYBOARD_BAR_HIDDEN_APPS, emptySet()) ?: emptySet()
+
+    fun isKeyboardBarHiddenInApp(context: Context, packageName: String?): Boolean {
+        if (packageName.isNullOrEmpty()) return false
+        val packages = getKeyboardBarHiddenPackages(context)
+        if (packageName in packages) return true
+        // A PWA's fields live in its host browser, so hiding it hides the browser's bar too.
+        return packageName in rocks.pkb.plektra.inputmethod.WebApkHost.expandWithHosts(context, packages)
+    }
+
+    fun setKeyboardBarHiddenInApp(context: Context, packageName: String, hidden: Boolean) {
+        val current = getKeyboardBarHiddenPackages(context).toMutableSet()
+        if (hidden) current.add(packageName) else current.remove(packageName)
+        getPreferences(context).edit()
+            .putStringSet(KEY_KEYBOARD_BAR_HIDDEN_APPS, current)
+            .apply()
+    }
+
     fun getAutoShowKeyboard(context: Context): Boolean {
         return getPreferences(context).getBoolean(KEY_AUTO_SHOW_KEYBOARD, DEFAULT_AUTO_SHOW_KEYBOARD)
     }
     
+    /**
+     * With automatic showing enabled, Plektra still leaves the decision to Android and the app at
+     * input start; their show requests, a tap or a key press open the keyboard.
+     */
+    fun getAutoShowRespectAppVisibility(context: Context): Boolean =
+        getPreferences(context).getBoolean(KEY_AUTO_SHOW_RESPECT_APP_VISIBILITY, true)
+
+    fun setAutoShowRespectAppVisibility(context: Context, enabled: Boolean) {
+        getPreferences(context).edit()
+            .putBoolean(KEY_AUTO_SHOW_RESPECT_APP_VISIBILITY, enabled)
+            .apply()
+    }
+
     /**
      * Sets the state of automatically showing the keyboard when a field gains focus.
      */
@@ -2935,7 +3102,7 @@ object SettingsManager {
     /**
      * Saves custom SYM mappings.
      */
-    fun saveSymMappings(context: Context, mappings: Map<Int, String>) {
+    fun saveSymMappings(context: Context, mappings: Map<Int, String>): Unit = keyboardSourceChange(context) {
         try {
             val keyCodeToName = mapOf(
                 KeyEvent.KEYCODE_Q to "KEYCODE_Q", KeyEvent.KEYCODE_W to "KEYCODE_W",
@@ -2975,7 +3142,7 @@ object SettingsManager {
     /**
      * Resets custom SYM mappings back to defaults.
      */
-    fun resetSymMappings(context: Context) {
+    fun resetSymMappings(context: Context): Unit = keyboardSourceChange(context) {
         getPreferences(context).edit()
             .remove(KEY_SYM_MAPPINGS_CUSTOM)
             .apply()
@@ -3036,7 +3203,7 @@ object SettingsManager {
     /**
      * Saves custom SYM mappings for page 2.
      */
-    fun saveSymMappingsPage2(context: Context, mappings: Map<Int, String>) {
+    fun saveSymMappingsPage2(context: Context, mappings: Map<Int, String>): Unit = keyboardSourceChange(context) {
         try {
             val keyCodeToName = mapOf(
                 KeyEvent.KEYCODE_Q to "KEYCODE_Q", KeyEvent.KEYCODE_W to "KEYCODE_W",
@@ -3076,7 +3243,7 @@ object SettingsManager {
     /**
      * Resets custom SYM mappings for page 2 back to defaults.
      */
-    fun resetSymMappingsPage2(context: Context) {
+    fun resetSymMappingsPage2(context: Context): Unit = keyboardSourceChange(context) {
         getPreferences(context).edit()
             .remove(KEY_SYM_MAPPINGS_PAGE2_CUSTOM)
             .apply()
@@ -3906,7 +4073,7 @@ object SettingsManager {
         return getLauncherShortcutsRaw(context)
     }
 
-    // djb/small-fixes: parsed shortcuts keyed on the JSON they came from; every writer goes
+    // parsed shortcuts keyed on the JSON they came from; every writer goes
     // through the preference, so a changed string is the only invalidation needed.
     @Volatile
     private var launcherShortcutsCache: Pair<String, Map<Int, LauncherShortcut>>? = null
@@ -4425,7 +4592,7 @@ object SettingsManager {
             .apply()
     }
 
-    // djb/sym-shortcuts: Sym+C/V/X/A edit shortcuts toggle
+    // Sym+C/V/X/A edit shortcuts toggle
     private const val KEY_SYM_EDIT_SHORTCUTS = "sym_edit_shortcuts"
     private const val DEFAULT_SYM_EDIT_SHORTCUTS = false
 
@@ -4482,11 +4649,13 @@ object SettingsManager {
     /**
      * Initializes the nav mode mappings file by copying from assets if it doesn't exist.
      */
-    fun initializeNavModeMappingsFile(context: Context) {
+    fun initializeNavModeMappingsFile(context: Context): Unit = keyboardSourceChange(context) {
+        // Before unlock filesDir is the published Direct Boot snapshot; the loader falls back to assets.
+        if (rocks.pkb.plektra.inputmethod.DirectBootStorage.isLocked(context)) return@keyboardSourceChange
         val mappingsFile = getNavModeMappingsFile(context)
         if (mappingsFile.exists()) {
             migrateNavModeMappingsFileIfNeeded(context)
-            return // File already exists, don't overwrite
+            return@keyboardSourceChange // File already exists, don't overwrite
         }
         
         try {
@@ -4560,7 +4729,7 @@ object SettingsManager {
     /**
      * Saves nav mode key mappings to the JSON file in filesDir.
      */
-    fun saveNavModeKeyMappings(context: Context, mappings: Map<Int, rocks.pkb.plektra.data.mappings.KeyMappingLoader.CtrlMapping>) {
+    fun saveNavModeKeyMappings(context: Context, mappings: Map<Int, rocks.pkb.plektra.data.mappings.KeyMappingLoader.CtrlMapping>): Unit = keyboardSourceChange(context) {
         try {
             val keyCodeToName = mapOf(
                 KeyEvent.KEYCODE_Q to "KEYCODE_Q", KeyEvent.KEYCODE_W to "KEYCODE_W",
@@ -4637,7 +4806,7 @@ object SettingsManager {
     /**
      * Resets nav mode key mappings to default by deleting the custom file.
      */
-    fun resetNavModeKeyMappings(context: Context) {
+    fun resetNavModeKeyMappings(context: Context): Unit = keyboardSourceChange(context) {
         try {
             val mappingsFile = getNavModeMappingsFile(context)
             if (mappingsFile.exists()) {
@@ -4664,6 +4833,10 @@ object SettingsManager {
         return mappingsFile.exists()
     }
     
+    /** Layout, mapping and selection changes reach the Direct Boot snapshot before returning. */
+    private inline fun <T> keyboardSourceChange(context: Context, change: () -> T): T =
+        rocks.pkb.plektra.inputmethod.DirectBootKeyboardConfig.changeSources(context, change)
+
     /**
      * Returns the selected keyboard layout name.
      */
@@ -4674,7 +4847,7 @@ object SettingsManager {
     /**
      * Sets the keyboard layout name.
      */
-    fun setKeyboardLayout(context: Context, layoutName: String) {
+    fun setKeyboardLayout(context: Context, layoutName: String): Unit = keyboardSourceChange(context) {
         getPreferences(context).edit()
             .putString(KEY_KEYBOARD_LAYOUT, layoutName)
             .apply()
@@ -4694,7 +4867,7 @@ object SettingsManager {
     /**
      * Enables/disables automatic keyboard layout resolution by locale mapping.
      */
-    fun setKeyboardLayoutAutoByLocale(context: Context, enabled: Boolean) {
+    fun setKeyboardLayoutAutoByLocale(context: Context, enabled: Boolean): Unit = keyboardSourceChange(context) {
         getPreferences(context).edit()
             .putBoolean(KEY_KEYBOARD_LAYOUT_AUTO_BY_LOCALE, enabled)
             .apply()
@@ -5042,31 +5215,25 @@ object SettingsManager {
             .apply()
     }
 
-    private fun normalizePhysicalKeyboardProfileOverride(profile: String?): String {
+    private val physicalKeyboardProfileOverrides = listOf(
+        "auto", "key2", "Q25", "titan", "titan2", "titan2elite_qwerty", "mp01", "clicks_razr", "clicks_pixel", "clicks_power"
+    )
+
+    /** The canonical spelling of a supported profile override; null for an unknown one. */
+    fun canonicalPhysicalKeyboardProfileOverride(profile: String?): String? {
         val normalized = profile?.trim().orEmpty()
-        return when {
-            normalized.equals("auto", ignoreCase = true) -> "auto"
-            normalized.equals("key2", ignoreCase = true) -> "key2"
-            normalized.equals("q25", ignoreCase = true) -> "Q25"
-            normalized.equals("titan", ignoreCase = true) -> "titan"
-            normalized.equals("titan2", ignoreCase = true) -> "titan2"
-            normalized.equals("titan2elite_qwerty", ignoreCase = true) -> "titan2elite_qwerty"
-            normalized.equals("mp01", ignoreCase = true) -> "mp01"
-            normalized.equals("clicks_razr", ignoreCase = true) -> "clicks_razr"
-            normalized.equals("clicks_pixel", ignoreCase = true) -> "clicks_pixel"
-            normalized.equals("clicks_power", ignoreCase = true) -> "clicks_power"
-            else -> DEFAULT_PHYSICAL_KEYBOARD_PROFILE_OVERRIDE
-        }
+        return physicalKeyboardProfileOverrides.firstOrNull { it.equals(normalized, ignoreCase = true) }
     }
 
-    private fun normalizePhysicalKeyboardCurrencySymbol(symbol: String?): String {
-        val normalized = symbol?.trim().orEmpty()
-        return if (normalized in physicalKeyboardCurrencySymbols()) {
-            normalized
-        } else {
-            DEFAULT_PHYSICAL_KEYBOARD_CURRENCY_SYMBOL
-        }
-    }
+    private fun normalizePhysicalKeyboardProfileOverride(profile: String?): String =
+        canonicalPhysicalKeyboardProfileOverride(profile) ?: DEFAULT_PHYSICAL_KEYBOARD_PROFILE_OVERRIDE
+
+    /** The canonical form of a supported currency symbol; null for an unknown one. */
+    fun canonicalPhysicalKeyboardCurrencySymbol(symbol: String?): String? =
+        symbol?.trim()?.takeIf { it in physicalKeyboardCurrencySymbols() }
+
+    private fun normalizePhysicalKeyboardCurrencySymbol(symbol: String?): String =
+        canonicalPhysicalKeyboardCurrencySymbol(symbol) ?: DEFAULT_PHYSICAL_KEYBOARD_CURRENCY_SYMBOL
 
     fun physicalKeyboardCurrencySymbols(): List<String> = listOf("€", "$", "£", "¥", "₹", "₽", "₿", "¤")
 
@@ -5112,14 +5279,14 @@ object SettingsManager {
      * Saves the list of keyboard layouts used for cycling.
      * The caller is responsible for also selecting the active layout via setKeyboardLayout().
      */
-    fun setKeyboardLayoutList(context: Context, layouts: List<String>) {
+    fun setKeyboardLayoutList(context: Context, layouts: List<String>): Unit = keyboardSourceChange(context) {
         val normalized = layouts.map { it.trim() }.filter { it.isNotBlank() }.distinct()
         if (normalized.isEmpty()) {
             // Clear the list to fall back to single-layout behaviour.
             getPreferences(context).edit()
                 .remove(KEY_KEYBOARD_LAYOUT_LIST)
                 .apply()
-            return
+            return@keyboardSourceChange
         }
         val array = org.json.JSONArray()
         normalized.forEach { array.put(it) }
@@ -5382,6 +5549,10 @@ object SettingsManager {
             .apply()
     }
 
+    /** Whether SYM closes after typing a symbol: a [touch] on screen also needs the touch option. */
+    fun symAutoClosesAfterCommit(context: Context, touch: Boolean): Boolean =
+        getSymAutoClose(context) && (!touch || getSymAutoCloseOnTouch(context))
+
     fun getEmojiPickerExpandedHeight(context: Context): Boolean {
         return getPreferences(context).getBoolean(
             KEY_EMOJI_PICKER_EXPANDED_HEIGHT,
@@ -5392,6 +5563,16 @@ object SettingsManager {
     fun setEmojiPickerExpandedHeight(context: Context, enabled: Boolean) {
         getPreferences(context).edit()
             .putBoolean(KEY_EMOJI_PICKER_EXPANDED_HEIGHT, enabled)
+            .apply()
+    }
+
+    /** Whether the full emoji picker stays open after an emoji or skin tone is typed; independent of the SYM auto-close settings. */
+    fun getEmojiPickerStaysOpen(context: Context): Boolean =
+        getPreferences(context).getBoolean(KEY_EMOJI_PICKER_STAYS_OPEN, DEFAULT_EMOJI_PICKER_STAYS_OPEN)
+
+    fun setEmojiPickerStaysOpen(context: Context, enabled: Boolean) {
+        getPreferences(context).edit()
+            .putBoolean(KEY_EMOJI_PICKER_STAYS_OPEN, enabled)
             .apply()
     }
 
@@ -5529,6 +5710,10 @@ object SettingsManager {
             .putLong(KEY_CLIPBOARD_RETENTION_TIME, minutes)
             .apply()
     }
+
+    /** Whether a preference change with [key] can change clipboard retention; null means the preferences were cleared. */
+    fun isClipboardRetentionKey(key: String?): Boolean =
+        key == null || key == KEY_CLIPBOARD_RETENTION_TIME || key == KEY_SENSITIVE_CLIPBOARD_RETENTION_TIME
 
     fun getSensitiveClipboardRetentionTime(context: Context): Long =
         getPreferences(context).getLong(KEY_SENSITIVE_CLIPBOARD_RETENTION_TIME, 30L).coerceIn(1L, 120L)
@@ -5810,7 +5995,7 @@ object SettingsManager {
         staticVariations: List<String>,
         staticVariationsShift: List<String>,
         staticVariationsAlt: List<String>
-    ) {
+    ): Unit = keyboardSourceChange(context) {
         try {
             val currentJson = loadCurrentJson(context)
             val jsonObject = if (currentJson != null) {
@@ -5848,7 +6033,7 @@ object SettingsManager {
         staticVariations: List<String>? = null,
         staticVariationsShift: List<String>? = null,
         staticVariationsAlt: List<String>? = null
-    ) {
+    ): Unit = keyboardSourceChange(context) {
         try {
             val variationsObject = JSONObject()
             for ((letter, chars) in variations) {
@@ -5900,7 +6085,7 @@ object SettingsManager {
         }
     }
 
-    fun saveStaticVariationBasePreset(context: Context, staticVariations: List<String>) {
+    fun saveStaticVariationBasePreset(context: Context, staticVariations: List<String>): Unit = keyboardSourceChange(context) {
         try {
             val jsonObject = loadCurrentJson(context) ?: JSONObject()
             val staticArray = org.json.JSONArray()
@@ -5921,7 +6106,7 @@ object SettingsManager {
     /**
      * Resets variations back to defaults by copying defaultvariations.json from assets.
      */
-    fun resetVariationsToDefault(context: Context) {
+    fun resetVariationsToDefault(context: Context): Unit = keyboardSourceChange(context) {
         try {
             val variationsFile = getVariationsFile(context)
             val inputStream = context.assets.open("common/variations/defaultvariations.json")
@@ -6445,11 +6630,12 @@ object SettingsManager {
         return MODIFIER_INDICATOR_STATUS_BAR in getModifierIndicators(context)
     }
 
-    // djb/caret-badge: modifier badge beside the text cursor (on/off and its two colours).
+    // Modifier badge beside the text cursor (on/off and its two colours).
     private const val KEY_CARET_MODIFIER_BADGE = "caret_modifier_badge"
     private const val KEY_CARET_BADGE_ARMED_COLOR = "caret_badge_armed_color"
     private const val KEY_CARET_BADGE_LOCKED_COLOR = "caret_badge_locked_color"
-    private const val DEFAULT_CARET_MODIFIER_BADGE = true
+    private const val KEY_CARET_BADGE_CUSTOM_COLORS = "caret_badge_custom_colors"
+    private const val DEFAULT_CARET_MODIFIER_BADGE = false
     /** One click: armed for the next key only. */
     const val DEFAULT_CARET_BADGE_ARMED_COLOR = 0xFF2563EB.toInt()
     /** Two clicks: stuck on until it is turned off. */
@@ -6470,6 +6656,13 @@ object SettingsManager {
         getPreferences(context).edit()
             .putBoolean(KEY_CARET_MODIFIER_BADGE, enabled)
             .apply()
+    }
+
+    fun getCaretBadgeCustomColors(context: Context): Boolean =
+        getPreferences(context).getBoolean(KEY_CARET_BADGE_CUSTOM_COLORS, false)
+
+    fun setCaretBadgeCustomColors(context: Context, enabled: Boolean) {
+        getPreferences(context).edit().putBoolean(KEY_CARET_BADGE_CUSTOM_COLORS, enabled).apply()
     }
 
     /** Colour of a modifier that is armed for one key only. */

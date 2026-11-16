@@ -785,9 +785,9 @@ private fun AddCustomInputStyleDialog(
         }
     }
 
-    // Get available locales based on dictionary availability (no filtering of system locales)
+    // Input languages can have a bundled layout without a dictionary.
     val availableLocales = remember(dictionariesRevision) {
-        getLocalesWithDictionary(context).sorted()
+        getAvailableInputStyleLocales(context)
     }
 
     AlertDialog(
@@ -985,7 +985,7 @@ private fun AddCustomInputStyleDialog(
 
                     SuggestionDictionariesSelector(
                         primaryLocale = selectedLocale!!,
-                        availableLocales = availableLocales,
+                        availableLocales = getLocalesWithDictionary(context).sorted(),
                         selectedLocales = selectedSuggestionLocales,
                         onSelectedLocalesChanged = { selectedSuggestionLocales = it }
                     )
@@ -1294,31 +1294,28 @@ private fun ensureAtLeastOneVisibleInputStyle(context: Context) {
     }
 }
 
-private fun migrateLegacyGermanSystemLayoutMapping(context: Context) {
+internal fun migrateLegacyGermanSystemLayoutMapping(context: Context) {
     val prefs = SettingsManager.getPreferences(context)
     val migrationKey = "legacy_german_qwertz_default_migrated"
     if (prefs.getBoolean(migrationKey, false)) return
-
-    val file = java.io.File(context.filesDir, "locale_layout_mapping.json")
-    if (!file.exists() || !file.canRead() || !file.canWrite()) {
-        prefs.edit().putBoolean(migrationKey, true).apply()
-        return
-    }
-
     try {
-        val json = org.json.JSONObject(file.readText())
-        val germanLocales = listOf("de", "de_DE", "de_AT", "de_CH", "de_LU")
-        var changed = false
-        germanLocales.forEach { locale ->
-            if (json.optString(locale) == "german_multitap_qwertz") {
-                json.put(locale, "qwertz")
-                changed = true
+        rocks.pkb.plektra.inputmethod.DirectBootKeyboardConfig.changeSources(context) {
+            if (!prefs.getBoolean(migrationKey, false)) {
+                val file = java.io.File(context.filesDir, "locale_layout_mapping.json")
+                if (file.exists() && file.canRead() && file.canWrite()) {
+                    val json = org.json.JSONObject(file.readText())
+                    var changed = false
+                    listOf("de", "de_DE", "de_AT", "de_CH", "de_LU").forEach { locale ->
+                        if (json.optString(locale) == "german_multitap_qwertz") {
+                            json.put(locale, "qwertz")
+                            changed = true
+                        }
+                    }
+                    if (changed) file.writeText(json.toString(2))
+                }
+                prefs.edit().putBoolean(migrationKey, true).apply()
             }
         }
-        if (changed) {
-            file.writeText(json.toString(2))
-        }
-        prefs.edit().putBoolean(migrationKey, true).apply()
     } catch (e: Exception) {
         android.util.Log.w("CustomInputStyles", "Error migrating legacy German layout mapping", e)
     }
@@ -1484,9 +1481,28 @@ private fun normalizeLocaleTag(locale: String): String {
 }
 
 /**
- * Gets list of locales that have dictionary files available.
- * Uses serialized (.dict) from assets and custom/imported folder.
+ * Input languages offered in the add dialog: every dictionary locale plus each
+ * language with a bundled layout (e.g. Uyghur), which needs no dictionary.
  */
+internal fun getAvailableInputStyleLocales(context: Context): List<String> {
+    val dictionaryLocales = getLocalesWithDictionary(context)
+    val coveredLanguages = dictionaryLocales.map { languageOfLocale(it) }.toSet()
+    val layoutLanguages = getBundledLayoutLanguages(context).filterNot { it in coveredLanguages }
+    return (dictionaryLocales + layoutLanguages).distinct().sorted()
+}
+
+private fun languageOfLocale(locale: String): String =
+    normalizeLocaleTag(locale).substringBefore('-').lowercase()
+
+private fun getBundledLayoutLanguages(context: Context): Set<String> = try {
+    val json = context.assets.open("common/locale_layout_mapping.json").bufferedReader().use { org.json.JSONObject(it.readText()) }
+    json.keys().asSequence().map(::languageOfLocale).filter { it.isNotEmpty() }.toSet()
+} catch (e: Exception) {
+    android.util.Log.w("CustomInputStyles", "Error reading bundled locale-layout mapping", e)
+    emptySet()
+}
+
+/** Gets dictionary locales from the catalog, bundled assets and installed packages. */
 private fun getLocalesWithDictionary(context: Context): List<String> {
     val localesWithDict = mutableSetOf<String>()
     localesWithDict.addAll(rocks.pkb.plektra.dictionaries.DictionaryRepositoryManager.offlineCatalog(context).items.map { it.languageTag })
@@ -1597,7 +1613,7 @@ private fun hasDictionaryForLocale(context: Context, locale: String): Boolean {
  * Reads from assets first, then merges with custom file, and saves to custom file.
  * If the locale being updated is currently active in the IME, immediately applies the layout change.
  */
-private fun updateLocaleLayoutMapping(context: Context, locale: String, layout: String) {
+internal fun updateLocaleLayoutMapping(context: Context, locale: String, layout: String) {
     try {
         // Read base mapping from assets
         val assets = context.assets
@@ -1606,27 +1622,30 @@ private fun updateLocaleLayoutMapping(context: Context, locale: String, layout: 
         }
         val json = org.json.JSONObject(baseJsonString)
 
-        // Merge with custom file if it exists
-        val customMappingFile = java.io.File(context.filesDir, "locale_layout_mapping.json")
-        if (customMappingFile.exists() && customMappingFile.canRead()) {
-            try {
-                val customJsonString = customMappingFile.readText()
-                val customJson = org.json.JSONObject(customJsonString)
-                val customKeys = customJson.keys()
-                while (customKeys.hasNext()) {
-                    val key = customKeys.next()
-                    json.put(key, customJson.getString(key))
+        // Read, merge and write in one change, so a concurrent mapping change or restore is not overwritten.
+        rocks.pkb.plektra.inputmethod.DirectBootKeyboardConfig.changeSources(context) {
+            // Merge with custom file if it exists
+            val customMappingFile = java.io.File(context.filesDir, "locale_layout_mapping.json")
+            if (customMappingFile.exists() && customMappingFile.canRead()) {
+                try {
+                    val customJsonString = customMappingFile.readText()
+                    val customJson = org.json.JSONObject(customJsonString)
+                    val customKeys = customJson.keys()
+                    while (customKeys.hasNext()) {
+                        val key = customKeys.next()
+                        json.put(key, customJson.getString(key))
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.w("CustomInputStyles", "Error reading custom mapping, using base only", e)
                 }
-            } catch (e: Exception) {
-                android.util.Log.w("CustomInputStyles", "Error reading custom mapping, using base only", e)
             }
+
+            // Update the locale-layout mapping
+            json.put(locale, layout)
+
+            // Save to custom file
+            customMappingFile.writeText(json.toString(2))
         }
-
-        // Update the locale-layout mapping
-        json.put(locale, layout)
-
-        // Save to custom file
-        customMappingFile.writeText(json.toString(2))
 
         android.util.Log.d("CustomInputStyles", "Updated locale-layout mapping: $locale -> $layout")
 

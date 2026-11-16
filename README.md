@@ -6,9 +6,17 @@
 
 Free software under [GPLv3](LICENSE), with source code you can inspect, modify and share.
 
+Plektra grew out of Pastiera, created by Andrea Palumbo (PalSoftware). Patrick Zauner took over maintenance of Pastiera and later continued the project as Plektra.
+
 [Product page](https://pkb.rocks/) · [Releases](https://github.com/pkb-rocks/plektra/releases) · [Installation guide](docs/getting-started.md)
 
 <a href="https://opencollective.com/plektra"><img src="docs/branding/opencollective-button.png" alt="Support Plektra on Open Collective" width="298" height="48"></a>
+
+## Special thanks to Clicks Technology
+
+We thank [Clicks Technology](https://clicks.tech) for their foundational support. Their support enables us to bring Plektra to more devices and sustain its development over the long term.
+
+Our ambition is to make Plektra **the** keyboard app for power users.
 
 ## Contents
 
@@ -138,7 +146,7 @@ Choose from nine built-in keyboard bar themes.
 
 Use the software keyboard on phones without physical keys, with suggestions, symbols and snippets.
 
-![Cloud Tap and Volcanic Dusk software keyboards shown separately on Pixel 7a](docs/showcase/exports/stable/visuals/16-software-keyboard.png)
+![Four Pixel 7a software keyboards in Cloud Tap, Moon Tap, Classic Cloud and Classic Midnight](docs/showcase/exports/stable/visuals/16-software-keyboard.png)
 
 ### Native QWERTY, AZERTY, and QWERTZ support
 
@@ -204,6 +212,24 @@ scripts/build-nightly-debug.sh 26.10
 ```
 
 To build and install on a connected device, add `--install --device <serial>`. Project structure and checks are in [Development](docs/development.md); maintainers use [Releasing](docs/releasing.md).
+
+For debug builds, copy `.env.example` to `.env`, run `chmod 600 .env`, and enter the speech API keys you use. Both `.env` and backups in `.local-work/device-backups/` are gitignored and contain private data. Build, back up the installed debug app, and install the update with:
+
+```sh
+scripts/build-nightly-debug.sh 26.10 --install --backup --device <serial> --env .env
+```
+
+For an explicit uninstall and reinstall, replace `--backup` with `--reinstall`. This includes a backup of the APK and app data, then restores app data, runtime permissions and keyboard selection. Android Keystore keys do not survive uninstalling: supply replacement keys in `.env` for every speech provider stored in the backup. Missing replacement keys prevent uninstallation. Use this path when replacing a debug build signed with a different key.
+
+To import keys without reinstalling, or back up and restore a debuggable app separately:
+
+```sh
+python3 scripts/setup-speech.py --device <serial> --env .env
+python3 scripts/debug_device.py --device <serial> backup
+python3 scripts/debug_device.py --device <serial> --env .env restore <backup-directory>
+```
+
+Restore requires the same package on the same device with a debuggable APK installed. Only supplied keys and optional speech settings are changed by the key import; omitted settings remain unchanged.
 
 Distributed forks must use their own name, application ID, update endpoints and branding, and must not present themselves as official Plektra releases.
 

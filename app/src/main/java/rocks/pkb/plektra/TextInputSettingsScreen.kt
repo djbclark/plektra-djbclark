@@ -117,12 +117,11 @@ fun TextInputSettingsScreen(
 
     var smartQuotesExpanded by remember { mutableStateOf(false) }
 
-    var clearAltOnSpace by remember {
-        mutableStateOf(SettingsManager.getClearAltOnSpace(context))
-    }
-
     var autoShowKeyboard by remember {
         mutableStateOf(SettingsManager.getAutoShowKeyboard(context))
+    }
+    var autoShowRespectAppVisibility by remember {
+        mutableStateOf(SettingsManager.getAutoShowRespectAppVisibility(context))
     }
 
     var experimentalSmoothCaret by remember {
@@ -494,16 +493,6 @@ fun TextInputSettingsScreen(
 
             SettingsSectionHeader(text = stringResource(R.string.text_input_section_keyboard_behavior))
             SettingsSwitchRow(
-                title = stringResource(R.string.clear_alt_on_space_title),
-                description = stringResource(R.string.clear_alt_on_space_description),
-                checked = clearAltOnSpace,
-                linkId = SettingLinkIds.TEXT_INPUT_CLEAR_ALT_ON_SPACE,
-                onCheckedChange = { enabled ->
-                    clearAltOnSpace = enabled
-                    SettingsManager.setClearAltOnSpace(context, enabled)
-                }
-            )
-            SettingsSwitchRow(
                 title = stringResource(R.string.auto_show_keyboard_title),
                 description = stringResource(R.string.auto_show_keyboard_description),
                 checked = autoShowKeyboard,
@@ -513,6 +502,19 @@ fun TextInputSettingsScreen(
                     SettingsManager.setAutoShowKeyboard(context, enabled)
                 }
             )
+            if (autoShowKeyboard) {
+                SettingsSwitchRow(
+                    title = stringResource(R.string.auto_show_respect_app_visibility_title),
+                    description = stringResource(R.string.auto_show_respect_app_visibility_description),
+                    checked = autoShowRespectAppVisibility,
+                    inset = 32.dp,
+                    linkId = SettingLinkIds.TEXT_INPUT_AUTO_SHOW_RESPECT_APP_VISIBILITY,
+                    onCheckedChange = { enabled ->
+                        autoShowRespectAppVisibility = enabled
+                        SettingsManager.setAutoShowRespectAppVisibility(context, enabled)
+                    }
+                )
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 SettingsSwitchRow(
                     title = stringResource(R.string.experimental_smooth_caret_title),
