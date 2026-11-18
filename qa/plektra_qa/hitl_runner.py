@@ -6,10 +6,10 @@ import difflib
 import time
 from contextlib import nullcontext
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 from rich.console import Console
 from rich.live import Live
 from rich.table import Table
@@ -30,8 +30,12 @@ REPROMPT = "Still waiting. "
 class ChordTrial(BaseModel):
     prompt: str
     expect: str
-    verify_mode: str = "text"
-    sentinel: str = "\n"
+    # `observation` asks the human what they SEE (a short answer such as
+    # "yes", "capitalized" or "2") and scores it exactly like `text`.
+    verify_mode: Literal["text", "clipboard", "observation"] = "text"
+    # None means the suite set no sentinel: text trials take the trailing
+    # Enter, an observation trial takes the bare answer.
+    sentinel: str | None = None
     timeout_s: float = 30
     package: str | None = None
     activity: str | None = None
@@ -51,10 +55,17 @@ class ChordTrial(BaseModel):
     max_reprompts: int = 3
     phase: str = ""
 
+    @model_validator(mode="after")
+    def _default_sentinel(self) -> "ChordTrial":
+        if self.sentinel is None:
+            self.sentinel = "" if self.verify_mode == "observation" else "\n"
+        return self
+
 
 class TrialResult(BaseModel):
     phase: str
     prompt: str
+    mode: str = "text"
     expect: str
     observed: str
     passed: bool
@@ -76,7 +87,8 @@ def load_suite(path: Path, keymap: Keymap | None = None) -> list[ChordTrial]:
     if keymap is None:
         keymap = resolve_keymap().keymap
     timeout_s = float(data.get("timeout_s", 30))
-    sentinel = data.get("sentinel", "\n")
+    # No sentinel here and none at phase or trial level lets the mode decide.
+    sentinel = data.get("sentinel")
     start_wait_s = float(data.get("start_wait_s", 10))
     max_reprompts = int(data.get("max_reprompts", 3))
     trials: list[ChordTrial] = []
@@ -148,6 +160,8 @@ def _table(results: list[TrialResult], current: str) -> Table:
     table.add_column("wpm", justify="right")
     for result in results:
         mark = "pass" if result.passed else "fail"
+        if result.mode == "observation":
+            mark = f"{mark} observed: {result.observed or 'nothing'}"
         table.add_row(
             result.phase,
             result.prompt,
@@ -385,6 +399,7 @@ def _run_trials(
         result = TrialResult(
             phase=trial.phase,
             prompt=trial.prompt,
+            mode=trial.verify_mode,
             expect=trial.expect,
             observed=compared,
             passed=passed,

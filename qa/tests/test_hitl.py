@@ -403,6 +403,119 @@ class _Gate:
         self.events.append(("yield", prompt))
 
 
+class _AnswerField:
+    """Stays empty for a couple of reads, then holds the human's answer."""
+
+    def __init__(self, answer: str, quiet_reads: int = 2) -> None:
+        self.answer = answer
+        self.quiet_reads = quiet_reads
+        self.reads = 0
+
+    def exists(self) -> bool:
+        return True
+
+    def info(self):
+        return SimpleNamespace(focused=True)
+
+    def click(self) -> None:
+        return None
+
+    def clear_text_field(self) -> None:
+        return None
+
+    def get_text(self) -> str:
+        self.reads += 1
+        return "" if self.reads <= self.quiet_reads else self.answer
+
+
+class _AnswerDevice:
+    def __init__(self, field: _AnswerField) -> None:
+        self.field = field
+
+    def __call__(self, **_kwargs):
+        return self.field
+
+
+def _write_suite(tmp_path: Path, trials: str, top: str = "") -> Path:
+    suite = tmp_path / "observation.yaml"
+    suite.write_text(
+        "name: observation\ntimeout_s: 0.2\n"
+        + top
+        + "phases:\n  - name: seen\n    trials:\n"
+        + trials
+    )
+    return suite
+
+
+def _quiet_console() -> Console:
+    console = Console(file=io.StringIO(), force_terminal=False)
+    console.bell = lambda: None
+    return console
+
+
+def test_observation_trial_scores_a_typed_answer_with_no_sentinel(tmp_path):
+    suite = _write_suite(
+        tmp_path,
+        '      - prompt: "did the paste menu appear?"\n'
+        '        expect: "yes"\n'
+        '        verify_mode: observation\n',
+    )
+    trial = load_suite(suite)[0]
+    assert trial.verify_mode == "observation"
+    assert trial.sentinel == ""
+    results = run_chord_batch(
+        ScreenController(_AnswerDevice(_AnswerField("yes"))), [trial], _quiet_console(), _Gate()
+    )
+    assert results[0].passed
+    assert results[0].observed == "yes"
+    assert results[0].mode == "observation"
+    assert results[0].diff == ""
+
+
+def test_observation_trial_fails_a_different_answer(tmp_path):
+    suite = _write_suite(
+        tmp_path,
+        '      - prompt: "is the suggestion bar showing?"\n'
+        '        expect: "yes"\n'
+        '        verify_mode: observation\n',
+    )
+    trial = load_suite(suite)[0]
+    results = run_chord_batch(
+        ScreenController(_AnswerDevice(_AnswerField("no"))), [trial], _quiet_console(), _Gate()
+    )
+    assert not results[0].passed
+    assert results[0].observed == "no"
+    assert results[0].error == ""
+
+
+def test_observation_trial_still_expands_key_tokens(tmp_path):
+    suite = _write_suite(
+        tmp_path,
+        '      - prompt: "press <Ctrl+A>, then answer yes or no"\n'
+        '        expect: "yes"\n'
+        '        verify_mode: observation\n',
+    )
+    trial = load_suite(suite)[0]
+    assert trial.verify_mode == "observation" and trial.sentinel == ""
+    assert "<Ctrl+A>" not in trial.prompt and "your Ctrl" in trial.prompt
+    assert "your Control" in trial.speak
+
+
+def test_a_text_trial_still_defaults_to_the_trailing_enter(tmp_path):
+    suite = _write_suite(
+        tmp_path,
+        '      - prompt: "type the answer"\n        expect: "hello"\n'
+        '      - prompt: "did it show?"\n        expect: "yes"\n'
+        '        verify_mode: observation\n        sentinel: "\\n"\n',
+    )
+    trials = load_suite(suite)
+    assert trials[0].sentinel == "\n"
+    # An explicit sentinel is respected, even for an observation trial.
+    assert trials[1].sentinel == "\n"
+    assert trial_matched("yes\n", "yes", trials[1].sentinel)
+    assert not trial_matched("yes\n", "yes", "")
+
+
 def test_batch_holds_the_screen_then_yields_for_typing():
     gate = _Gate()
     console = Console(file=io.StringIO(), force_terminal=False)

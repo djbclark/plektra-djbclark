@@ -130,7 +130,9 @@ phases:
         clear_field: false       # keep the text from the previous trial
 ```
 
-All trial fields: `prompt`, `expect`, `verify_mode` (`text` or `clipboard`), `sentinel`, `timeout_s`, `shade`, `speak`, `start_wait_s`, `max_reprompts`, `package`, `activity`, `resource_id`, `text_hint`, `click_resource_id`, `clear_field`, `cue_on_device` (the phone beeps too).
+All trial fields: `prompt`, `expect`, `verify_mode` (`text`, `clipboard` or `observation`), `sentinel`, `timeout_s`, `shade`, `speak`, `start_wait_s`, `max_reprompts`, `package`, `activity`, `resource_id`, `text_hint`, `click_resource_id`, `clear_field`, `cue_on_device` (the phone beeps too).
+
+`verify_mode: observation` asks what you see rather than what you type: the same field is prepared, but `expect` is your short answer (`yes`, `no`, `capitalized`, `2`) and it is matched exactly, like a text trial. `sentinel` defaults to `""` for an observation trial, so no Enter is needed; set one at suite, phase or trial level to require it. The rich table and the JSON result mark the trial as an observation and show the answer.
 
 Tips:
 
