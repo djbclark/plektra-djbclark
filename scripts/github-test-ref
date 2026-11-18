@@ -1,0 +1,166 @@
+#!/usr/bin/env bash
+# github-test-ref — run Gradle for any branch/commit on GitHub Actions (never on the Mac).
+#
+#   scripts/github-test-ref [--no-wait] [--release] REF [GRADLE_ARGS...]
+#   scripts/github-test-ref plk/main
+#   scripts/github-test-ref --release plk/main
+#
+# Fork-only (ci/base). Builds an overlay commit = REF's tree + ci/base CI files, with
+# every other .github/workflows/* removed, pushes it to origin ci/run/<slug>, and waits
+# for the Actions run. GRADLE_ARGS default to :app:testStableDebugUnitTest.
+set -euo pipefail
+
+repo=djbclark/plektra-djbclark
+remote=origin
+ci_base_ref=${DJB_CI_BASE_REF:-origin/ci/base}
+
+wait=1
+release=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --no-wait) wait=0; shift ;;
+    --release) release=1; shift ;;
+    -*) echo "github-test-ref: unknown flag $1" >&2; exit 2 ;;
+    *) break ;;
+  esac
+done
+if [ $# -lt 1 ]; then
+  gsed -n '2,12p' "$0" >&2
+  exit 2
+fi
+ref=$1
+shift
+tasks="${*:-:app:testStableDebugUnitTest}"
+if [ "$release" = 1 ]; then
+  tasks=":app:testStableDebugUnitTest :app:assembleStableDebug"
+fi
+
+top=$(git rev-parse --show-toplevel)
+GIT=${GIT:-git}
+
+# Resolve target SHA (prefer already-on-remote).
+if $GIT -C "$top" rev-parse --verify --quiet "$ref^{commit}" >/dev/null; then
+  target_sha=$($GIT -C "$top" rev-parse "$ref^{commit}")
+else
+  echo "github-test-ref: cannot resolve $ref" >&2
+  exit 1
+fi
+
+# Ensure ci/base is available.
+if ! $GIT -C "$top" rev-parse --verify --quiet "$ci_base_ref^{commit}" >/dev/null; then
+  echo "github-test-ref: missing $ci_base_ref; fetch origin ci/base first" >&2
+  exit 1
+fi
+ci_base_sha=$($GIT -C "$top" rev-parse "$ci_base_ref^{commit}")
+
+slug=$(printf '%s' "$ref" | tr '/:' '--' | tr -c 'A-Za-z0-9._-' '-' | cut -c1-40)
+short=${target_sha:0:8}
+# The task list is part of the name, so two runs of one commit with different
+# Gradle args (debug and F-Droid paths) can be pushed at once without colliding.
+tasks_tag=$(printf '%s' "$tasks" | shasum | cut -c1-6)
+branch="ci/run/${slug}-${short}-${tasks_tag}"
+if [ "$release" = 1 ]; then
+  branch="ci/run/release-${short}"
+fi
+
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+$GIT -C "$top" worktree add --detach "$work/src" "$target_sha"
+cd "$work/src"
+
+# Neutralise every workflow from the target tree, then overlay ci/base CI files.
+rm -rf .github/workflows
+mkdir -p .github/workflows .github/ci scripts
+# Copy CI overlay paths from ci/base tree
+for path in \
+  .github/workflows/djb-test-ref.yml \
+  .github/workflows/djb-release.yml \
+  .github/ci/known-failures.gradle \
+  .github/ci/central-mirror.gradle \
+  .github/ci/djb_release.py \
+  scripts/github-test-ref \
+  scripts/github-install-latest
+do
+  if $GIT -C "$top" cat-file -e "${ci_base_sha}:${path}" 2>/dev/null; then
+    mkdir -p "$(dirname "$path")"
+    $GIT -C "$top" show "${ci_base_sha}:${path}" > "$path"
+  fi
+done
+chmod +x scripts/github-test-ref scripts/github-install-latest .github/ci/djb_release.py 2>/dev/null || true
+# tasks.txt / run-meta.env are written fresh below; do not copy placeholders from ci/base.
+
+# Write run metadata consumed by the workflows (tasks may contain spaces).
+printf '%s\n' "$tasks" > .github/ci/tasks.txt
+cat > .github/ci/run-meta.env <<EOF
+TARGET_REF=$ref
+TARGET_SHA=$target_sha
+RELEASE=$release
+EOF
+
+msg="ci: overlay $ref@$short"
+if [ "$release" = 1 ]; then
+  msg="ci: overlay $ref@$short [djb-release]"
+fi
+
+$GIT -C "$work/src" add -A
+$GIT -C "$work/src" -c user.email=ci@localhost -c user.name='plektra-ci' commit -m "$msg" --quiet
+overlay_sha=$($GIT -C "$work/src" rev-parse HEAD)
+
+echo "pushing $branch (overlay $overlay_sha of $ref@$short)"
+timeout 600 $GIT -C "$work/src" push -u "$remote" "HEAD:refs/heads/$branch" --force
+
+# Find the new run for this overlay commit. Both workflows run on every push and
+# one of them skips, so select by workflow file, never just the newest run.
+workflow=djb-test-ref.yml
+[ "$release" = 1 ] && workflow=djb-release.yml
+run_json=$work/run.json
+run_id=
+for _ in 1 2 3 4 5 6 7; do
+  sleep 5
+  timeout 120 gh run list -R "$repo" --workflow "$workflow" --commit "$overlay_sha" --limit 1 \
+    --json databaseId,url,status,conclusion,createdAt,headSha > "$run_json" || continue
+  run_id=$(jq -r '.[0].databaseId // empty' "$run_json")
+  url=$(jq -r '.[0].url // empty' "$run_json")
+  [ -n "$run_id" ] && break
+done
+if [ -z "$run_id" ]; then
+  echo "github-test-ref: pushed $branch but no Actions run found yet" >&2
+  echo "https://github.com/$repo/actions"
+  exit 1
+fi
+echo "dispatched run $run_id for $ref: $tasks"
+echo "$url"
+[ "$wait" = 1 ] || exit 0
+
+logdir="$HOME/.local/state/plektra-ci"
+mkdir -p "$logdir"
+# Poll in <=8 min chunks (Cursor turn safety).
+deadline=$(( $(date +%s) + ${DJB_CI_WAIT:-5400} ))
+while :; do
+  chunk_deadline=$(( $(date +%s) + 480 ))
+  if [ "$chunk_deadline" -gt "$deadline" ]; then
+    chunk_deadline=$deadline
+  fi
+  while [ "$(date +%s)" -lt "$chunk_deadline" ]; do
+    # A transient API error must not end the wait (set -e).
+    if ! timeout 60 gh run view "$run_id" -R "$repo" --json status,conclusion,url > "$work/status.json"; then
+      sleep 30
+      continue
+    fi
+    status=$(jq -r .status "$work/status.json")
+    conclusion=$(jq -r .conclusion "$work/status.json")
+    case "$status" in
+      completed)
+        timeout 120 gh run view "$run_id" -R "$repo" --log > "$logdir/run-$run_id.log" || true
+        echo "run $run_id: $conclusion ($url, log $logdir/run-$run_id.log)"
+        [ "$conclusion" = success ]
+        exit $?
+        ;;
+    esac
+    sleep 30
+  done
+  if [ "$(date +%s)" -ge "$deadline" ]; then
+    echo "github-test-ref: run $run_id still $status after ${DJB_CI_WAIT:-5400} s: $url" >&2
+    exit 1
+  fi
+done
