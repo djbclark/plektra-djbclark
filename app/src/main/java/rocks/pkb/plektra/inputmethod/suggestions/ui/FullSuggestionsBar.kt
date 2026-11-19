@@ -27,6 +27,8 @@ import rocks.pkb.plektra.R
 import rocks.pkb.plektra.SettingsActivity
 import rocks.pkb.plektra.inputmethod.NotificationHelper
 import rocks.pkb.plektra.inputmethod.suggestions.SuggestionButtonHandler
+import rocks.pkb.plektra.core.suggestions.CasingHelper
+import rocks.pkb.plektra.inputmethod.AutoCapitalizeHelper
 import rocks.pkb.plektra.inputmethod.VariationButtonHandler
 import rocks.pkb.plektra.inputmethod.ui.HamburgerMenuView
 import rocks.pkb.plektra.inputmethod.ui.KeyboardThemeColors
@@ -698,6 +700,13 @@ class FullSuggestionsBar(
         } else {
             listOf(slots[0], slots[1], slots[2]) // left, center, right
         }
+        // The label must match what tapping inserts: when auto-cap is armed,
+        // the click path capitalizes the first letter, so the label must too.
+        val forceLeadingCapital = AutoCapitalizeHelper.shouldAutoCapitalizeAtCursor(
+            context = context,
+            inputConnection = inputConnection,
+            shouldDisableAutoCapitalize = shouldDisableSuggestions
+        ) && SettingsManager.getAutoCapitalizeFirstLetter(context)
         val canReuseButtons = actionCandidate == null && bar.childCount == slotOrder.size &&
             (0 until bar.childCount).all { bar.getChildAt(it) is TextView }
         if (!canReuseButtons) bar.removeAllViews()
@@ -732,7 +741,9 @@ class FullSuggestionsBar(
                 setCompoundDrawables(null, null, null, null)
                 contentDescription = null
                 alpha = 1f
-                text = (suggestion ?: "")
+                text = if (suggestion != null && forceLeadingCapital)
+                    CasingHelper.applyCasing(suggestion, "", forceLeadingCapital = true)
+                else suggestion ?: ""
                 gravity = if (continuousSpeechPreview) Gravity.CENTER_VERTICAL or Gravity.END else Gravity.CENTER
                 KeyboardBarTypography.applyAutoSize(this, minTextSp, maxTextSp)
                 if (continuousSpeechPreview) {
