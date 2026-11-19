@@ -101,3 +101,14 @@ out of ScreenGate.__enter__/__exit__ into a session-level qa-prep / qa-end (or a
 for N minutes" applied first); the per-pass ScreenGate should only do inversion/shade/heads-up, not own
 the timeout. Also: wm dismiss-keyguard cannot clear a PIN/pattern (README already says the harness will
 not enter a PIN), so the 30-min hold only prevents RE-locking after the operator unlocks once.
+
+## Prior art from ~/ops/stayturgid (operator, 2026-11-19)
+Architecture is the improved line (ScreenGate ~ stayturgid control/lib/screen_control.py, inversion
+fail-closed + restore), but two pieces are worth borrowing:
+1. stayturgid/device/termux/py/stayturgid_screen_awake_guard.py - an on-device guard that, while the
+   screen is held awake, keeps a notification offering ONE TAP to restore normal screen lock. This is
+   the prior art for the "notification with a button to reset to default" harness requirement: borrow
+   the on-device notification + restore-action pattern.
+2. stayturgid/control/lib/device_screen_lease.py (DSCL v1) - cross-project screen-control lease at
+   ~/.local/state/device-screen-control/leases/ so multiple agents don't fight over the same phone.
+   Adopt this (or its protocol) so the QA harness and stayturgid cannot both drive the Titan at once.
