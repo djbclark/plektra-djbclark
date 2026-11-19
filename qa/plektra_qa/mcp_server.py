@@ -56,13 +56,18 @@ def _interesting(node: ElementTree.Element) -> bool:
 
 
 def _node_row(node: ElementTree.Element) -> dict[str, object]:
-    return {
+    row = {
         "resourceId": node.attrib.get("resource-id", ""),
         "text": node.attrib.get("text", ""),
         "className": node.attrib.get("class", ""),
+        "contentDescription": node.attrib.get("content-desc", ""),
         "bounds": node.attrib.get("bounds", ""),
         "focused": node.attrib.get("focused", "false") == "true",
     }
+    hint = node.attrib.get("hint", "")
+    if hint:
+        row["hint"] = hint
+    return row
 
 
 @mcp.tool()

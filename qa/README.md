@@ -203,6 +203,8 @@ The keymap is read once at the start. Change a key setting during a run and the 
 | `execute_ui_action` | One click or key press on a selector (behind the screen gate). |
 | `request_human_chord_batch` | Run trials (a JSON list of trial objects) with a person typing, and return the report. It blocks until the person is done. |
 
+Navigation is a key event, not a gesture. Suites call `execute_ui_action` with `action="press_key"`, which runs `device.press_key`. Home, Back and Recents are `KEY_HOME`, `KEY_BACK` and `KEY_RECENT` (pass `key` as `HOME`, `BACK` or `RECENT`). The harness adds no swipe logic.
+
 Rules for agents:
 
 1. Start a run only when the person has asked and is holding the phone. Tell them first what they will see and hear.
@@ -243,6 +245,7 @@ The tests use fakes and need no phone.
 | `plektra_qa/speech.py` | The voice backends and the phrase cache. |
 | `plektra_qa/keys.py` | Key tokens, the keymap (live or profile), the renderer and the lint. |
 | `plektra_qa/controller.py` | Opening activities, focusing and clearing fields, reading text. |
+| `plektra_qa/screen.py` | A short hash of package, activity and the screen's ids and content-descs. |
 | `plektra_qa/connection.py` | The certificate-authenticated FIRERPA connection. |
 | `plektra_qa/mcp_server.py` / `cli.py` | The MCP server and the `plektra-qa` command. |
 | `suites/` | Trial suites. |
