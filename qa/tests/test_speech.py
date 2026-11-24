@@ -151,7 +151,7 @@ def test_without_a_voice_the_old_start_window_still_applies():
 
 def test_suite_carries_voice_timing_and_spoken_lines():
     trials = load_suite(ROOT / "suites" / "smoke_chords.yaml")
-    assert all(t.start_wait_s == 10 and t.max_reprompts == 3 for t in trials)
+    assert all(t.start_wait_s == 10 and t.max_reprompts is None and t.timeout_s is None for t in trials)
     spoken = {t.speak for t in trials if t.speak}
     assert "Type: a, comma, space, b, period." in spoken
 

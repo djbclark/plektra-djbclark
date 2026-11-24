@@ -26,7 +26,6 @@ SETTLE_S = 1.5  # a match counts only after the text stays put this long: people
 STOPPED = "stopped from the phone"
 NOT_STARTED = "never started after the spoken prompts"
 SKIPPED = "skipped from the phone"
-OVERLAY_IDLE_S = 300.0  # with the button bar only Done ends a trial; this just stops a forgotten run
 HANDS_OFF = "Hands off. Get ready."
 FINISHED = "Testing finished."
 REPROMPT = "Still waiting. "
@@ -37,7 +36,7 @@ class ChordTrial(BaseModel):
     expect: str
     verify_mode: str = "text"
     sentinel: str = "\n"
-    timeout_s: float = 30
+    timeout_s: float | None = None  # None: wait for the person without a limit
     package: str | None = None
     activity: str | None = None
     resource_id: str | None = None
@@ -53,7 +52,7 @@ class ChordTrial(BaseModel):
     # and how many times. With a voice, `timeout_s` counts from the first
     # key that changes the field, not from the prompt.
     start_wait_s: float = 10
-    max_reprompts: int = 3
+    max_reprompts: int | None = None  # None: keep reprompting, never give up
     phase: str = ""
 
 
@@ -80,10 +79,12 @@ def load_suite(path: Path, keymap: Keymap | None = None) -> list[ChordTrial]:
     data = yaml.safe_load(path.read_text())
     if keymap is None:
         keymap = resolve_keymap().keymap
-    timeout_s = float(data.get("timeout_s", 30))
+    raw_timeout = data.get("timeout_s")
+    timeout_s = float(raw_timeout) if raw_timeout is not None else None
     sentinel = data.get("sentinel", "\n")
     start_wait_s = float(data.get("start_wait_s", 10))
-    max_reprompts = int(data.get("max_reprompts", 3))
+    raw_reprompts = data.get("max_reprompts")
+    max_reprompts = int(raw_reprompts) if raw_reprompts is not None else None
     trials: list[ChordTrial] = []
     for phase in data.get("phases", []):
         phase_name = str(phase.get("name", ""))
@@ -273,7 +274,7 @@ class _Reprompter:
         self.speaker = speaker if speaker is not None and speaker.enabled else None
         self.text = spoken_action(trial)
         self.wait_s = trial.start_wait_s
-        self.left = trial.max_reprompts
+        self.left = trial.max_reprompts if trial.max_reprompts is not None else 10**9
         self.quiet_since: float | None = None
 
     @property
@@ -334,7 +335,8 @@ def _run_trials(
     on_result: Callable[[int, TrialResult], None] | None = None,
     overlay: ButtonBar | None = None,
 ) -> list[TrialResult]:
-    idle_s_for = lambda trial: OVERLAY_IDLE_S if overlay is not None else trial.timeout_s  # noqa: E731
+    # No limit unless the suite or the operator sets `timeout_s`.
+    idle_s_for = lambda trial: float("inf") if trial.timeout_s is None else trial.timeout_s  # noqa: E731
     for index, trial in enumerate(trials):
         error = ""
         element = None

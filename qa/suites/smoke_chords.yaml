@@ -1,8 +1,6 @@
 name: smoke_chords
-timeout_s: 30
 # Spoken prompts: quiet seconds before the action is said again, and how often.
 start_wait_s: 10
-max_reprompts: 3
 sentinel: "\n"
 phases:
   - name: one_screen

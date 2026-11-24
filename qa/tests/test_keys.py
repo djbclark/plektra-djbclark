@@ -99,7 +99,7 @@ def test_render_without_tokens_is_unchanged():
 def test_render_function_keys_and_alternatives():
     assert screen("Press <Backspace>") == "Press your Backspace. Keycaps: tap ⌫."
     out = screen("<Tab|Enter> on Plektra")
-    assert out.startswith("Your Tab or your Enter on Plektra. Keycaps: tap Recent or tap right ⇧")
+    assert out.startswith("Your Tab or your Enter on Plektra. Keycaps: tap □ or tap right ⇧")
     assert "Shift + your Tab" in screen("<Shift+Tab>")
 
 
@@ -251,7 +251,7 @@ def test_smoke_suite_uses_tokens_and_keeps_its_expectations():
     backspace, tab, chord = trials[3], trials[5], trials[6]
     assert "your Backspace" in backspace.shade and "Keycaps: ⌫." in backspace.shade
     assert "your Tab or your Enter" in tab.shade
-    assert "tap Recent or tap right ⇧" in tab.shade or "Recent or right ⇧" in tab.shade
+    assert "tap □ or tap right ⇧" in tab.shade or "□ or right ⇧" in tab.shade
     assert chord.shade == "Press your Ctrl + A, then your Ctrl + C. Keycaps: Fn+A, then Fn+C."
     assert "Control plus letter A" in chord.speak
     assert chord.verify_mode == "clipboard" and chord.clear_field is False

@@ -145,10 +145,10 @@ Eine Suite ist YAML. Einstellungen oben gelten für jeden Versuch; eine Phase od
 
 ```yaml
 name: my_suite
-timeout_s: 30          # Sekunden bis zum Ende, sobald getippt wird
+# timeout_s: 60      # optional: Sekunden Ruhe bis ein Versuch endet; ohne Angabe wartet ein Versuch ohne Limit
 sentinel: "\n"         # ein abschließendes Enter zählt auch als fertig
 start_wait_s: 10       # ruhige Sekunden, bevor die Aktion wiederholt wird
-max_reprompts: 3
+# max_reprompts: 3   # optional; ohne Angabe wird die Aktion wiederholt, bis die Person anfängt
 phases:
   - name: notes
     resource_id: branislav667.pinnote:id/pin_text

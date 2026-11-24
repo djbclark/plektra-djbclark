@@ -143,10 +143,10 @@ A suite is YAML. Settings at the top apply to every trial, and a phase or a tria
 
 ```yaml
 name: my_suite
-timeout_s: 30          # seconds to finish once typing has started
+# timeout_s: 60      # optional: seconds of quiet before a trial ends; by default a trial waits without limit
 sentinel: "\n"         # a trailing Enter also counts as done
 start_wait_s: 10       # quiet seconds before the action is said again
-max_reprompts: 3
+# max_reprompts: 3   # optional; by default the action is repeated until the person starts
 phases:
   - name: notes
     resource_id: branislav667.pinnote:id/pin_text

@@ -319,9 +319,9 @@ def test_a_match_alone_does_not_end_the_trial_with_the_bar():
     field = _TimedField([(0.1, "hello")])
     bar = _FakeBar([(1.2, "done")])
     started = time.perf_counter()
-    results, _ = _run(field, bar, [ChordTrial(prompt="a: hello", expect="hello", timeout_s=0.3)])
+    results, _ = _run(field, bar, [ChordTrial(prompt="a: hello", expect="hello")])
     assert results[0].passed
-    assert time.perf_counter() - started >= 1.2  # waited for Done, not the 0.3 s timeout
+    assert time.perf_counter() - started >= 1.2  # no timeout by default: it waited for Done
 
 
 def test_done_with_the_wrong_text_fails_the_trial():

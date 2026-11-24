@@ -66,9 +66,10 @@ keycaps:
     spoken: "the space bar"
     native: 62
   - id: recent
-    # The glyph on this keycap is not verified (facts section 2.1): named by function.
-    screen: "Recent"
-    spoken: "the Recent key"
+    # djbclark, 2026-11-24: name the symbol keys by their shapes. Square is the standard
+    # Android Recent glyph; confirm it against the printed keycap.
+    screen: "□"
+    spoken: "the key printed square"
     native: 187
     scan: 580
     vendor: recent
@@ -79,9 +80,8 @@ keycaps:
     scan: 102
     vendor: home
   - id: back
-    # The glyph on this keycap is not verified (facts section 2.1): named by function.
-    screen: "Back"
-    spoken: "the Back key"
+    screen: "◁"
+    spoken: "the key printed triangle"
     native: 4
     scan: 158
     vendor: back
