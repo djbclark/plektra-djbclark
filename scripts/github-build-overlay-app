@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+# github-build-overlay-app — build the HITL button bar overlay app (qa/overlay-app) on GitHub Actions.
+#
+#   scripts/github-build-overlay-app [--no-wait] [--release] REF
+#   scripts/github-build-overlay-app plk/main
+#   scripts/github-build-overlay-app --release plk/main   # also attach the APK to a GitHub release
+#
+# Fork-only (ci/base). Like github-test-ref: an overlay commit = REF's tree + the overlay-app workflow
+# (every other workflow removed), pushed to origin ci/run/overlay-app-<sha8>[-release]. The APK is
+# the artifact hitl-button-bar-<sha8> of the run and, with --release, the asset of the release
+# overlay-app-<UTC time>-<sha8>. Never builds on this machine.
+set -euo pipefail
+
+repo=djbclark/plektra-djbclark
+remote=origin
+ci_base_ref=${DJB_CI_BASE_REF:-origin/ci/base}
+GIT=${GIT:-git}
+
+wait=1
+release=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --no-wait) wait=0; shift ;;
+    --release) release=1; shift ;;
+    -*) echo "github-build-overlay-app: unknown flag $1" >&2; exit 2 ;;
+    *) break ;;
+  esac
+done
+if [ $# -ne 1 ]; then
+  gsed -n '2,10p' "$0" >&2
+  exit 2
+fi
+ref=$1
+
+top=$($GIT rev-parse --show-toplevel)
+target_sha=$($GIT -C "$top" rev-parse --verify "$ref^{commit}")
+ci_base_sha=$($GIT -C "$top" rev-parse --verify "$ci_base_ref^{commit}")
+short=${target_sha:0:8}
+branch="ci/run/overlay-app-$short"
+[ "$release" = 1 ] && branch="$branch-release"
+
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+$GIT -C "$top" worktree add --detach "$work/src" "$target_sha"
+cd "$work/src"
+if [ ! -f qa/overlay-app/settings.gradle.kts ]; then
+  echo "github-build-overlay-app: $ref has no qa/overlay-app" >&2
+  exit 1
+fi
+
+rm -rf .github/workflows
+mkdir -p .github/workflows .github/ci
+for path in .github/workflows/djb-overlay-app.yml .github/ci/central-mirror.gradle; do
+  $GIT -C "$top" show "$ci_base_sha:$path" > "$path"
+done
+cat > .github/ci/run-meta.env <<EOF
+TARGET_REF=$ref
+TARGET_SHA=$target_sha
+RELEASE=$release
+EOF
+
+$GIT add -A
+$GIT -c user.email=ci@localhost -c user.name='plektra-ci' commit --quiet -m "ci: overlay-app $ref@$short"
+overlay_sha=$($GIT rev-parse HEAD)
+echo "pushing $branch (overlay $overlay_sha of $ref@$short)"
+timeout 600 $GIT push -u "$remote" "HEAD:refs/heads/$branch" --force
+
+run_json=$work/run.json
+run_id=
+for _ in 1 2 3 4 5 6 7; do
+  sleep 5
+  timeout 120 gh run list -R "$repo" --workflow djb-overlay-app.yml --commit "$overlay_sha" --limit 1 \
+    --json databaseId,url > "$run_json" || continue
+  run_id=$(jq -r '.[0].databaseId // empty' "$run_json")
+  url=$(jq -r '.[0].url // empty' "$run_json")
+  [ -n "$run_id" ] && break
+done
+if [ -z "$run_id" ]; then
+  echo "github-build-overlay-app: pushed $branch but no Actions run found yet: https://github.com/$repo/actions" >&2
+  exit 1
+fi
+echo "dispatched run $run_id: $url"
+[ "$wait" = 1 ] || exit 0
+
+deadline=$(( $(date +%s) + ${DJB_CI_WAIT:-2700} ))
+while :; do
+  if timeout 60 gh run view "$run_id" -R "$repo" --json status,conclusion > "$work/status.json"; then
+    if [ "$(jq -r .status "$work/status.json")" = completed ]; then
+      conclusion=$(jq -r .conclusion "$work/status.json")
+      echo "run $run_id: $conclusion ($url)"
+      [ "$conclusion" = success ]
+      exit $?
+    fi
+  fi
+  if [ "$(date +%s)" -ge "$deadline" ]; then
+    echo "github-build-overlay-app: run $run_id still running: $url" >&2
+    exit 1
+  fi
+  sleep 30
+done
