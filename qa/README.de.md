@@ -105,7 +105,23 @@ Tasten und Berührungen kommen aus `getevent` des Telefons; der Gleichlauf mit d
 
 ### Schaltflächenleiste statt Benachrichtigungskarte (optional)
 
-`just qa-run SUITE --bar` zeigt eine kleine Leiste mit **Fertig** (Done), **Weiter** (Next) und **Stopp** (Stop) auf dem Bildschirm, statt die Benachrichtigungsleiste herunterzuziehen. Ein Versuch endet erst, wenn du **Done** drückst, du kannst also vorher einen Tippfehler korrigieren. **Next** überspringt den Versuch (wird als übersprungen vermerkt); **Stop** beendet den Durchlauf. Die Leiste ist eine Begleit-App (`--bar-package`, Standard `dev.hitlbar.overlay`; sie braucht die Berechtigung „über anderen Apps einblenden“). Der Host steuert sie per `am broadcast -a <package>.SHOW|HIDE` und liest die Antworten aus Logcat-Zeilen mit dem Tag `QAOVERLAY` (`shown`, `hidden`, `button=done|next|stop`). Meldet die Leiste nicht innerhalb von 5 s `shown`, schlägt der Versuch mit einer klaren Fehlermeldung fehl. Die App selbst ist noch zu schreiben (`qa/overlay-app/`); die Host-Seite steht in `plektra_qa/button_bar.py`.
+`just qa-run SUITE --bar` zeigt eine kleine Leiste mit **Fertig** (Done), **Weiter** (Next) und **Stopp** (Stop) auf dem Bildschirm, statt die Benachrichtigungsleiste herunterzuziehen. Ein Versuch endet erst, wenn du **Done** drückst, du kannst also vorher einen Tippfehler korrigieren. **Next** überspringt den Versuch (wird als übersprungen vermerkt); **Stop** beendet den Durchlauf. Die Leiste ist eine Begleit-App (`--bar-package`, Standard `dev.hitlbar.overlay`; sie braucht die Berechtigung „über anderen Apps einblenden“). Der Host steuert sie per `am broadcast -a <package>.SHOW|HIDE` und liest die Antworten aus Logcat-Zeilen mit dem Tag `QAOVERLAY` (`shown`, `hidden`, `button=done|next|stop`). Meldet die Leiste nicht innerhalb von 5 s `shown`, schlägt der Versuch mit einer klaren Fehlermeldung fehl. Die App liegt in `qa/overlay-app/` (siehe deren README); die Host-Seite steht in `plektra_qa/button_bar.py`.
+
+**Installieren** (einmal je Telefon; nur auf einem Entwicklergerät, denn die App zeichnet über anderen Apps und nimmt Broadcasts von adb an): die APK auf GitHub Actions bauen (Workflow `djb-overlay-app.yml` auf `ci/base`, Start mit `scripts/github-build-overlay-app --release plk/main`), `hitl-button-bar-<sha8>.apk` aus dem Release `overlay-app-<UTC-Zeit>-<sha8>` laden, dann:
+
+```bash
+adb install -r hitl-button-bar-<sha8>.apk
+adb shell appops set dev.hitlbar.overlay SYSTEM_ALERT_WINDOW allow   # oder: Einstellungen, Apps, HITL button bar, Über anderen Apps einblenden
+```
+
+**Rauchtest** (ein Mensch mit dem Telefon in der Hand): In einem Terminal `adb logcat -s QAOVERLAY:I` laufen lassen, in einem zweiten:
+
+```bash
+adb shell am broadcast -a dev.hitlbar.overlay.SHOW -p dev.hitlbar.overlay --es text "Rauchtest: Done druecken" --es buttons done,next,stop
+adb shell am broadcast -a dev.hitlbar.overlay.HIDE -p dev.hitlbar.overlay
+```
+
+Erwartet: Nach dem ersten Befehl erscheint die Leiste oben unter der Statusleiste, die Tastatur eines offenen Textfelds bleibt oben, und Logcat zeigt `QAOVERLAY shown seq=1`. Done drücken: `QAOVERLAY button=done seq=2` (Next und Stop ergeben `button=next` und `button=stop`). Nach dem zweiten Befehl ist die Leiste weg, und Logcat zeigt `QAOVERLAY hidden seq=3`. Ohne die Berechtigung erscheint nach dem ersten Befehl stattdessen `QAOVERLAY error=no-permission seq=1`, und es erscheint nichts.
 
 ## 5. Ergebnisse lesen
 

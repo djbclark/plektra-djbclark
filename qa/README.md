@@ -103,7 +103,23 @@ Keys and touches come from the phone's `getevent`; sync with the picture is with
 
 ### Button bar instead of the shade card (optional)
 
-`just qa-run SUITE --bar` shows a small on-screen bar with **Done**, **Next** and **Stop** instead of pulling down the notification shade. A trial ends only when you press **Done**, so you can fix a typo first. **Next** skips the trial (it is recorded as skipped); **Stop** ends the batch. The bar is a companion app (`--bar-package`, default `dev.hitlbar.overlay`; it needs the draw-over-apps permission). The host talks to it by `am broadcast -a <package>.SHOW|HIDE` and reads the answers from logcat lines with tag `QAOVERLAY` (`shown`, `hidden`, `button=done|next|stop`). If the bar does not report `shown` within 5 s, the trial fails with a clear error. The app itself is still to be written (`qa/overlay-app/`); the host side is in `plektra_qa/button_bar.py`.
+`just qa-run SUITE --bar` shows a small on-screen bar with **Done**, **Next** and **Stop** instead of pulling down the notification shade. A trial ends only when you press **Done**, so you can fix a typo first. **Next** skips the trial (it is recorded as skipped); **Stop** ends the batch. The bar is a companion app (`--bar-package`, default `dev.hitlbar.overlay`; it needs the draw-over-apps permission). The host talks to it by `am broadcast -a <package>.SHOW|HIDE` and reads the answers from logcat lines with tag `QAOVERLAY` (`shown`, `hidden`, `button=done|next|stop`). If the bar does not report `shown` within 5 s, the trial fails with a clear error. The app is in `qa/overlay-app/` (see its README); the host side is in `plektra_qa/button_bar.py`.
+
+**Install** (once per phone; a developer device only, since the app draws over other apps and takes broadcasts from adb): build the APK on GitHub Actions (workflow `djb-overlay-app.yml` on `ci/base`, run with `scripts/github-build-overlay-app --release plk/main`), download `hitl-button-bar-<sha8>.apk` from the `overlay-app-<UTC time>-<sha8>` release, then:
+
+```bash
+adb install -r hitl-button-bar-<sha8>.apk
+adb shell appops set dev.hitlbar.overlay SYSTEM_ALERT_WINDOW allow   # or: Settings, Apps, HITL button bar, Display over other apps
+```
+
+**Smoke test** (a human with the phone in hand): in one terminal run `adb logcat -s QAOVERLAY:I`, in another:
+
+```bash
+adb shell am broadcast -a dev.hitlbar.overlay.SHOW -p dev.hitlbar.overlay --es text "Smoke test: press Done" --es buttons done,next,stop
+adb shell am broadcast -a dev.hitlbar.overlay.HIDE -p dev.hitlbar.overlay
+```
+
+Expected: after the first command the bar appears at the top below the status bar, the keyboard of any open text field stays up, and logcat prints `QAOVERLAY shown seq=1`. Press Done: `QAOVERLAY button=done seq=2` (Next and Stop print `button=next` and `button=stop`). After the second command the bar is gone and logcat prints `QAOVERLAY hidden seq=3`. Without the permission the first command prints `QAOVERLAY error=no-permission seq=1` instead and nothing appears.
 
 ## 5. Read the results
 

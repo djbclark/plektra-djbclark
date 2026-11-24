@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- The only permission: draw over other apps. No network, no storage. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <application
+        android:allowBackup="false"
+        android:label="HITL button bar"
+        android:theme="@android:style/Theme.DeviceDefault.DayNight">
+
+        <!-- Explains the app and opens the "draw over other apps" screen. Nothing else. -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          Exported so that `adb shell am broadcast` can reach it, but only senders that hold
+          android.permission.DUMP (the adb shell user; no normal app can get it) are delivered.
+        -->
+        <receiver
+            android:name=".BarReceiver"
+            android:exported="true"
+            android:permission="android.permission.DUMP">
+            <intent-filter>
+                <action android:name="dev.hitlbar.overlay.SHOW" />
+                <action android:name="dev.hitlbar.overlay.HIDE" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>
