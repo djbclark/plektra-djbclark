@@ -153,7 +153,18 @@ class Interpreter:
     # -- keys ---------------------------------------------------------------
 
     def _key(self, now: float, ev: Event) -> None:
-        if ev.code in ("BTN_TOUCH",) or ev.code.startswith("BTN_TOOL"):
+        if ev.code == "BTN_TOUCH":
+            # Devices without tracking ids (the keyboard's trackpad) mark a
+            # finger only by BTN_TOUCH: slot 0, down at DOWN, lifted at UP.
+            slot = (ev.dev, self._slot.get(ev.dev, 0))
+            if ev.value == "DOWN":
+                self._pos.setdefault(slot, [0, 0])
+                self._fingers.pop(slot, None)
+                self._pending_up.pop(slot, None)
+            elif ev.value == "UP" and slot in self._pos:
+                self._pending_up[slot] = ev.ts
+            return
+        if ev.code.startswith("BTN_TOOL"):
             return
         if not (ev.code.startswith("KEY_") or ev.code.startswith("BTN_")):
             return

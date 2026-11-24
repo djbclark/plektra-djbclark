@@ -87,6 +87,29 @@ def test_a_short_still_touch_is_a_tap_and_a_long_one_a_long_press():
     assert j.touch_timeline()[-1].text.startswith("LONG PRESS (540, 600)")
 
 
+def test_a_device_with_only_btn_touch_still_gives_taps_and_swipes():
+    i = Interpreter(Geometry())
+
+    def frame(t, x, y, btn=None):
+        if btn:
+            run(i, [(t, ev(t, 4, "EV_KEY", "BTN_TOUCH", btn))])
+        run(i, [
+            (t, ev(t, 4, "EV_ABS", "ABS_MT_POSITION_X", f"{x:08x}")),
+            (t, ev(t, 4, "EV_ABS", "ABS_MT_POSITION_Y", f"{y:08x}")),
+            (t, ev(t, 4, "EV_SYN", "SYN_MT_REPORT", "00000000")),
+            (t, ev(t, 4, "EV_SYN", "SYN_REPORT", "00000000")),
+        ])
+
+    frame(1.0, 100, 100, "DOWN")
+    frame(1.05, 101, 100)
+    run(i, [(1.1, ev(1.1, 4, "EV_KEY", "BTN_TOUCH", "UP")), (1.1, ev(1.1, 4, "EV_SYN", "SYN_REPORT", "00000000"))])
+    assert i.touch_timeline()[-1].text == "TAP (101, 100)"
+    frame(2.0, 100, 500, "DOWN")
+    frame(2.1, 100, 100)
+    run(i, [(2.2, ev(2.2, 4, "EV_KEY", "BTN_TOUCH", "UP")), (2.2, ev(2.2, 4, "EV_SYN", "SYN_REPORT", "00000000"))])
+    assert i.touch_timeline()[-1].text.startswith("SWIPE up (100, 500) to (100, 100)")
+
+
 def test_a_swipe_names_its_direction_and_endpoints_and_the_pad_is_labelled():
     i = Interpreter(parse_geometry(LP, "Physical size: 1080x1200"))
     touch(i, 6, 5.0, [(540, 900), (540, 700), (540, 300)])

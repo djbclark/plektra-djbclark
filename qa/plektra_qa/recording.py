@@ -331,7 +331,7 @@ class Recorder:
                 self.warnings.append(f"voice track failed, video only: {exc}")
                 track = b""
             length = max(length, len(track) / (SAMPLE_RATE * BYTES_PER_SAMPLE))
-            width, _height = self._size()
+            width, height = self._size()
             marks = [(t - self._t0, title) for t, title in self._marks]
             items = chapters(marks, length)
             meta = work / "chapters.ffmeta"
@@ -347,12 +347,14 @@ class Recorder:
                 audio = "2"
             meta_index = 3 if track else 2
             cmd += ["-i", str(meta)]
-            # A still screen sends few frames, so the raw video can end seconds
+            # A rotation changes scrcpy's frame size mid-stream, so every frame is
+            # fitted to the first one's size. A still screen sends few frames, so the raw video can end seconds
             # before the run does: steady 30 fps, last frame held to the run's
             # length. The band (timecode, keys, touches) goes on top, so the
             # phone's own picture is never covered.
             graph = (
-                f"[0:v]fps={FPS},tpad=stop_mode=clone:stop_duration=3600,format=rgb24[v];"
+                f"[0:v]fps={FPS},scale={width}:{height}:force_original_aspect_ratio=decrease,"
+                f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,tpad=stop_mode=clone:stop_duration=3600,format=rgb24[v];"
                 "[1:v][v]vstack=inputs=2:shortest=1,format=yuv420p[out]"
             )
             cmd += ["-filter_complex", graph, "-map", "[out]"]
