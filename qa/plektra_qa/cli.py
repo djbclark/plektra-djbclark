@@ -132,14 +132,14 @@ def run(
     console.print(f"voice: {speaker.backend} (PLEKTRA_QA_VOICE=auto|kokoro|say|espeak|off)")
     try:
         # A human batch never starts on its own: card, voice, then the person's go.
-        StartGate(require_serial(), speaker=speaker, console=console).wait(
-            f"Plektra QA: {suite.name}", batch_instruction(len(trials))
-        )
-        with recording(require_serial(), speaker, record, record_dir, panel=panel) as recorder:
-            if recorder is not None:
-                voice = "with the voice" if speaker.enabled else "video only (voice is off)"
-                console.print(f"recording the screen {voice} to {recorder.output}")
-            with ButtonBar(require_serial(), package=bar_package) if bar else nullcontext() as button_bar:
+        with ButtonBar(require_serial(), package=bar_package) if bar else nullcontext() as button_bar:
+            StartGate(require_serial(), speaker=speaker, console=console, bar=button_bar).wait(
+                f"Plektra QA: {suite.name}", batch_instruction(len(trials))
+            )
+            with recording(require_serial(), speaker, record, record_dir, panel=panel) as recorder:
+                if recorder is not None:
+                    voice = "with the voice" if speaker.enabled else "video only (voice is off)"
+                    console.print(f"recording the screen {voice} to {recorder.output}")
                 results = run_chord_batch(
                     controller, trials, console, gate, speaker,
                     on_trial=recorder.on_trial if recorder is not None else None,

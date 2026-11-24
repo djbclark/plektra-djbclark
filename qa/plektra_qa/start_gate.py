@@ -75,7 +75,9 @@ class StartGate:
         sleep: Callable[[float], None] = time.sleep,
         terminal: Callable[[], str | None] | None = None,
         timeout_s: float = START_TIMEOUT_S,
+        bar: Any | None = None,
     ) -> None:
+        self.bar = bar  # a started ButtonBar: the start card goes on it, not on the shade
         self.serial = serial
         self.speaker = speaker
         self.console = console or Console()
@@ -95,8 +97,10 @@ class StartGate:
         the batch starts without waiting for a second signal.
         """
         text = card_text(title, instruction, phone=True, terminal=self._terminal_enabled)
+        if self.bar is not None:
+            text = text.replace("press any key or tap the screen", "press Done on the bar or any key")
         self.console.print(f"[bold]{title}[/bold]\n{text}")
-        self._post(title, text)
+        self._show_card(title, text)
         if self.speaker is not None:
             self.speaker.say(text)
         if confirmed:
@@ -111,6 +115,8 @@ class StartGate:
                 now = self._clock()
                 if events and now - shown >= SETTLE_S:
                     return self._done("phone")
+                if self.bar is not None and now - shown >= SETTLE_S and self.bar.pressed() == "done":
+                    return self._done("bar")
                 if now - shown < SETTLE_S:
                     events.clear()
                 if self._terminal_enabled:
@@ -127,10 +133,23 @@ class StartGate:
 
     def _done(self, how: str = "relayed") -> str:
         try:
-            self._shell(["cmd", "statusbar", "collapse"])
+            if self.bar is not None:
+                self.bar.hide()
+            else:
+                self._shell(["cmd", "statusbar", "collapse"])
         except Exception:
             pass
         return how
+
+    def _show_card(self, title: str, text: str) -> None:
+        if self.bar is None:
+            self._post(title, text)
+            return
+        try:
+            self.bar.show(text, ("done",))
+        except Exception as exc:  # no bar: fall back to the shade card rather than start blind
+            self.console.print(f"start bar: {exc}", markup=False)
+            self._post(title, text)
 
     def _post(self, title: str, text: str) -> None:
         for args in (

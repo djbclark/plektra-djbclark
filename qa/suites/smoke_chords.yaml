@@ -25,8 +25,8 @@ phases:
         speak: "Type: a, comma, space, b, period."
         expect: "a, b."
       # Keys are tokens: <Ctrl+A>, <Tab|Enter> (either). See README, "Naming keys".
-      - prompt: "use <Backspace> on the previous word, then type ok"
-        shade: "Use <Backspace> on the previous word, then type ok"
+      - prompt: "type no, use <Backspace> twice, then type ok"
+        shade: "Type no, use <Backspace> twice, then type ok"
         expect: "ok"
   - name: two_fields
     trials:
