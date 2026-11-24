@@ -43,7 +43,17 @@ from pathlib import Path
 from typing import Any
 
 from plektra_qa.inputlog import InputLogger, Shown
-from plektra_qa.overlay import BAND_H, FPS, band_frames, chapters, ffmetadata, write_chapter_files
+from plektra_qa.overlay import (
+    BAND_H,
+    FPS,
+    PANEL_W,
+    band_frames,
+    chapters,
+    ffmetadata,
+    srt,
+    write_chapter_files,
+    write_panel,
+)
 
 SAMPLE_RATE = 24000
 BYTES_PER_SAMPLE = 2  # s16le mono
@@ -111,6 +121,7 @@ class Recorder:
         which: Which = shutil.which,
         stamp: str | None = None,
         capture_input: bool = True,
+        panel: bool = True,
     ) -> None:
         self.serial = serial
         self.out_dir = out_dir or default_dir()
@@ -125,6 +136,8 @@ class Recorder:
         self._ffmpeg_log = self.out_dir / f"{name}.ffmpeg.log"
         self.chapters_file: Path | None = None
         self._marks: list[tuple[float, str]] = []
+        self._notes: list[tuple[float, str, str]] = []  # (clock, kind, text) for the log panel
+        self._panel = panel
         self._touches_was: str | None = None  # show_touches before we turned it on
         self._input: InputLogger | None = (
             InputLogger(serial, clock=clock) if capture_input else None
@@ -242,6 +255,7 @@ class Recorder:
 
     def on_speech(self, event: str, **info: Any) -> None:
         if event == "say":
+            self.note("voice", f"voice: {info['text']}", at=info["time"])
             self._lines.append(
                 SpeechLine(
                     start=info["time"], text=info["text"], kind=info["kind"],
@@ -278,9 +292,21 @@ class Recorder:
         """A chapter starts now (the next batch of key presses)."""
         self._marks.append((self._clock(), title))
 
+    def note(self, kind: str, text: str, at: float | None = None) -> None:
+        """A line for the log panel and the subtitle track, stamped now (or at `at`)."""
+        self._notes.append((self._clock() if at is None else at, kind, text))
+
     def on_trial(self, index: int, trial: Any) -> None:
         phase = f"{trial.phase}: " if getattr(trial, "phase", "") else ""
         self.mark(f"{index}. {phase}{trial.prompt}")
+        self.note("trial", f"trial {index}: {phase}{trial.prompt}", at=self._marks[-1][0])
+
+    def on_result(self, index: int, result: Any) -> None:
+        if result.passed:
+            self.note("pass", f"trial {index} pass: {result.observed!r}")
+        else:
+            detail = result.error or result.diff
+            self.note("fail", f"trial {index} FAIL: expected {result.expect!r}, saw {result.observed!r} {detail}".strip())
 
     def _size(self) -> tuple[int, int]:
         try:
@@ -311,6 +337,14 @@ class Recorder:
         if code:
             raise subprocess.CalledProcessError(code, cmd, stderr=self._ffmpeg_log.read_bytes()[-400:])
 
+    def _timed_notes(self, keys: list[Shown], touches: list[Shown]) -> list[tuple[float, str, str]]:
+        """Everything for the log panel, in time order, seconds from the start."""
+        merged = list(self._notes)
+        merged += [(item.start, "key", f"keys: {item.text}") for item in keys if item.text]
+        merged += [(item.start, "touch", f"touch: {item.text}") for item in touches if item.text]
+        merged.sort(key=lambda note: note[0])
+        return [(max(t - self._t0, 0.0), kind, text) for t, kind, text in merged]
+
     def finish(self) -> Path | None:
         """Stop everything and write the mp4. None, with warnings, if it could not."""
         length = self._clock() - self._t0
@@ -333,6 +367,7 @@ class Recorder:
             length = max(length, len(track) / (SAMPLE_RATE * BYTES_PER_SAMPLE))
             width, height = self._size()
             marks = [(t - self._t0, title) for t, title in self._marks]
+            notes = self._timed_notes(keys, touches)
             items = chapters(marks, length)
             meta = work / "chapters.ffmeta"
             meta.write_text(ffmetadata(items, length))
@@ -347,6 +382,15 @@ class Recorder:
                 audio = "2"
             meta_index = 3 if track else 2
             cmd += ["-i", str(meta)]
+            panel_index = srt_index = -1
+            if self._panel and notes:
+                listing = write_panel(notes, length, PANEL_W, height + BAND_H, work)
+                panel_index = meta_index + 1
+                cmd += ["-f", "concat", "-safe", "0", "-i", str(listing)]
+                subs = work / "notes.srt"
+                subs.write_text(srt(notes, length))
+                srt_index = meta_index + 2
+                cmd += ["-i", str(subs)]
             # A rotation changes scrcpy's frame size mid-stream, so every frame is
             # fitted to the first one's size. A still screen sends few frames, so the raw video can end seconds
             # before the run does: steady 30 fps, last frame held to the run's
@@ -355,11 +399,20 @@ class Recorder:
             graph = (
                 f"[0:v]fps={FPS},scale={width}:{height}:force_original_aspect_ratio=decrease,"
                 f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,tpad=stop_mode=clone:stop_duration=3600,format=rgb24[v];"
-                "[1:v][v]vstack=inputs=2:shortest=1,format=yuv420p[out]"
+                "[1:v][v]vstack=inputs=2:shortest=1[stk];"
             )
+            if panel_index > 0:
+                graph += (
+                    f"[{panel_index}:v]fps={FPS},tpad=stop_mode=clone:stop_duration=3600,format=rgb24[pan];"
+                    "[stk][pan]hstack=inputs=2:shortest=1,pad=ceil(iw/2)*2:ceil(ih/2)*2,format=yuv420p[out]"
+                )
+            else:
+                graph += "[stk]pad=ceil(iw/2)*2:ceil(ih/2)*2,format=yuv420p[out]"
             cmd += ["-filter_complex", graph, "-map", "[out]"]
             if audio:
                 cmd += ["-map", f"{audio}:a", "-c:a", "aac", "-af", "apad"]
+            if srt_index > 0:
+                cmd += ["-map", f"{srt_index}:s", "-c:s", "mov_text", "-metadata:s:s:0", "title=Terminal log"]
             cmd += [
                 "-map_metadata", str(meta_index), "-map_chapters", str(meta_index),
                 "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",

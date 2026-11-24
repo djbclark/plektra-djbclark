@@ -213,6 +213,7 @@ def run_chord_batch(
     gate: Any | None = None,
     speaker: Speaker | None = None,
     on_trial: Callable[[int, ChordTrial], None] | None = None,
+    on_result: Callable[[int, TrialResult], None] | None = None,
 ) -> list[TrialResult]:
     console = console or Console()
     if speaker is not None:
@@ -242,6 +243,7 @@ def run_chord_batch(
                     previous_complete,
                     speaker,
                     on_trial,
+                    on_result,
                 )
             finally:
                 if speaker is not None:
@@ -318,6 +320,7 @@ def _run_trials(
     previous_complete: float | None,
     speaker: Speaker | None = None,
     on_trial: Callable[[int, ChordTrial], None] | None = None,
+    on_result: Callable[[int, TrialResult], None] | None = None,
 ) -> list[TrialResult]:
     for index, trial in enumerate(trials):
         error = ""
@@ -404,6 +407,8 @@ def _run_trials(
             error=error,
         )
         results.append(result)
+        if on_result is not None:
+            on_result(index + 1, result)
         previous_complete = complete
         live.update(_table(results, ""))
         if error in (STOPPED, NOT_STARTED):

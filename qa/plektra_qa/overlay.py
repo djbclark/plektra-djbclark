@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import bisect
 import os
+import textwrap
 from collections.abc import Iterator, Sequence
 from pathlib import Path
 
@@ -19,6 +20,8 @@ from plektra_qa.inputlog import Shown
 
 FPS = 30
 BAND_H = 112
+PANEL_W = 720  # the terminal-style log panel beside the phone
+PANEL_MIN_S = 0.2
 MIN_CHAPTER_S = 10.0  # YouTube ignores chapter lists with shorter chapters
 MONO_FONTS = (
     "/System/Library/Fonts/Menlo.ttc",
@@ -165,3 +168,88 @@ def write_chapter_files(
     path = base.with_suffix(".chapters.txt")
     path.write_text(youtube_text(youtube_chapters(items, length)))
     return path
+
+
+# --- The log panel: what the terminal shows, beside the phone ---------------
+# A note is (seconds into the run, kind, text). The panel is drawn with Pillow
+# (no drawtext or libass here), one PNG per distinct state, and fed to ffmpeg as
+# a concat list with durations, so a long run does not need a raw frame per tick.
+# The same notes become a subtitle track the viewer can switch off.
+
+PANEL_COLORS = {
+    "trial": (255, 214, 102),
+    "voice": (120, 220, 255),
+    "key": (210, 210, 210),
+    "touch": (170, 170, 200),
+    "pass": (110, 230, 130),
+    "fail": (255, 110, 110),
+    "info": (255, 255, 255),
+}
+Note = tuple[float, str, str]
+
+
+def panel_lines(notes: Sequence[Note], upto: int, cols: int, rows: int) -> list[tuple[str, str]]:
+    """The last rows wrapped lines of notes[:upto], newest at the bottom."""
+    lines: list[tuple[str, str]] = []
+    for t, kind, text in notes[:upto]:
+        stamp = timecode(t)[:-2]
+        wrapped = textwrap.wrap(f"{stamp} {text}", cols, subsequent_indent="         ") or [stamp]
+        lines += [(kind, part) for part in wrapped]
+    return lines[-rows:]
+
+
+def panel_image(lines: Sequence[tuple[str, str]], width: int, height: int, title: str) -> Image.Image:
+    image = Image.new("RGB", (width, height), (18, 18, 22))
+    draw = ImageDraw.Draw(image)
+    font = _font(22)
+    draw.text((16, 14), title, font=font, fill=(150, 150, 160))
+    draw.line((16, 48, width - 16, 48), fill=(60, 60, 70), width=2)
+    step = 30
+    y = 62
+    for kind, text in lines:
+        draw.text((16, y), text, font=font, fill=PANEL_COLORS.get(kind, PANEL_COLORS["info"]))
+        y += step
+    return image
+
+
+def panel_geometry(width: int, height: int) -> tuple[int, int]:
+    font = _font(22)
+    char = max(1.0, font.getlength("M"))
+    return max(10, int((width - 32) // char)), max(1, (height - 62) // 30)
+
+
+def write_panel(
+    notes: Sequence[Note], length: float, width: int, height: int, work: Path,
+    title: str = "Plektra QA: terminal log",
+) -> Path:
+    """Write PNG states and an ffmpeg concat list; return the list's path."""
+    cols, rows = panel_geometry(width, height)
+    starts = [0.0] + [max(0.0, t) for t, _kind, _text in notes]
+    entries: list[str] = []
+    for index, begin in enumerate(starts):
+        end = starts[index + 1] if index + 1 < len(starts) else max(length, begin + PANEL_MIN_S)
+        png = work / f"panel-{index:05d}.png"
+        panel_image(panel_lines(notes, index, cols, rows), width, height, title).save(png)
+        entries.append(f"file '{png}'\nduration {max(end - begin, PANEL_MIN_S):.3f}")
+    entries.append(f"file '{work / f'panel-{len(starts) - 1:05d}.png'}'")
+    listing = work / "panel.txt"
+    listing.write_text("\n".join(entries) + "\n")
+    return listing
+
+
+def srt(notes: Sequence[Note], length: float) -> str:
+    """The same notes as subtitles; each stays up until the next, at most 6 s."""
+    out: list[str] = []
+    for index, (t, _kind, text) in enumerate(notes, start=1):
+        nxt = notes[index][0] if index < len(notes) else length
+        end = min(max(nxt, t + 1.0), t + 6.0, max(length, t + 1.0))
+        out.append(f"{index}\n{_srt_time(max(t, 0.0))} --> {_srt_time(end)}\n{text}\n")
+    return "\n".join(out)
+
+
+def _srt_time(seconds: float) -> str:
+    ms = int(round(seconds * 1000))
+    h, rest = divmod(ms, 3_600_000)
+    m, rest = divmod(rest, 60_000)
+    s, milli = divmod(rest, 1000)
+    return f"{h:02d}:{m:02d}:{s:02d},{milli:03d}"

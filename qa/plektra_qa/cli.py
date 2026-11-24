@@ -66,6 +66,11 @@ def run(
         "--record/--no-record",
         help="Record the screen and the spoken prompts to an mp4 for sharing. Off by default; ask the person first.",
     ),
+    panel: bool = typer.Option(
+        True,
+        "--panel/--no-panel",
+        help="With --record: put the terminal log beside the phone and add it as a switchable subtitle track.",
+    ),
     record_dir: Path | None = typer.Option(
         None, "--record-dir", help="Where the mp4 goes (default: PLEKTRA_QA_RECORD_DIR or ~/plektra-qa-recordings)."
     ),
@@ -88,13 +93,14 @@ def run(
         StartGate(require_serial(), speaker=speaker, console=console).wait(
             f"Plektra QA: {suite.name}", batch_instruction(len(trials))
         )
-        with recording(require_serial(), speaker, record, record_dir) as recorder:
+        with recording(require_serial(), speaker, record, record_dir, panel=panel) as recorder:
             if recorder is not None:
                 voice = "with the voice" if speaker.enabled else "video only (voice is off)"
                 console.print(f"recording the screen {voice} to {recorder.output}")
             results = run_chord_batch(
                 controller, trials, console, gate, speaker,
                 on_trial=recorder.on_trial if recorder is not None else None,
+                on_result=recorder.on_result if recorder is not None else None,
             )
     except (RecordingError, StartGateError) as exc:
         typer.echo(f"refused: {exc}", err=True)

@@ -168,6 +168,7 @@ def request_human_chord_batch(
             results = run_chord_batch(
                 controller, trials, gate=gate, speaker=speaker,
                 on_trial=recorder.on_trial if recorder is not None else None,
+                on_result=recorder.on_result if recorder is not None else None,
             )
     except (RecordingError, StartGateError) as exc:
         return json.dumps({"refused": str(exc)})

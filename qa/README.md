@@ -96,6 +96,7 @@ cd qa && just qa-run suites/smoke_chords.yaml --record
 
 - The phone's screen (a view-only copy; scrcpy runs with `--no-control`) and the computer's spoken prompts, laid on the audio track at the times they were spoken (the voice is not captured from the speakers).
 - A band above the screen: a running timecode on the left; on the right the keys held at that moment (`L-Shift + A`, kernel names such as `ENTER`, d-pad keys included) and the touches (`TOUCH (x, y)`, then `TAP`, `LONG PRESS` or `SWIPE up (x1, y1) to (x2, y2)`; the keyboard's own trackpad is marked `PAD`). Android's "show touches" dots are on while recording and put back afterwards.
+- A log panel to the right of the phone: what the terminal shows, in time with the picture (trial prompts, spoken lines, pass or fail, and the keys and touches as they happen). The same lines are also an mp4 subtitle track named "Terminal log" that a player can switch off. `--no-panel` leaves both out (CLI only).
 - Chapters, one per trial (the next batch of key presses): inside the mp4, and as `plektra-qa-*.chapters.txt` to paste into a YouTube description (YouTube needs 0:00 first and chapters of at least 10 s, so shorter ones are merged there).
 
 Keys and touches come from the phone's `getevent`; sync with the picture is within about a tenth of a second. The recording shows the whole screen, the status bar and every key the person presses, so it is shared only with their say-so. Do not use it for anything private.
