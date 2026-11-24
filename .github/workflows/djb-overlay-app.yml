@@ -73,7 +73,7 @@ jobs:
         run: |
           set -euo pipefail
           gradle -p "$PROJECT" --no-daemon --stacktrace \
-            --init-script .github/ci/central-mirror.gradle \
+            --init-script "$GITHUB_WORKSPACE/.github/ci/central-mirror.gradle" \
             testDebugUnitTest assembleDebug
 
       - name: Re-sign the APK with the fork debug key and verify
