@@ -53,11 +53,13 @@ mkdir -p .github/workflows .github/ci
 for path in .github/workflows/djb-overlay-app.yml .github/ci/central-mirror.gradle; do
   $GIT -C "$top" show "$ci_base_sha:$path" > "$path"
 done
-cat > .github/ci/run-meta.env <<EOF
-TARGET_REF=$ref
-TARGET_SHA=$target_sha
-RELEASE=$release
-EOF
+# The workflow reads these lines with grep and cut (never sources them); %q still quotes any
+# shell metacharacters in the ref.
+{
+  printf 'TARGET_REF=%q\n' "$ref"
+  printf 'TARGET_SHA=%s\n' "$target_sha"
+  printf 'RELEASE=%s\n' "$release"
+} > .github/ci/run-meta.env
 
 $GIT add -A
 $GIT -c user.email=ci@localhost -c user.name='plektra-ci' commit --quiet -m "ci: overlay-app $ref@$short"
