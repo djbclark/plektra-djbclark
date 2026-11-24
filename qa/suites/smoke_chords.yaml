@@ -12,7 +12,7 @@ phases:
     trials:
       - prompt: "alpha: hello"
         shade: "Type hello"
-        expect: "hello"
+        expect: "Hello"  # Plektra autocapitalizes the first letter
         package: branislav667.pinnote
         activity: branislav667.pinnote.NotesActivity
         click_resource_id: branislav667.pinnote:id/notes_fab
