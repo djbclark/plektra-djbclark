@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import time
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,7 @@ from plektra_qa.connection import require_version
 from plektra_qa.controller import ScreenController
 from plektra_qa.hitl_runner import load_suite, run_chord_batch
 from plektra_qa.keys import Flavor, KeyNamingError, KeyResolutionError, LiveReadError, render, resolve_keymap
+from plektra_qa.button_bar import DEFAULT_PACKAGE, ButtonBar, OverlayError
 from plektra_qa.recording import RecordingError, recording
 from plektra_qa.screen_gate import ScreenGate, require_serial
 from plektra_qa.speech import Speaker
@@ -105,6 +107,14 @@ def run(
     record_dir: Path | None = typer.Option(
         None, "--record-dir", help="Where the mp4 goes (default: PLEKTRA_QA_RECORD_DIR or ~/plektra-qa-recordings)."
     ),
+    bar: bool = typer.Option(
+        False,
+        "--bar/--no-bar",
+        help="Use the on-screen Done/Next/Stop bar instead of the notification-shade card; a trial ends on Done.",
+    ),
+    bar_package: str = typer.Option(
+        DEFAULT_PACKAGE, "--bar-package", envvar="PLEKTRA_QA_BAR_PACKAGE", help="Package of the button-bar app."
+    ),
 ) -> None:
     """Run a YAML chord suite. A person types on the keyboard; the host does not."""
     try:
@@ -129,12 +139,14 @@ def run(
             if recorder is not None:
                 voice = "with the voice" if speaker.enabled else "video only (voice is off)"
                 console.print(f"recording the screen {voice} to {recorder.output}")
-            results = run_chord_batch(
-                controller, trials, console, gate, speaker,
-                on_trial=recorder.on_trial if recorder is not None else None,
-                on_result=recorder.on_result if recorder is not None else None,
-            )
-    except (RecordingError, StartGateError) as exc:
+            with ButtonBar(require_serial(), package=bar_package) if bar else nullcontext() as button_bar:
+                results = run_chord_batch(
+                    controller, trials, console, gate, speaker,
+                    on_trial=recorder.on_trial if recorder is not None else None,
+                    on_result=recorder.on_result if recorder is not None else None,
+                    overlay=button_bar,
+                )
+    except (RecordingError, StartGateError, OverlayError) as exc:
         typer.echo(f"refused: {exc}", err=True)
         raise typer.Exit(code=2) from exc
     if recorder is not None:

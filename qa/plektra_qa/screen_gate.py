@@ -158,10 +158,15 @@ class ScreenGate:
         self._collapse()
         self._notify("Hands off", "Hands off")
 
-    def yield_to_human(self, action: str) -> None:
-        """Ordinary colors. The shade shows the action, then closes before typing."""
+    def yield_to_human(self, action: str, *, shade: bool = True) -> None:
+        """Ordinary colors. The shade shows the action, then closes before typing.
+
+        shade=False: only the colors change; the on-screen bar carries the action.
+        """
         if not self._set_inversion(False):
             raise RuntimeError("display inversion did not turn off")
+        if not shade:
+            return
         text = action.strip()
         self._notify(text, text)
         self._expand()

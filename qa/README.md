@@ -101,6 +101,10 @@ cd qa && just qa-run suites/smoke_chords.yaml --record
 
 Keys and touches come from the phone's `getevent`; sync with the picture is within about a tenth of a second. The recording shows the whole screen, the status bar and every key the person presses, so it is shared only with their say-so. Do not use it for anything private.
 
+### Button bar instead of the shade card (optional)
+
+`just qa-run SUITE --bar` shows a small on-screen bar with **Done**, **Next** and **Stop** instead of pulling down the notification shade. A trial ends only when you press **Done**, so you can fix a typo first. **Next** skips the trial (it is recorded as skipped); **Stop** ends the batch. The bar is a companion app (`--bar-package`, default `dev.hitlbar.overlay`; it needs the draw-over-apps permission). The host talks to it by `am broadcast -a <package>.SHOW|HIDE` and reads the answers from logcat lines with tag `QAOVERLAY` (`shown`, `hidden`, `button=done|next|stop`). If the bar does not report `shown` within 5 s, the trial fails with a clear error. The app itself is still to be written (`qa/overlay-app/`); the host side is in `plektra_qa/button_bar.py`.
+
 ## 5. Read the results
 
 Each trial is a row: the prompt, the expected text, what the field held, pass or fail, accuracy, words per minute, and the gap since the previous trial. A failed run exits 1 and prints one `fail` line per failed trial.

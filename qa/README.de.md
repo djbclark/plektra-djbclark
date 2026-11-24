@@ -103,6 +103,10 @@ cd qa && just qa-run suites/smoke_chords.yaml --record
 
 Tasten und Berührungen kommen aus `getevent` des Telefons; der Gleichlauf mit dem Bild stimmt auf etwa eine Zehntelsekunde. Die Aufnahme zeigt den ganzen Bildschirm, die Statusleiste und jede Taste, die die Person drückt; sie wird nur mit deren Einverständnis geteilt. Nicht für Privates verwenden.
 
+### Schaltflächenleiste statt Benachrichtigungskarte (optional)
+
+`just qa-run SUITE --bar` zeigt eine kleine Leiste mit **Fertig** (Done), **Weiter** (Next) und **Stopp** (Stop) auf dem Bildschirm, statt die Benachrichtigungsleiste herunterzuziehen. Ein Versuch endet erst, wenn du **Done** drückst, du kannst also vorher einen Tippfehler korrigieren. **Next** überspringt den Versuch (wird als übersprungen vermerkt); **Stop** beendet den Durchlauf. Die Leiste ist eine Begleit-App (`--bar-package`, Standard `dev.hitlbar.overlay`; sie braucht die Berechtigung „über anderen Apps einblenden“). Der Host steuert sie per `am broadcast -a <package>.SHOW|HIDE` und liest die Antworten aus Logcat-Zeilen mit dem Tag `QAOVERLAY` (`shown`, `hidden`, `button=done|next|stop`). Meldet die Leiste nicht innerhalb von 5 s `shown`, schlägt der Versuch mit einer klaren Fehlermeldung fehl. Die App selbst ist noch zu schreiben (`qa/overlay-app/`); die Host-Seite steht in `plektra_qa/button_bar.py`.
+
 ## 5. Ergebnisse lesen
 
 Jeder Versuch ist eine Zeile: Aufforderung, erwarteter Text, Inhalt des Felds, bestanden oder nicht, Genauigkeit, Wörter pro Minute und Abstand zum vorigen Versuch. Ein fehlgeschlagener Durchlauf endet mit Code 1 und gibt pro fehlgeschlagenem Versuch eine `fail`-Zeile aus.

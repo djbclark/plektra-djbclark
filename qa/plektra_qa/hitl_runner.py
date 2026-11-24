@@ -17,6 +17,7 @@ from rich.table import Table
 
 from plektra_qa.controller import ScreenController
 from plektra_qa.keys import Keymap, localise_texts, resolve_keymap
+from plektra_qa.button_bar import ButtonBar
 from plektra_qa.speech import Speaker
 
 POLL_S = 0.025
@@ -24,6 +25,8 @@ STOP_CHECK_S = 1.0
 SETTLE_S = 1.5  # a match counts only after the text stays put this long: people fix typos
 STOPPED = "stopped from the phone"
 NOT_STARTED = "never started after the spoken prompts"
+SKIPPED = "skipped from the phone"
+OVERLAY_IDLE_S = 300.0  # with the button bar only Done ends a trial; this just stops a forgotten run
 HANDS_OFF = "Hands off. Get ready."
 FINISHED = "Testing finished."
 REPROMPT = "Still waiting. "
@@ -215,6 +218,7 @@ def run_chord_batch(
     speaker: Speaker | None = None,
     on_trial: Callable[[int, ChordTrial], None] | None = None,
     on_result: Callable[[int, TrialResult], None] | None = None,
+    overlay: ButtonBar | None = None,
 ) -> list[TrialResult]:
     console = console or Console()
     if speaker is not None:
@@ -245,6 +249,7 @@ def run_chord_batch(
                     speaker,
                     on_trial,
                     on_result,
+                    overlay,
                 )
             finally:
                 if speaker is not None:
@@ -322,7 +327,9 @@ def _run_trials(
     speaker: Speaker | None = None,
     on_trial: Callable[[int, ChordTrial], None] | None = None,
     on_result: Callable[[int, TrialResult], None] | None = None,
+    overlay: ButtonBar | None = None,
 ) -> list[TrialResult]:
+    idle_s_for = lambda trial: OVERLAY_IDLE_S if overlay is not None else trial.timeout_s  # noqa: E731
     for index, trial in enumerate(trials):
         error = ""
         element = None
@@ -344,7 +351,15 @@ def _run_trials(
             error = STOPPED
         if error == "" and gate is not None:
             try:
-                gate.yield_to_human(trial.shade or trial.prompt)
+                if overlay is not None:
+                    gate.yield_to_human(trial.shade or trial.prompt, shade=False)
+                else:
+                    gate.yield_to_human(trial.shade or trial.prompt)
+            except Exception as exc:
+                error = str(exc)
+        if error == "" and overlay is not None:
+            try:
+                overlay.show(trial.shade or trial.prompt)
             except Exception as exc:
                 error = str(exc)
         ready = time.perf_counter()
@@ -368,7 +383,7 @@ def _run_trials(
         complete: float | None = None
         observed = baseline
         # With a voice the human gets reprompts instead of a fixed start window.
-        deadline = float("inf") if voice.active else ready + trial.timeout_s
+        deadline = float("inf") if voice.active else ready + idle_s_for(trial)
         live.update(_table(results, "" if error else trial.prompt))
         last_stop_check = ready
         last_seen = observed
@@ -392,13 +407,24 @@ def _run_trials(
                 last_change = now
                 matched_at = None
                 if first is not None:
-                    deadline = last_change + trial.timeout_s  # the timeout is idle time, not total time
+                    deadline = last_change + idle_s_for(trial)  # the timeout is idle time, not total time
             if changed and first is None and strip_sentinel(observed, trial.sentinel) != "":
                 first = time.perf_counter()
                 voice.started()
                 if voice.active:
-                    deadline = first + trial.timeout_s
-            if changed and trial_matched(observed, trial.expect, trial.sentinel):
+                    deadline = first + idle_s_for(trial)
+            if overlay is not None:
+                button = overlay.pressed()
+                if button == "stop":
+                    error = STOPPED
+                    break
+                if button == "next":
+                    error = SKIPPED
+                    break
+                if button == "done":
+                    complete = time.perf_counter()  # the person says it is finished
+                    break
+            elif changed and trial_matched(observed, trial.expect, trial.sentinel):
                 if matched_at is None:
                     matched_at = time.perf_counter()
                 if now - last_change >= SETTLE_S:
@@ -408,6 +434,11 @@ def _run_trials(
                 error = NOT_STARTED
                 break
             time.sleep(POLL_S)
+        if overlay is not None:
+            try:
+                overlay.hide()
+            except Exception:
+                pass
         if complete is None:
             complete = time.perf_counter()
         compared = strip_sentinel(observed, trial.sentinel)
