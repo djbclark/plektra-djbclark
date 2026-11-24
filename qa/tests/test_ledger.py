@@ -52,6 +52,26 @@ def test_final_video_joins_passed_clips_in_suite_order_and_names_the_rest(tmp_pa
     assert listing.endswith("clips.txt")
 
 
+def test_every_clip_gets_one_size_one_rate_and_an_audio_track(tmp_path):
+    calls = []
+
+    def fake_run(cmd, **_kwargs):
+        calls.append(cmd)
+        if cmd[0] == "ffprobe":
+            return SimpleNamespace(stdout="" if no_audio else "1\n", returncode=0)
+        (tmp_path / "c.mp4").write_bytes(b"v")
+        return SimpleNamespace(returncode=0)
+
+    for no_audio in (True, False):
+        calls.clear()
+        assert ledger_mod.cut_clip(tmp_path / "raw.mkv", 1.0, 3.0, tmp_path / "c.mp4", fake_run)
+        cut = calls[-1]
+        vf = cut[cut.index("-vf") + 1]
+        assert "scale=1600:1200" in vf and "pad=1600:1200" in vf and "fps=30" in vf
+        assert ("anullsrc" in " ".join(cut)) is no_audio  # silence is added only when the source has no audio
+        assert "-c:a" in cut
+
+
 def test_ime_build_reads_the_package_of_the_current_keyboard():
     def fake_run(cmd, **_kwargs):
         if "input_method" in cmd:

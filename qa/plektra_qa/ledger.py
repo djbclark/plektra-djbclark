@@ -152,13 +152,40 @@ class Ledger:
         return self.clips / f"{trial_key(trial)}.mp4"
 
 
+CLIP_W, CLIP_H, CLIP_FPS, CLIP_AUDIO_HZ = 1600, 1200, 30, 44100
+
+
+def _has_audio(source: Path, run: Callable[..., Any]) -> bool:
+    try:
+        done = run(
+            ["ffprobe", "-v", "error", "-select_streams", "a", "-show_entries", "stream=index", "-of", "csv=p=0", str(source)],
+            capture_output=True, text=True, timeout=30,
+        )
+        return bool(str(done.stdout).strip())
+    except (OSError, subprocess.SubprocessError, AttributeError):
+        return False
+
+
 def cut_clip(source: Path, start: float, end: float, dest: Path, run: Callable[..., Any] = subprocess.run) -> bool:
     """Copy [start, end] seconds of a recording into its own mp4 (re-encoded so the cut is exact)."""
     dest.parent.mkdir(parents=True, exist_ok=True)
-    cmd = [
-        "ffmpeg", "-v", "error", "-y", "-ss", f"{max(start, 0):.3f}", "-to", f"{end:.3f}", "-i", str(source),
-        "-map", "0:v:0", "-map", "0:a?", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
-        "-pix_fmt", "yuv420p", "-c:a", "aac", "-movflags", "+faststart", str(dest),
+    # Every clip gets the same frame size, frame rate and an audio track, so `concat -c copy` can join them
+    # (the panel makes some recordings wider; a run with the voice off has no audio).
+    video = (
+        f"scale={CLIP_W}:{CLIP_H}:force_original_aspect_ratio=decrease,"
+        f"pad={CLIP_W}:{CLIP_H}:(ow-iw)/2:(oh-ih)/2,fps={CLIP_FPS},setsar=1"
+    )
+    cmd = ["ffmpeg", "-v", "error", "-y", "-ss", f"{max(start, 0):.3f}", "-to", f"{end:.3f}", "-i", str(source)]
+    if _has_audio(source, run):
+        cmd += ["-vf", video, "-map", "0:v:0", "-map", "0:a:0", "-af", f"aresample={CLIP_AUDIO_HZ}"]
+    else:
+        cmd += [
+            "-f", "lavfi", "-t", f"{max(end - max(start, 0), 0.1):.3f}", "-i", f"anullsrc=r={CLIP_AUDIO_HZ}:cl=stereo",
+            "-vf", video, "-map", "0:v:0", "-map", "1:a:0",
+        ]
+    cmd += [
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p",
+        "-c:a", "aac", "-ac", "2", "-movflags", "+faststart", str(dest),
     ]
     try:
         done = run(cmd, capture_output=True, text=True, timeout=600)

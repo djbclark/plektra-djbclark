@@ -4,8 +4,13 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import xml.etree.ElementTree as ElementTree
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any
+
+from rich.console import Console
 
 from lamda.client import Keys
 from mcp.server.mcpserver import MCPServer
@@ -13,6 +18,7 @@ from mcp.server.mcpserver import MCPServer
 from plektra_qa.connection import connect, server_status
 from plektra_qa.controller import ScreenController, obj_info
 from plektra_qa import runlock
+from plektra_qa.button_bar import DEFAULT_PACKAGE, ButtonBar, OverlayError
 from plektra_qa.hitl_runner import ChordTrial, run_chord_batch
 from plektra_qa.keys import localise_texts, resolve_keymap
 from plektra_qa.recording import RecordingError, recording
@@ -34,6 +40,20 @@ def _session() -> tuple[Any, ScreenController]:
         _device = connect()
         _controller = ScreenController(_device)
     return _device, _controller
+
+
+@contextmanager
+def _phone_lock() -> Iterator[None]:
+    """Every tool that drives the screen takes the phone's run lock, so it cannot collide with a `run`."""
+    serial = runlock.device_serial(require_serial())
+    try:
+        runlock.acquire(serial)
+    except runlock.RunLockError as exc:
+        raise RuntimeError(f"refused: {exc}") from exc
+    try:
+        yield
+    finally:
+        runlock.release(serial)
 
 
 def _key(name: str) -> Any:
@@ -89,7 +109,7 @@ def device_status() -> dict[str, object]:
 def teleport_and_prep_input(package: str, activity: str, field_resource_id: str) -> dict[str, object]:
     """Jump to an activity and focus and clear the named input."""
     _device, controller = _session()
-    with ScreenGate(require_serial(), allowed_packages={package}) as gate:
+    with _phone_lock(), ScreenGate(require_serial(), allowed_packages={package}) as gate:
         gate.hold(f"Opening {package}")
         controller.teleport_to_activity(package, activity)
         element = controller.focus_and_clear(resource_id=field_resource_id)
@@ -121,13 +141,13 @@ def execute_ui_action(action: str, selector_kwargs: dict[str, Any]) -> str:
     device, _controller = _session()
     if action == "press_key":
         key_name = str(selector_kwargs.get("key", ""))
-        with ScreenGate(require_serial()) as gate:
+        with _phone_lock(), ScreenGate(require_serial()) as gate:
             gate.hold(f"Pressing {key_name}")
             device.press_key(_key(key_name))
         return f"pressed {key_name}"
     if action not in {"click", "long_click", "clear_text_field"}:
         raise ValueError(f"unsupported action {action}")
-    with ScreenGate(require_serial()) as gate:
+    with _phone_lock(), ScreenGate(require_serial()) as gate:
         gate.hold(action)
         element = device(**selector_kwargs)
         getattr(element, action)()
@@ -159,26 +179,43 @@ def request_human_chord_batch(
         for index, item in enumerate(raw, start=1)
     ]
     packages = {trial.package for trial in trials if trial.package}
-    gate = ScreenGate(require_serial(), allowed_packages=packages)
+    target = require_serial()
+    bar_package = os.environ.get("PLEKTRA_QA_BAR_PACKAGE", "").strip() or DEFAULT_PACKAGE
+    # stdout is the JSON-RPC channel: everything the batch prints goes to stderr.
+    console = Console(stderr=True)
+    gate = ScreenGate(target, allowed_packages=packages, overlay_package=bar_package)
     speaker = Speaker()
     locked = False
+    serial = runlock.device_serial(target)
+    bar_cm = ButtonBar(target, package=bar_package)
+    bar: ButtonBar | None = None
     try:
-        runlock.acquire(require_serial())
+        runlock.acquire(serial)
         locked = True
-        StartGate(require_serial(), speaker=speaker).wait(
-            "Plektra QA batch", batch_instruction(len(trials)), confirmed=human_said_go
-        )
-        with recording(require_serial(), speaker, record) as recorder:
-            results = run_chord_batch(
-                controller, trials, gate=gate, speaker=speaker,
-                on_trial=recorder.on_trial if recorder is not None else None,
-                on_result=recorder.on_result if recorder is not None else None,
+        try:
+            bar = bar_cm.__enter__()  # the on-screen bar is the default; without the overlay app use the shade card
+        except OverlayError as exc:
+            console.print(f"no button bar ({exc}); using the shade card", markup=False)
+            bar = None
+        try:
+            StartGate(target, speaker=speaker, console=console, bar=bar).wait(
+                "Plektra QA batch", batch_instruction(len(trials)), confirmed=human_said_go
             )
+            with recording(target, speaker, record) as recorder:
+                results = run_chord_batch(
+                    controller, trials, console, gate=gate, speaker=speaker,
+                    on_trial=recorder.on_trial if recorder is not None else None,
+                    on_result=recorder.on_result if recorder is not None else None,
+                    overlay=bar,
+                )
+        finally:
+            if bar is not None:
+                bar_cm.__exit__(None, None, None)
     except (RecordingError, StartGateError, runlock.RunLockError) as exc:
         return json.dumps({"refused": str(exc)})
     finally:
         if locked:
-            runlock.release(require_serial())
+            runlock.release(serial)
     report = [item.model_dump() for item in results]
     if recorder is None:
         return json.dumps(report)
