@@ -117,6 +117,11 @@ def strip_sentinel(observed: str, sentinel: str) -> str:
 def trial_matched(observed: str, expect: str, sentinel: str) -> bool:
     if observed == expect:
         return True
+    if not expect.startswith("\n"):
+        # <Tab|Enter> may be either key: Enter leaves a leading newline, Tab does not.
+        observed = observed.lstrip("\n")
+        if observed == expect:
+            return True
     return bool(sentinel) and strip_sentinel(observed, sentinel) == expect
 
 

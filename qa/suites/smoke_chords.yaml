@@ -36,9 +36,9 @@ phases:
         resource_id: branislav667.pinnote:id/pin_text
       - prompt: "<Tab|Enter> on Plektra, then field B: beta"
         shade: "Press <Tab|Enter>, then type beta"
-        expect: "beta"
+        expect: "Beta"  # autocapitalized; a leading newline from Enter is ignored
       - prompt: "<Ctrl+A>, then <Ctrl+C> on Plektra"
         shade: "Press <Ctrl+A>, then <Ctrl+C>"
-        expect: "beta"
+        expect: "Beta"
         verify_mode: clipboard
         clear_field: false

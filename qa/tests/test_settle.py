@@ -96,3 +96,9 @@ def test_a_stale_clipboard_is_cleared_before_a_clipboard_trial():
     result = _run(device, trial)[0]
     assert device.cleared >= 1
     assert not result.passed
+
+
+def test_a_leading_newline_from_enter_does_not_fail_a_match():
+    assert hitl_runner.trial_matched("\nBeta", "Beta", "\n")
+    assert hitl_runner.trial_matched("Beta", "Beta", "\n")
+    assert not hitl_runner.trial_matched("\nBeta", "\nBeta!", "\n")

@@ -45,7 +45,7 @@ def test_suite_drops_null_overrides_and_keeps_phase_name():
     assert trials[0].sentinel == "\n"
     clipboard = trials[-1]
     assert clipboard.verify_mode == "clipboard"
-    assert clipboard.expect == "beta"
+    assert clipboard.expect == "Beta"
     assert clipboard.clear_field is False
 
 

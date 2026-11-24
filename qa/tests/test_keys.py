@@ -247,7 +247,7 @@ def test_spoken_text_falls_back_to_shade_then_prompt():
 
 def test_smoke_suite_uses_tokens_and_keeps_its_expectations():
     trials = load_suite(ROOT / "suites" / "smoke_chords.yaml", BASELINE)
-    assert [t.expect for t in trials] == ["Hello", "42", "a, b.", "ok", "alpha", "beta", "beta"]
+    assert [t.expect for t in trials] == ["Hello", "42", "a, b.", "ok", "alpha", "Beta", "Beta"]
     backspace, tab, chord = trials[3], trials[5], trials[6]
     assert "your Backspace" in backspace.shade and "Keycaps: ⌫." in backspace.shade
     assert "your Tab or your Enter" in tab.shade
