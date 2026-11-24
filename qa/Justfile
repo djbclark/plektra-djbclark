@@ -18,8 +18,9 @@ qa-prep:
     cd "{{ justfile_directory() }}" && uv run --python 3.14 plektra-qa prep
 
 # Run one YAML suite. The human chords; this process only watches the field.
-qa-run suite:
-    cd "{{ justfile_directory() }}" && uv run --python 3.14 plektra-qa run "{{ suite }}"
+# Add --record to also save the screen and the spoken prompts as an mp4 (off by default; ask the person first).
+qa-run suite *flags:
+    cd "{{ justfile_directory() }}" && uv run --python 3.14 plektra-qa run "{{ suite }}" {{ flags }}
 
 # Print the screen, shade and spoken versions of key tokens, e.g. just qa-keys "<Ctrl+A>, then <Ctrl+C>".
 # Live keymap from the phone when ADB_TARGET is set, else the profile.

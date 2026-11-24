@@ -25,6 +25,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 from pathlib import Path
 from collections.abc import Callable, Iterable
 
@@ -85,6 +86,10 @@ class Speaker:
         self._player = _player(which) if self.backend == "kokoro" else None
         self._lock = threading.Lock()
         self._warm: threading.Thread | None = None
+        # Optional (event, **info) callback: "say" with time/text/kind/path/tool
+        # when a line starts, "cut" with time when a line is cut off. The
+        # recorder uses it to lay the voice on a screen recording.
+        self.listener: Callable[..., None] | None = None
 
     @property
     def enabled(self) -> bool:
@@ -140,6 +145,17 @@ class Speaker:
                 return ["say", text]
         return None
 
+    def _announce(self, text: str, cmd: list[str]) -> None:
+        if self.listener is None:
+            return
+        if cmd[0] == "say":
+            info: dict[str, object] = {"kind": "say"}
+        elif cmd[-1].endswith(".wav"):
+            info = {"kind": "wav", "path": Path(cmd[-1])}
+        else:
+            info = {"kind": "espeak", "tool": cmd[0]}
+        self.listener("say", time=time.monotonic(), text=text, **info)
+
     def say(self, text: str) -> None:
         if not self.enabled or not text:
             return
@@ -155,6 +171,14 @@ class Speaker:
             except OSError as exc:
                 print(f"voice: {exc}", file=sys.stderr)
                 self._proc = None
+                return
+            self._announce(text, cmd)
+
+    def wait_idle(self, timeout_s: float) -> None:
+        """Block until the line being said has finished, or the timeout."""
+        deadline = time.monotonic() + timeout_s
+        while self.speaking() and time.monotonic() < deadline:
+            time.sleep(0.05)
 
     def speaking(self) -> bool:
         return self._proc is not None and self._proc.poll() is None
@@ -162,6 +186,8 @@ class Speaker:
     def stop(self) -> None:
         proc, self._proc = self._proc, None
         if proc is not None and proc.poll() is None:
+            if self.listener is not None:
+                self.listener("cut", time=time.monotonic())
             proc.terminate()
             try:
                 proc.wait(timeout=1)

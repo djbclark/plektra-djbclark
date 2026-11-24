@@ -86,6 +86,20 @@ cd qa && just qa-run suites/smoke_chords.yaml
 
 The computer shows the keymap in use (`keymap: live ...` or `keymap: profile ...`, section 7), a live table and the voice in use (`voice: kokoro`). Follow the signals in section 1. Ctrl-C on the computer stops the pass and restores the phone.
 
+### Record a run to share (optional, off by default)
+
+```bash
+cd qa && just qa-run suites/smoke_chords.yaml --record
+```
+
+`--record` saves one mp4 in `~/plektra-qa-recordings/` (`--record-dir` or `PLEKTRA_QA_RECORD_DIR` change it). It needs `scrcpy`, `ffmpeg` and the phone on adb (`ADB_TARGET`). What is in it:
+
+- The phone's screen (a view-only copy; scrcpy runs with `--no-control`) and the computer's spoken prompts, laid on the audio track at the times they were spoken (the voice is not captured from the speakers).
+- A band above the screen: a running timecode on the left; on the right the keys held at that moment (`L-Shift + A`, kernel names such as `ENTER`, d-pad keys included) and the touches (`TOUCH (x, y)`, then `TAP`, `LONG PRESS` or `SWIPE up (x1, y1) to (x2, y2)`; the keyboard's own trackpad is marked `PAD`). Android's "show touches" dots are on while recording and put back afterwards.
+- Chapters, one per trial (the next batch of key presses): inside the mp4, and as `plektra-qa-*.chapters.txt` to paste into a YouTube description (YouTube needs 0:00 first and chapters of at least 10 s, so shorter ones are merged there).
+
+Keys and touches come from the phone's `getevent`; sync with the picture is within about a tenth of a second. The recording shows the whole screen, the status bar and every key the person presses, so it is shared only with their say-so. Do not use it for anything private.
+
 ## 5. Read the results
 
 Each trial is a row: the prompt, the expected text, what the field held, pass or fail, accuracy, words per minute, and the gap since the previous trial. A failed run exits 1 and prints one `fail` line per failed trial.
@@ -199,7 +213,7 @@ The keymap is read once at the start. Change a key setting during a run and the 
 | `teleport_and_prep_input` | Open an activity and focus and clear a field (behind the screen gate). |
 | `inspect_ui_fast` | The screen's UI tree, optionally with a JPEG screenshot. |
 | `execute_ui_action` | One click or key press on a selector (behind the screen gate). |
-| `request_human_chord_batch` | Run trials (a JSON list of trial objects) with a person typing, and return the report. It blocks until the person is done. |
+| `request_human_chord_batch` | Run trials (a JSON list of trial objects) with a person typing, and return the report. It blocks until the person is done. `record=true` also records the run (section 4); only after the person said yes. |
 
 Rules for agents:
 
@@ -208,6 +222,7 @@ Rules for agents:
 3. Never change the active input method, and never `am force-stop` or `am start -S` the Plektra package. Android would switch keyboards.
 4. Do not click dialogs the harness has not seen before, press Back, or change Do Not Disturb.
 5. Name keys with tokens (`<Ctrl+A>`) in trial lists and in questions to the person: `just qa-keys "<Ctrl+A>"` prints the two-version text to paste (section 7).
+6. Recording (section 4) is off unless the person asks for it. Ask at the start of every guided run ("record the screen and voice to share with the group?") and pass `--record` (CLI) or `record=true` (`request_human_chord_batch`) only on a yes. The answer covers that run only. Tell them where the file lands.
 
 [firerpa-hitl.md](firerpa-hitl.md) is the full specification. It is written as a build prompt for an agent.
 
@@ -239,6 +254,9 @@ The tests use fakes and need no phone.
 | `plektra_qa/hitl_runner.py` | Suite loading, the trial loop, scoring, reminders. |
 | `plektra_qa/screen_gate.py` | Inverted colors, the shade, stay-awake, the stop card and the phone-side watcher. adb only. |
 | `plektra_qa/speech.py` | The voice backends and the phrase cache. |
+| `plektra_qa/recording.py` | Optional screen and voice recording (scrcpy, ffmpeg), the voice track and the chapters. |
+| `plektra_qa/inputlog.py` | Reads the phone's `getevent` and turns it into held keys and tap, long press and swipe text. |
+| `plektra_qa/overlay.py` | The band above the video (Pillow) and the chapter files. |
 | `plektra_qa/keys.py` | Key tokens, the keymap (live or profile), the renderer and the lint. |
 | `plektra_qa/controller.py` | Opening activities, focusing and clearing fields, reading text. |
 | `plektra_qa/connection.py` | The certificate-authenticated FIRERPA connection. |

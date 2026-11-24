@@ -13,6 +13,7 @@ from plektra_qa.connection import require_version
 from plektra_qa.controller import ScreenController
 from plektra_qa.hitl_runner import load_suite, run_chord_batch
 from plektra_qa.keys import Flavor, KeyNamingError, KeyResolutionError, LiveReadError, render, resolve_keymap
+from plektra_qa.recording import RecordingError, recording
 from plektra_qa.screen_gate import ScreenGate, require_serial
 from plektra_qa.speech import Speaker
 
@@ -57,7 +58,17 @@ def prep() -> None:
 
 
 @app.command()
-def run(suite: Path) -> None:
+def run(
+    suite: Path,
+    record: bool = typer.Option(
+        False,
+        "--record/--no-record",
+        help="Record the screen and the spoken prompts to an mp4 for sharing. Off by default; ask the person first.",
+    ),
+    record_dir: Path | None = typer.Option(
+        None, "--record-dir", help="Where the mp4 goes (default: PLEKTRA_QA_RECORD_DIR or ~/plektra-qa-recordings)."
+    ),
+) -> None:
     """Run a YAML chord suite. A person types on the keyboard; the host does not."""
     try:
         resolved = resolve_keymap(on_live_failure="error")
@@ -71,7 +82,23 @@ def run(suite: Path) -> None:
     gate = ScreenGate(require_serial(), allowed_packages=packages)
     speaker = Speaker()
     console.print(f"voice: {speaker.backend} (PLEKTRA_QA_VOICE=auto|kokoro|say|espeak|off)")
-    results = run_chord_batch(controller, trials, console, gate, speaker)
+    try:
+        with recording(require_serial(), speaker, record, record_dir) as recorder:
+            if recorder is not None:
+                voice = "with the voice" if speaker.enabled else "video only (voice is off)"
+                console.print(f"recording the screen {voice} to {recorder.output}")
+            results = run_chord_batch(
+                controller, trials, console, gate, speaker,
+                on_trial=recorder.on_trial if recorder is not None else None,
+            )
+    except RecordingError as exc:
+        typer.echo(f"refused: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    if recorder is not None:
+        for warning in recorder.warnings:
+            console.print(f"recording: {warning}", markup=False)
+        if recorder.output.is_file():
+            console.print(f"recording saved: {recorder.output}", markup=False)
     failed = [item for item in results if not item.passed]
     for item in failed:
         console.print(

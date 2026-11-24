@@ -88,6 +88,20 @@ cd qa && just qa-run suites/smoke_chords.yaml
 
 Der Computer zeigt den verwendeten Keymap (`keymap: live ...` oder `keymap: profile ...`, Abschnitt 7), eine Live-Tabelle und die verwendete Stimme (`voice: kokoro`). Den Signalen aus Abschnitt 1 folgen. Strg-C am Computer beendet den Durchlauf und stellt das Telefon wieder her.
 
+### Einen Durchlauf zum Teilen aufnehmen (optional, standardmäßig aus)
+
+```bash
+cd qa && just qa-run suites/smoke_chords.yaml --record
+```
+
+`--record` speichert ein mp4 in `~/plektra-qa-recordings/` (`--record-dir` oder `PLEKTRA_QA_RECORD_DIR` ändern den Ort). Nötig sind `scrcpy`, `ffmpeg` und das Telefon an adb (`ADB_TARGET`). Das steckt drin:
+
+- Der Bildschirm des Telefons (eine reine Ansichtskopie; scrcpy läuft mit `--no-control`) und die gesprochenen Ansagen des Computers, zu den Zeitpunkten ihres Sprechens in die Tonspur gelegt (die Stimme wird nicht von den Lautsprechern abgenommen).
+- Ein Balken über dem Bildschirm: links ein laufender Timecode; rechts die gerade gehaltenen Tasten (`L-Shift + A`, Kernel-Namen wie `ENTER`, Steuerkreuz-Tasten eingeschlossen) und die Berührungen (`TOUCH (x, y)`, dann `TAP`, `LONG PRESS` oder `SWIPE up (x1, y1) to (x2, y2)`; das Trackpad der Tastatur trägt die Marke `PAD`). Die Punkte der Android-Funktion „Fingertipps anzeigen“ sind während der Aufnahme an und werden danach zurückgesetzt.
+- Kapitel, eines je Versuch (der nächste Satz Tastendrücke): im mp4 und als `plektra-qa-*.chapters.txt` zum Einfügen in eine YouTube-Beschreibung (YouTube braucht 0:00 zuerst und Kapitel von mindestens 10 s; kürzere werden dort zusammengelegt).
+
+Tasten und Berührungen kommen aus `getevent` des Telefons; der Gleichlauf mit dem Bild stimmt auf etwa eine Zehntelsekunde. Die Aufnahme zeigt den ganzen Bildschirm, die Statusleiste und jede Taste, die die Person drückt; sie wird nur mit deren Einverständnis geteilt. Nicht für Privates verwenden.
+
 ## 5. Ergebnisse lesen
 
 Jeder Versuch ist eine Zeile: Aufforderung, erwarteter Text, Inhalt des Felds, bestanden oder nicht, Genauigkeit, Wörter pro Minute und Abstand zum vorigen Versuch. Ein fehlgeschlagener Durchlauf endet mit Code 1 und gibt pro fehlgeschlagenem Versuch eine `fail`-Zeile aus.
@@ -201,7 +215,7 @@ Der Keymap wird einmal am Anfang gelesen. Wer während eines Durchlaufs eine Tas
 | `teleport_and_prep_input` | Eine Activity öffnen, ein Feld fokussieren und leeren (hinter dem Bildschirm-Gate). |
 | `inspect_ui_fast` | Der UI-Baum des Bildschirms, optional mit JPEG-Screenshot. |
 | `execute_ui_action` | Ein Klick oder Tastendruck auf einen Selektor (hinter dem Bildschirm-Gate). |
-| `request_human_chord_batch` | Versuche (eine JSON-Liste von Versuchsobjekten) mit tippendem Menschen ausführen und den Bericht zurückgeben. Blockiert, bis der Mensch fertig ist. |
+| `request_human_chord_batch` | Versuche (eine JSON-Liste von Versuchsobjekten) mit tippendem Menschen ausführen und den Bericht zurückgeben. Blockiert, bis der Mensch fertig ist. `record=true` nimmt den Durchlauf zusätzlich auf (Abschnitt 4); nur nach einem Ja des Menschen. |
 
 Regeln für Agenten:
 
@@ -210,6 +224,7 @@ Regeln für Agenten:
 3. Nie die aktive Eingabemethode ändern und das Plektra-Paket nie mit `am force-stop` oder `am start -S` behandeln. Android würde die Tastatur wechseln.
 4. Keine unbekannten Dialoge anklicken, nicht Zurück drücken, „Nicht stören“ nicht ändern.
 5. Tasten in Versuchslisten und in Fragen an den Menschen als Token schreiben (`<Ctrl+A>`): `just qa-keys "<Ctrl+A>"` gibt den Text in beiden Fassungen zum Einfügen aus (Abschnitt 7).
+6. Aufnahme (Abschnitt 4) ist aus, solange der Mensch sie nicht wünscht. Zu Beginn jedes geführten Durchlaufs fragen („Bildschirm und Stimme aufnehmen, um es mit der Gruppe zu teilen?“) und `--record` (CLI) oder `record=true` (`request_human_chord_batch`) nur bei einem Ja angeben. Die Antwort gilt nur für diesen Durchlauf. Sagen, wo die Datei liegt.
 
 [firerpa-hitl.md](firerpa-hitl.md) (englisch) ist die vollständige Spezifikation, geschrieben als Bau-Anleitung für einen Agenten.
 
@@ -241,6 +256,9 @@ Die Tests nutzen Attrappen und brauchen kein Telefon.
 | `plektra_qa/hitl_runner.py` | Suite laden, Versuchsschleife, Bewertung, Erinnerungen. |
 | `plektra_qa/screen_gate.py` | Invertierte Farben, Benachrichtigungsleiste, Wachbleiben, Stopp-Benachrichtigung und der Wächter auf dem Telefon. Nur adb. |
 | `plektra_qa/speech.py` | Die Sprach-Backends und der Satz-Cache. |
+| `plektra_qa/recording.py` | Optionale Bildschirm- und Sprachaufnahme (scrcpy, ffmpeg), die Tonspur und die Kapitel. |
+| `plektra_qa/inputlog.py` | Liest `getevent` des Telefons und macht daraus gehaltene Tasten sowie Tipp-, Langdruck- und Wisch-Text. |
+| `plektra_qa/overlay.py` | Der Balken über dem Video (Pillow) und die Kapiteldateien. |
 | `plektra_qa/keys.py` | Tasten-Token, der Keymap (live oder Profil), der Renderer und die Prüfung. |
 | `plektra_qa/controller.py` | Activities öffnen, Felder fokussieren und leeren, Text lesen. |
 | `plektra_qa/connection.py` | Die per Zertifikat authentifizierte FIRERPA-Verbindung. |

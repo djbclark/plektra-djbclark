@@ -14,6 +14,7 @@ from plektra_qa.connection import connect, server_status
 from plektra_qa.controller import ScreenController, obj_info
 from plektra_qa.hitl_runner import ChordTrial, run_chord_batch
 from plektra_qa.keys import localise_texts, resolve_keymap
+from plektra_qa.recording import RecordingError, recording
 from plektra_qa.screen_gate import ScreenGate, require_serial
 from plektra_qa.speech import Speaker
 
@@ -132,8 +133,14 @@ def execute_ui_action(action: str, selector_kwargs: dict[str, Any]) -> str:
 
 
 @mcp.tool()
-def request_human_chord_batch(trials_json: str) -> str:
-    """Block while a person chords the batch. Returns the per-trial report."""
+def request_human_chord_batch(trials_json: str, record: bool = False) -> str:
+    """Block while a person chords the batch. Returns the per-trial report.
+
+    record=true also records the screen and the spoken prompts to an mp4 for
+    sharing. Set it only after the person said yes to being recorded in this
+    session; the default is off. Then the result is {"results": [...],
+    "recording": path or null, "warnings": [...]}.
+    """
     _device, controller = _session()
     raw = json.loads(trials_json)
     keymap = resolve_keymap(on_live_failure="error").keymap
@@ -143,8 +150,26 @@ def request_human_chord_batch(trials_json: str) -> str:
     ]
     packages = {trial.package for trial in trials if trial.package}
     gate = ScreenGate(require_serial(), allowed_packages=packages)
-    results = run_chord_batch(controller, trials, gate=gate, speaker=Speaker())
-    return json.dumps([item.model_dump() for item in results])
+    speaker = Speaker()
+    try:
+        with recording(require_serial(), speaker, record) as recorder:
+            results = run_chord_batch(
+                controller, trials, gate=gate, speaker=speaker,
+                on_trial=recorder.on_trial if recorder is not None else None,
+            )
+    except RecordingError as exc:
+        return json.dumps({"refused": str(exc)})
+    report = [item.model_dump() for item in results]
+    if recorder is None:
+        return json.dumps(report)
+    saved = recorder.output.is_file()
+    return json.dumps(
+        {
+            "results": report,
+            "recording": str(recorder.output) if saved else None,
+            "warnings": recorder.warnings,
+        }
+    )
 
 
 def main() -> None:

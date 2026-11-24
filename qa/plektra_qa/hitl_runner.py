@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import difflib
 import time
+from collections.abc import Callable
 from contextlib import nullcontext
 from pathlib import Path
 from typing import Any
@@ -211,6 +212,7 @@ def run_chord_batch(
     console: Console | None = None,
     gate: Any | None = None,
     speaker: Speaker | None = None,
+    on_trial: Callable[[int, ChordTrial], None] | None = None,
 ) -> list[TrialResult]:
     console = console or Console()
     if speaker is not None:
@@ -239,6 +241,7 @@ def run_chord_batch(
                     results,
                     previous_complete,
                     speaker,
+                    on_trial,
                 )
             finally:
                 if speaker is not None:
@@ -314,6 +317,7 @@ def _run_trials(
     results: list[TrialResult],
     previous_complete: float | None,
     speaker: Speaker | None = None,
+    on_trial: Callable[[int, ChordTrial], None] | None = None,
 ) -> list[TrialResult]:
     for index, trial in enumerate(trials):
         error = ""
@@ -342,6 +346,8 @@ def _run_trials(
         ready = time.perf_counter()
         voice = _Reprompter(speaker, trial)
         if error == "":
+            if on_trial is not None:
+                on_trial(index + 1, trial)
             console.bell()
             if trial.cue_on_device:
                 device.beep()
