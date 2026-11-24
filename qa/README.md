@@ -135,7 +135,7 @@ All trial fields: `prompt`, `expect`, `verify_mode` (`text` or `clipboard`), `se
 Tips:
 
 1. Spell symbols out in `speak`. A voice reads `,` and `.` as pauses. Write keys as tokens (`<Ctrl+A>`), never as bare names: section 7.
-2. Find resource ids with the MCP tool `inspect_ui_fast`, or `adb shell uiautomator dump`.
+2. Find resource ids with the MCP tool `inspect_ui_fast`, or `adb shell uiautomator dump` with FIRERPA stopped (section 11, item 6).
 3. Open an app's exported launcher activity, then click into the editor with `click_resource_id`. Activities that are not exported cannot be started directly.
 4. Avoid search boxes as targets: Enter submits them.
 
@@ -254,3 +254,6 @@ The tests use fakes and need no phone.
 3. `svc power stayon true` reads back as `15` (AC, USB, wireless, dock) on Android 16, not `7`. Any non-zero value counts.
 4. An overlay window cannot be the "your turn" signal: it needs an install, can take keyboard focus, and Android 12+ blocks touches through it. The notification shade is the trusted surface.
 5. Empty Pinnote fields report their hint (`Title`, `Start writing…`) as their text. The harness treats a hint as empty.
+6. `adb shell uiautomator dump`, and any tool built on it, fails while FIRERPA is running. Android allows one UiAutomation client at a time and FIRERPA holds it, so the dump prints `Killed` and no XML. Use `inspect_ui_fast` while FIRERPA is up; stop FIRERPA first if you need a plain `uiautomator dump`.
+7. Alternatives considered (2026-11-24), none adopted. [Mobile MCP](https://github.com/mobile-next/mobile-mcp) 1.0.19 (Apache-2.0): both of its modes read the screen with `uiautomator dump`, so both fail the same way next to FIRERPA, and its default mode also pushes `mobilecli.dex` to `/data/local/tmp` and may install a DeviceKit agent on the phone. Its text-typing tool would also bypass the keyboard under test. [Vercel UI SDK](https://github.com/vercel-labs/ui): web only (React, Vue, Svelte, Solid, Web Components), no Android. [Mobilerun](https://github.com/droidrun/mobilerun) (MIT): an LLM agent framework that plans its own steps, not a scripted typing harness. [uiautomator2](https://github.com/openatx/uiautomator2) was not tried: it needs the same single UiAutomation slot as FIRERPA and adds nothing it lacks. With FIRERPA stopped, both Mobile MCP modes did list the screen (about 4 s in legacy mode, about 12 s in default mode; plain `uiautomator dump` returned 59 nodes), so the only blocker is the single UiAutomation slot.
+8. After stopping FIRERPA, `just start` can fail with `FIRERPA UIAutomation helpers did not start` although the server is up. On Android 16 the lifecycle controller's helper check never matches, because `/proc/PID/maps` names the loaded driver `[anon:dalvik-classes.dex extracted in memory from @aab.zip]` and not the file path. Finish the swap by hand: copy `overrides/aab.zip.patched` over the active `aab.zip` (temp file, then `mv -f`), kill only the `lamda` processes whose maps contain `@aab.zip`, and wait for them to respawn. `just status` then passes.
