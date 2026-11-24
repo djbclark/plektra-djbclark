@@ -373,7 +373,7 @@ class _ReadyField:
 
     def get_text(self) -> str:
         self.reads += 1
-        return "" if self.reads <= 2 else "hello"
+        return "" if self.reads <= 6 else "hello"  # open and baseline reads come first
 
 
 class _ReadyDevice:

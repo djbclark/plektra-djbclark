@@ -21,6 +21,7 @@ from plektra_qa.speech import Speaker
 
 POLL_S = 0.025
 STOP_CHECK_S = 1.0
+SETTLE_S = 1.5  # a match counts only after the text stays put this long: people fix typos
 STOPPED = "stopped from the phone"
 NOT_STARTED = "never started after the spoken prompts"
 HANDS_OFF = "Hands off. Get ready."
@@ -355,6 +356,11 @@ def _run_trials(
             if trial.cue_on_device:
                 device.beep()
             voice.start()
+        if error == "" and trial.verify_mode == "clipboard":
+            try:
+                device.set_clipboard("")  # a stale copy must not pass the trial
+            except Exception:
+                pass
         baseline = ""
         if error == "" and element is not None:
             baseline = _read_observed(trial, element, device, controller)
@@ -365,6 +371,9 @@ def _run_trials(
         deadline = float("inf") if voice.active else ready + trial.timeout_s
         live.update(_table(results, "" if error else trial.prompt))
         last_stop_check = ready
+        last_seen = observed
+        last_change = ready
+        matched_at: float | None = None
         while error == "" and time.perf_counter() < deadline:
             now = time.perf_counter()
             if now - last_stop_check >= STOP_CHECK_S:
@@ -378,14 +387,23 @@ def _run_trials(
                 error = f"field lost: {type(exc).__name__}"
                 break
             changed = observed != baseline
+            if observed != last_seen:
+                last_seen = observed
+                last_change = now
+                matched_at = None
+                if first is not None:
+                    deadline = last_change + trial.timeout_s  # the timeout is idle time, not total time
             if changed and first is None and strip_sentinel(observed, trial.sentinel) != "":
                 first = time.perf_counter()
                 voice.started()
                 if voice.active:
                     deadline = first + trial.timeout_s
-            if trial_matched(observed, trial.expect, trial.sentinel):
-                complete = time.perf_counter()
-                break
+            if changed and trial_matched(observed, trial.expect, trial.sentinel):
+                if matched_at is None:
+                    matched_at = time.perf_counter()
+                if now - last_change >= SETTLE_S:
+                    complete = matched_at
+                    break
             if first is None and not voice.tick(now):
                 error = NOT_STARTED
                 break

@@ -127,7 +127,7 @@ def test_typing_ends_the_reprompts_and_the_trial_passes():
     speaker = _FakeSpeaker()
     trial = ChordTrial(prompt="alpha: hello", expect="hello", speak="Type hello now")
     results = run_chord_batch(
-        ScreenController(_Device(_Field(typed_after=2))),
+        ScreenController(_Device(_Field(typed_after=6))),  # a few reads go to open/baseline
         [trial],
         _console(),
         _Gate(),
