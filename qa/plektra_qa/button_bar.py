@@ -223,7 +223,9 @@ class ButtonBar:
             return self._buttons.popleft() if self._buttons else None
 
     def _broadcast(self, action: str, extras: list[str]) -> None:
-        self._shell(["am", "broadcast", "-a", f"{self.package}.{action}", "-p", self.package, *extras])
+        # -f 0x20 (include stopped packages): a freshly installed app is "stopped" and gets nothing
+        # until it has run once (found on the first live check, 2026-11-24).
+        self._shell(["am", "broadcast", "-f", "0x20", "-a", f"{self.package}.{action}", "-p", self.package, *extras])
 
     def _await_state(self, state: str) -> None:
         start = self._clock()

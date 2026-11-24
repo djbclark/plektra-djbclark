@@ -74,9 +74,9 @@ def _bar(shell_calls, pipe, ack=0.3, *, uid_listing=f"package:x.bar uid:{APP_UID
         if args[0] == "date":
             return DEVICE_NOW + "\n"
         shell_calls.append(list(args))
-        if "SHOW" in args[3]:
+        if "SHOW" in args[5]:
             pipe.push(_line("shown seq=1"))
-        if "HIDE" in args[3]:
+        if "HIDE" in args[5]:
             pipe.push(_line("hidden seq=2"))
         return ""
 
@@ -102,7 +102,7 @@ def test_show_broadcasts_waits_for_the_ack_and_reads_buttons():
     pipe = _Pipe()
     with _bar(calls, pipe) as bar:
         bar.show("Type hello")
-        assert calls[0][:6] == ["am", "broadcast", "-a", "x.bar.SHOW", "-p", "x.bar"]
+        assert calls[0][:8] == ["am", "broadcast", "-f", "0x20", "-a", "x.bar.SHOW", "-p", "x.bar"]
         assert "Type hello" in calls[0] and "done,next,stop" in calls[0]
         assert bar.pressed() is None
         pipe.push(_line("button=done seq=3"))
@@ -199,7 +199,7 @@ def test_a_forged_shown_does_not_acknowledge_a_bar_that_never_appeared():
             return f"package:x.bar uid:{APP_UID}\n"
         if args[0] == "date":
             return DEVICE_NOW
-        if "SHOW" in args[3]:
+        if "SHOW" in args[5]:
             pipe.push(_line("shown seq=1", uid=10999))  # forged: the overlay permission was revoked
         return ""
 
