@@ -130,7 +130,7 @@ jobs:
             "" \
             "A test tool for developer devices. Install: adb install -r $APK, then allow it to draw over other apps (see qa/overlay-app/README.md)." \
             > notes.md
-          gh release create "$tag" "$APK" "$APK.sha256" --target "$target" --title "HITL button bar $SHA8" --notes-file notes.md
+          gh release create "$tag" "$APK" "$APK.sha256" --target "$target" --latest=false --title "HITL button bar $SHA8" --notes-file notes.md
           echo "released $tag"
           # Keep the 10 newest overlay-app releases.
           gh release list --limit 100 --json tagName,createdAt \
