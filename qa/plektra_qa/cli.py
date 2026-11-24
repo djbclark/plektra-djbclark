@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 import time
 from contextlib import nullcontext
 from pathlib import Path
@@ -16,6 +18,7 @@ from plektra_qa.connection import connect as open_device
 from plektra_qa.connection import require_version
 from plektra_qa.controller import ScreenController
 from plektra_qa.hitl_runner import load_suite, run_chord_batch
+from plektra_qa.ledger import TAIL_S, Ledger, cut_clip, final_video, ime_build
 from plektra_qa.keys import Flavor, KeyNamingError, KeyResolutionError, LiveReadError, render, resolve_keymap
 from plektra_qa.button_bar import DEFAULT_PACKAGE, ButtonBar, OverlayError
 from plektra_qa.recording import RecordingError, recording
@@ -115,8 +118,14 @@ def run(
     bar_package: str = typer.Option(
         DEFAULT_PACKAGE, "--bar-package", envvar="PLEKTRA_QA_BAR_PACKAGE", help="Package of the button-bar app."
     ),
+    redo: bool = typer.Option(
+        False, "--redo", help="Run every trial again, also those that already passed on this keyboard build."
+    ),
 ) -> None:
-    """Run a YAML chord suite. A person types on the keyboard; the host does not."""
+    """Run a YAML chord suite. A person types on the keyboard; the host does not.
+
+    A trial that already passed on the installed keyboard build is skipped; its clip stays in the
+    final video (`plektra-qa video`). Failed or unfinished trials run again."""
     try:
         resolved = resolve_keymap(on_live_failure="error")
         console.print(resolved.describe(), markup=False)
@@ -124,6 +133,17 @@ def run(
     except (KeyNamingError, KeyResolutionError, LiveReadError, ValueError) as exc:
         typer.echo(f"refused: {exc}", err=True)
         raise typer.Exit(code=2) from exc
+    ledger = Ledger(suite.stem, ime_build(require_serial()))
+    all_trials = trials
+    if not redo:
+        trials = ledger.pending(all_trials)
+        done = len(all_trials) - len(trials)
+        if done:
+            console.print(f"{done} of {len(all_trials)} trials already passed on this keyboard build and are skipped (--redo runs them again).", markup=False)
+        if not trials:
+            console.print("nothing left to run.", markup=False)
+            _write_final(ledger, all_trials, suite, record_dir)
+            return
     controller = ScreenController(open_device())
     install_watchers(controller.device)
     packages = {trial.package for trial in trials if trial.package}
@@ -154,6 +174,18 @@ def run(
             console.print(f"recording: {warning}", markup=False)
         if recorder.output.is_file():
             console.print(f"recording saved: {recorder.output}", markup=False)
+    spans = {id(item[0]): item for item in recorder.spans} if recorder is not None else {}
+    for trial, item in zip(trials, results):
+        if not item.passed:
+            continue
+        clip = None
+        span = spans.get(id(trial))
+        if span is not None and recorder is not None and recorder.output.is_file():
+            dest = ledger.clip_path(trial)
+            if cut_clip(recorder.output, span[1], span[2] + TAIL_S, dest):
+                clip = dest
+        ledger.record(trial, item.observed, clip)
+    _write_final(ledger, all_trials, suite, record_dir)
     failed = [item for item in results if not item.passed]
     for item in failed:
         console.print(
@@ -162,6 +194,68 @@ def run(
         )
     if failed:
         raise typer.Exit(code=1)
+
+
+def _write_final(ledger: Ledger, trials: list[Any], suite: Path, record_dir: Path | None) -> None:
+    """Join the clips of the passed trials, in suite order, into one video; say what is still open."""
+    out_dir = record_dir or Path(os.environ.get("PLEKTRA_QA_RECORD_DIR") or Path.home() / "plektra-qa-recordings")
+    dest = out_dir / f"{suite.stem}-final.mp4"
+    written, missing = final_video(ledger, trials, dest)
+    if written:
+        console.print(f"video of the passed trials: {dest}", markup=False)
+    if missing:
+        console.print(f"still to pass ({len(missing)}): " + "; ".join(t.prompt for t in missing), markup=False)
+    else:
+        console.print("every trial has passed on this keyboard build.", markup=False)
+
+
+@app.command()
+def video(suite: Path, record_dir: Path | None = typer.Option(None, "--record-dir")) -> None:
+    """Rebuild the final video of a suite from the clips of its passed trials."""
+    try:
+        trials = load_suite(suite, resolve_keymap(on_live_failure="error").keymap)
+    except (KeyNamingError, KeyResolutionError, LiveReadError, ValueError) as exc:
+        typer.echo(f"refused: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    _write_final(Ledger(suite.stem, ime_build(require_serial())), trials, suite, record_dir)
+
+
+@app.command("import")
+def import_recording(
+    suite: Path,
+    recording_file: Path,
+    passed: str = typer.Option(..., "--passed", help="Trial numbers that passed in that run, e.g. 2,3,4,5."),
+) -> None:
+    """Add trials that passed in an earlier recording (cut by its chapters) to the ledger."""
+    try:
+        trials = load_suite(suite, resolve_keymap(on_live_failure="error").keymap)
+    except (KeyNamingError, KeyResolutionError, LiveReadError, ValueError) as exc:
+        typer.echo(f"refused: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    probe = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_chapters", "-show_format", "-of", "json", str(recording_file)],
+        capture_output=True, text=True, check=True,
+    )
+    info = json.loads(probe.stdout)
+    length = float(info["format"]["duration"])
+    marks = [(int(c["tags"]["title"].split(".")[0]), float(c["start_time"])) for c in info.get("chapters", [])
+             if c.get("tags", {}).get("title", "")[:1].isdigit()]
+    marks.sort(key=lambda m: m[1])
+    ledger = Ledger(suite.stem, ime_build(require_serial()))
+    for number in (int(n) for n in passed.split(",")):
+        found = [i for i, m in enumerate(marks) if m[0] == number]
+        if not found or number > len(trials):
+            console.print(f"trial {number}: no chapter in the recording, skipped", markup=False)
+            continue
+        i = found[0]
+        end = marks[i + 1][1] if i + 1 < len(marks) else length
+        trial = trials[number - 1]
+        dest = ledger.clip_path(trial)
+        if cut_clip(recording_file, marks[i][1], end, dest):
+            ledger.record(trial, trial.expect, dest)
+            console.print(f"trial {number} added: {trial.prompt}", markup=False)
+        else:
+            console.print(f"trial {number}: could not cut the clip", markup=False)
 
 
 @app.command()

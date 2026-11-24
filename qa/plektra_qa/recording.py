@@ -135,6 +135,9 @@ class Recorder:
         self._log = self.out_dir / f"{name}.scrcpy.log"
         self._ffmpeg_log = self.out_dir / f"{name}.ffmpeg.log"
         self.chapters_file: Path | None = None
+        # (trial, start s, end s, passed, result) in video time; a trial with no result is not here.
+        self.spans: list[tuple[Any, float, float, bool, Any]] = []
+        self._open_trial: tuple[Any, float] | None = None
         self._marks: list[tuple[float, str]] = []
         self._notes: list[tuple[float, str, str]] = []  # (clock, kind, text) for the log panel
         self._panel = panel
@@ -300,13 +303,19 @@ class Recorder:
         phase = f"{trial.phase}: " if getattr(trial, "phase", "") else ""
         self.mark(f"{index}. {phase}{trial.prompt}")
         self.note("trial", f"trial {index}: {phase}{trial.prompt}", at=self._marks[-1][0])
+        self._open_trial = (trial, self._marks[-1][0] - self._t0)
 
     def on_result(self, index: int, result: Any) -> None:
+        now = self._clock()
+        if self._open_trial is not None:
+            trial, began = self._open_trial
+            self._open_trial = None
+            self.spans.append((trial, began, now - self._t0, bool(result.passed), result))
         if result.passed:
-            self.note("pass", f"trial {index} pass: {result.observed!r}")
+            self.note("pass", f"trial {index} pass: {result.observed!r}", at=now)
         else:
             detail = result.error or result.diff
-            self.note("fail", f"trial {index} FAIL: expected {result.expect!r}, saw {result.observed!r} {detail}".strip())
+            self.note("fail", f"trial {index} FAIL: expected {result.expect!r}, saw {result.observed!r} {detail}".strip(), at=now)
 
     def _size(self) -> tuple[int, int]:
         try:
