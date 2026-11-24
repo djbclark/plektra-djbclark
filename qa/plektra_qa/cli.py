@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
+from typing import Any
 
 import typer
+from lamda.client import Selector
 from rich.console import Console
 
 from plektra_qa.connection import connect as open_device
@@ -24,7 +27,15 @@ console = Console()
 # Names are added only after a watcher is proven on a device. A watcher may
 # click a dialog button. It must not change the IME. Each item is
 # (name, condition selector, click-target selector).
-PROVEN_WATCHERS: list[tuple[str, dict[str, object], dict[str, object]]] = []
+PROVEN_WATCHERS: list[tuple[str, dict[str, object], dict[str, object]]] = [
+    # Pinnote asks for a rating every few launches and the modal blocks the field
+    # (seen 2026-11-24: every trial failed "input field not found"). Decline it.
+    (
+        "pinnote-rate-prompt",
+        {"resourceId": "branislav667.pinnote:id/alertTitle", "text": "Enjoying the app?"},
+        {"resourceId": "android:id/button2", "text": "Maybe later"},
+    ),
+]
 ANIMATION_SCALES = (
     "window_animation_scale",
     "transition_animation_scale",
@@ -42,6 +53,25 @@ def connect() -> None:
     )
 
 
+def install_watchers(device: Any) -> None:
+    """Register the proven dialog watchers and turn the watcher loop on."""
+    for name, conditions, target in PROVEN_WATCHERS:
+        device.register_click_target_selector_watcher(name, [Selector(**conditions)], Selector(**target))
+        device.set_watcher_enabled(name, True)
+    device.set_watcher_loop_enabled(True)
+
+
+@app.command()
+def watchers() -> None:
+    """Register the proven dialog watchers only (no settings change) and say whether the dialogs are on screen."""
+    device = open_device()
+    install_watchers(device)
+    time.sleep(8.0)  # the watcher loop takes a few seconds to notice a dialog
+    for name, conditions, _target in PROVEN_WATCHERS:
+        shown = device(**{key: value for key, value in conditions.items() if key == "resourceId"}).exists()
+        console.print(f"{name}: dialog still on screen={shown}", markup=False)
+
+
 @app.command()
 def prep() -> None:
     """Zero animator scales and enable the UI watcher loop."""
@@ -49,10 +79,7 @@ def prep() -> None:
     settings = device.stub("Settings")
     for name in ANIMATION_SCALES:
         settings.put_global(name, "0")
-    for name, conditions, target in PROVEN_WATCHERS:
-        device.register_click_target_selector_watcher(name, conditions, target)
-        device.set_watcher_enabled(name, True)
-    device.set_watcher_loop_enabled(True)
+    install_watchers(device)
     console.print(
         f"animator scales 0; watcher loop on; proven watchers={len(PROVEN_WATCHERS)}"
     )
@@ -84,6 +111,7 @@ def run(
         typer.echo(f"refused: {exc}", err=True)
         raise typer.Exit(code=2) from exc
     controller = ScreenController(open_device())
+    install_watchers(controller.device)
     packages = {trial.package for trial in trials if trial.package}
     gate = ScreenGate(require_serial(), allowed_packages=packages)
     speaker = Speaker()
@@ -118,6 +146,42 @@ def run(
         )
     if failed:
         raise typer.Exit(code=1)
+
+
+@app.command()
+def ui(
+    open_: str = typer.Option("", "--open", help="Open PACKAGE/ACTIVITY first."),
+    click: str = typer.Option("", "--click", help="Click this resource id next, then wait a second."),
+    all_nodes: bool = typer.Option(False, "--all", help="Print every node, not only interactive or labelled ones."),
+) -> None:
+    """Print the foreground app and the screen's nodes (to debug a trial that cannot find its field).
+
+    Read-only unless you pass --open or --click, which drive the phone: only with the person's say-so.
+    """
+    from xml.etree import ElementTree
+
+    device = open_device()
+    if open_:
+        package, _, activity = open_.partition("/")
+        ScreenController(device).teleport_to_activity(package, activity)
+        time.sleep(1.5)
+    if click:
+        device(resourceId=click).click()
+        time.sleep(1.0)
+    app = device.current_application()
+    console.print(f"{app.applicationId} {getattr(app, 'activity', '')}", markup=False)
+    root = ElementTree.fromstring(device.dump_window_hierarchy().read())
+    for node in root.iter():
+        a = node.attrib
+        if a.get("resource-id", "").startswith("com.android.systemui"):
+            continue
+        wanted = all_nodes or a.get("clickable") == "true" or a.get("focused") == "true" or a.get("text") or a.get("resource-id")
+        if wanted:
+            console.print(
+                f"{a.get('resource-id', '')} | {a.get('class', '')} | {a.get('text', '')!r} | {a.get('bounds', '')}"
+                f"{' | focused' if a.get('focused') == 'true' else ''}",
+                markup=False,
+            )
 
 
 @app.command()

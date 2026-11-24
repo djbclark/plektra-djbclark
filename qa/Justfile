@@ -27,6 +27,14 @@ qa-run suite *flags:
 qa-keys text:
     cd "{{ justfile_directory() }}" && uv run --python 3.14 plektra-qa render {{ quote(text) }}
 
+# Register the proven dialog watchers (no settings change); prints whether each dialog is still showing.
+qa-watchers:
+    cd "{{ justfile_directory() }}" && uv run --python 3.14 plektra-qa watchers
+
+# Print the foreground app and the screen's nodes; --click RESOURCE_ID clicks first. Debugs "input field not found".
+qa-ui *flags:
+    cd "{{ justfile_directory() }}" && uv run --python 3.14 plektra-qa ui {{ flags }}
+
 # MCP server on stdio for an agent session.
 qa-mcp:
     cd "{{ justfile_directory() }}" && uv run --python 3.14 plektra-qa mcp
