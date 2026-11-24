@@ -28,6 +28,8 @@ TIMEOUT_KEY = "screen_off_timeout"
 STAY_KEY = "stay_on_while_plugged_in"
 NOTIFY_TAG = "plektra-qa-presence"
 STOP_TAG = "plektra-qa-stop"
+START_TAG = "plektra-qa-start"
+RETIRE_WAIT_S = 10.0  # how long an earlier run's phone watcher may take to restore the settings
 STOP_TEXT = "Swipe away to stop testing"
 SNOOZE_MS = "2147483647"
 AWAKE_MS = "86400000"
@@ -103,7 +105,9 @@ class ScreenGate:
         allowed_packages: set[str] | None = None,
         countdown_s: float = 10,
         read_s: float = 4,
+        overlay_package: str | None = None,
     ) -> None:
+        self.overlay_package = overlay_package  # the button-bar app; the phone watcher hides its bar on exit
         if not serial.strip():
             raise RuntimeError("ADB_TARGET is required while the harness drives the screen")
         self.serial = serial.strip()
@@ -122,6 +126,12 @@ class ScreenGate:
         self._retire_previous_watcher()
         self._saved_heads = self._get("global", HEADS_UP_KEY).strip()
         timeout = self._digits("system", TIMEOUT_KEY)
+        if timeout == AWAKE_MS:
+            self._restore()
+            raise RuntimeError(
+                f"{TIMEOUT_KEY} is {AWAKE_MS} (this harness's own stay-awake value, left by a run that did not "
+                "restore it); set the real screen timeout first, e.g. settings put system screen_off_timeout 60000"
+            )
         stay = self._digits("global", STAY_KEY)
         self._saved_timeout = timeout
         self._saved_stay = stay
@@ -262,7 +272,13 @@ class ScreenGate:
                 self._shell(["sh", "-c", f"touch {AWAKE_RELEASE}"])
             except Exception:
                 return
-            self._sleep(1.2)
+            waited = 0.0
+            while waited < RETIRE_WAIT_S and self._watcher_alive():
+                self._sleep(0.5)
+                waited += 0.5
+            if self._watcher_alive():
+                raise RuntimeError("an earlier run's phone watcher did not finish restoring the phone; try again")
+            self._sleep(0.5)  # its last lines (snooze, rm) finish just after the pid file goes
         try:
             self._shell(["sh", "-c", f"rm -f {AWAKE_RELEASE} {AWAKE_STOPPED}"])
         except Exception:
@@ -341,6 +357,9 @@ class ScreenGate:
         ]
         if stay == "0":
             lines.append("svc power stayon false")
+        if self.overlay_package:
+            pkg = shlex.quote(self.overlay_package)
+            lines.append(f"am broadcast -f 0x20 -a {pkg}.HIDE -p {pkg} >/dev/null 2>&1 || true")
         heads = _heads_restore_line(self._saved_heads or "")
         if heads:
             lines.append(heads)
@@ -350,7 +369,7 @@ class ScreenGate:
                 "while IFS= read -r row; do",
                 '  case "$row" in',
                 (
-                    f'    *"|{STOP_TAG}|"*|*"|{NOTIFY_TAG}|"*) '
+                    f'    *"|{STOP_TAG}|"*|*"|{NOTIFY_TAG}|"*|*"|{START_TAG}|"*) '
                     f'cmd notification snooze --for {SNOOZE_MS} "$row" || true ;;'
                 ),
                 "  esac",
@@ -373,7 +392,7 @@ class ScreenGate:
         self._shell(["cmd", "notification", "post", "-t", title, tag, body])
 
     def _our_tag(self, tag: str) -> bool:
-        return tag in {STOP_TAG, NOTIFY_TAG} or tag.startswith(f"{STOP_TAG}-") or tag.startswith(
+        return tag in {STOP_TAG, NOTIFY_TAG, START_TAG} or tag.startswith(f"{STOP_TAG}-") or tag.startswith(
             f"{NOTIFY_TAG}-"
         )
 
@@ -419,7 +438,7 @@ class ScreenGate:
             return
         for line in listing.splitlines():
             parts = [part.strip() for part in line.split("|")]
-            if len(parts) >= 4 and parts[3] in {NOTIFY_TAG, STOP_TAG}:
+            if len(parts) >= 4 and parts[3] in {NOTIFY_TAG, STOP_TAG, START_TAG}:
                 try:
                     self._shell(
                         ["cmd", "notification", "snooze", "--for", SNOOZE_MS, line.strip()]

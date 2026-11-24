@@ -21,9 +21,8 @@ from typing import Any
 from rich.console import Console
 
 from plektra_qa.inputlog import Event, parse_event
-from plektra_qa.screen_gate import adb_shell
+from plektra_qa.screen_gate import START_TAG, adb_shell
 
-START_TAG = "plektra-qa-start"
 START_TIMEOUT_S = 900.0
 SETTLE_S = 1.0  # presses this soon after the card went up are not a start
 POLL_S = 0.1
@@ -35,12 +34,9 @@ class StartGateError(RuntimeError):
 
 
 def is_start_event(event: Event) -> bool:
-    """A key going down (BTN_TOUCH included), or a finger arriving."""
-    if event.type == "EV_KEY":
-        return event.value == "DOWN"
-    if event.type == "EV_ABS" and event.code == "ABS_MT_TRACKING_ID":
-        return event.value.lower() != NO_TRACKING_ID
-    return False
+    """A keyboard key going down. A touch never starts a batch: the keyboard's own touch pad and a
+    thumb resting on the screen sent the 2026-11-24 phantom start (BTN_* codes and fingers are ignored)."""
+    return event.type == "EV_KEY" and event.value == "DOWN" and not event.code.startswith("BTN_")
 
 
 def batch_instruction(count: int) -> str:
@@ -50,10 +46,12 @@ def batch_instruction(count: int) -> str:
     )
 
 
-def card_text(title: str, instruction: str, *, phone: bool, terminal: bool) -> str:
+def card_text(title: str, instruction: str, *, phone: bool, terminal: bool, bar: bool = False) -> str:
     ways = []
-    if phone:
-        ways.append("press any key or tap the screen")
+    if bar:
+        ways.append("press Done on the bar")
+    elif phone:
+        ways.append("press any key")
     if terminal:
         ways.append("type go in the terminal")
     how = " or ".join(ways) or "ask the agent to relay your go"
@@ -96,9 +94,7 @@ class StartGate:
         relays it). The card, the terminal text and the voice still run, then
         the batch starts without waiting for a second signal.
         """
-        text = card_text(title, instruction, phone=True, terminal=self._terminal_enabled)
-        if self.bar is not None:
-            text = text.replace("press any key or tap the screen", "press Done on the bar or any key")
+        text = card_text(title, instruction, phone=True, terminal=self._terminal_enabled, bar=self.bar is not None)
         self.console.print(f"[bold]{title}[/bold]\n{text}")
         self._show_card(title, text)
         if self.speaker is not None:
@@ -108,11 +104,16 @@ class StartGate:
             return "relayed"
         events: list[str] = []
         stop = threading.Event()
-        proc = self._start_phone_watch(events, stop)
+        # With the bar only its Done (or a typed go) starts the batch: no key or touch can.
+        proc = self._start_phone_watch(events, stop) if self.bar is None else None
         shown = self._clock()
         try:
             while True:
                 now = self._clock()
+                speaking = getattr(self.speaker, "speaking", None)
+                if callable(speaking) and speaking():
+                    events.clear()  # keys pressed while the instruction is still being read are not a start
+                    shown = max(shown, now - SETTLE_S + POLL_S)
                 if events and now - shown >= SETTLE_S:
                     return self._done("phone")
                 if self.bar is not None and now - shown >= SETTLE_S and self.bar.pressed() == "done":

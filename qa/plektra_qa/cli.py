@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import json
 import os
+import signal
 import subprocess
+import shutil
 import time
-from contextlib import nullcontext
+from contextlib import ExitStack
 from pathlib import Path
 from typing import Any
 
@@ -17,9 +19,10 @@ from rich.console import Console
 from plektra_qa.connection import connect as open_device
 from plektra_qa.connection import require_version
 from plektra_qa.controller import ScreenController
-from plektra_qa.hitl_runner import load_suite, run_chord_batch
+from plektra_qa.hitl_runner import allowed_packages, load_suite, plan_trials, run_chord_batch
 from plektra_qa import runlock
-from plektra_qa.ledger import TAIL_S, Ledger, cut_clip, final_video, ime_build
+from plektra_qa.ledger import TAIL_S, BuildError, Ledger, cut_clip, final_video, ime_build, require_plektra_build
+from plektra_qa.keys import DEFAULT_PACKAGE as KEYBOARD_PACKAGE
 from plektra_qa.keys import Flavor, KeyNamingError, KeyResolutionError, LiveReadError, render, resolve_keymap
 from plektra_qa.button_bar import DEFAULT_PACKAGE, ButtonBar, OverlayError
 from plektra_qa.recording import RecordingError, recording
@@ -112,9 +115,10 @@ def run(
         None, "--record-dir", help="Where the mp4 goes (default: PLEKTRA_QA_RECORD_DIR or ~/plektra-qa-recordings)."
     ),
     bar: bool = typer.Option(
-        False,
+        True,
         "--bar/--no-bar",
-        help="Use the on-screen Done/Next/Stop bar instead of the notification-shade card; a trial ends on Done.",
+        help="Use the on-screen Done/Next/Stop bar (default); a trial ends on Done and the batch starts only on its Done "
+        "or a typed go. --no-bar: the notification-shade card, a trial ends when the text matches.",
     ),
     bar_package: str = typer.Option(
         DEFAULT_PACKAGE, "--bar-package", envvar="PLEKTRA_QA_BAR_PACKAGE", help="Package of the button-bar app."
@@ -127,91 +131,162 @@ def run(
 
     A trial that already passed on the installed keyboard build is skipped; its clip stays in the
     final video (`plektra-qa video`). Failed or unfinished trials run again."""
+    target = require_serial()
     try:
         resolved = resolve_keymap(on_live_failure="error")
         console.print(resolved.describe(), markup=False)
-        trials = load_suite(suite, resolved.keymap)
-    except (KeyNamingError, KeyResolutionError, LiveReadError, ValueError) as exc:
+        all_trials = load_suite(suite, resolved.keymap)
+        build = _keyboard_build(target)
+    except (KeyNamingError, KeyResolutionError, LiveReadError, ValueError, BuildError) as exc:
         typer.echo(f"refused: {exc}", err=True)
         raise typer.Exit(code=2) from exc
+    if record:
+        missing = [tool for tool in ("scrcpy", "ffmpeg") if not shutil.which(tool)]
+        if missing:
+            typer.echo(f"refused: recording needs {', '.join(missing)} on PATH (macOS: brew install scrcpy ffmpeg)", err=True)
+            raise typer.Exit(code=2)
+    serial = runlock.device_serial(target)  # the phone's own serial: LAN, Tailscale and USB share one lock
     try:
-        runlock.acquire(require_serial())
+        runlock.acquire(serial)
     except runlock.RunLockError as exc:
         typer.echo(f"refused: {exc}", err=True)
         raise typer.Exit(code=2) from exc
-    ledger = Ledger(suite.stem, ime_build(require_serial()))
-    all_trials = trials
+    try:
+        _run_locked(suite, all_trials, build, target, serial, record, panel, record_dir, bar, bar_package, redo)
+    finally:
+        runlock.release(serial)
+
+
+def _raise_interrupt(signum: int, _frame: Any) -> None:
+    raise KeyboardInterrupt(f"signal {signum}")
+
+
+def _run_locked(
+    suite: Path, all_trials: list[Any], build: str, target: str, serial: str, record: bool, panel: bool,
+    record_dir: Path | None, bar: bool, bar_package: str, redo: bool,
+) -> None:
+    ledger = Ledger(suite.stem, build)
+    trials = all_trials
     if not redo:
-        trials = ledger.pending(all_trials)
+        trials = plan_trials(all_trials, ledger.passed)
         done = len(all_trials) - len(trials)
         if done:
-            console.print(f"{done} of {len(all_trials)} trials already passed on this keyboard build and are skipped (--redo runs them again).", markup=False)
+            console.print(
+                f"{done} of {len(all_trials)} trials already passed on this keyboard build and are skipped "
+                "(--redo runs them again).", markup=False,
+            )
         if not trials:
             console.print("nothing left to run.", markup=False)
             _write_final(ledger, all_trials, suite, record_dir)
             return
+    by_number = {trial.number: trial for trial in trials}
     controller = ScreenController(open_device())
     install_watchers(controller.device)
-    packages = {trial.package for trial in trials if trial.package}
-    gate = ScreenGate(require_serial(), allowed_packages=packages)
+    gate = ScreenGate(
+        target, allowed_packages=allowed_packages(all_trials), overlay_package=bar_package if bar else None
+    )
     speaker = Speaker()
     console.print(f"voice: {speaker.backend} (PLEKTRA_QA_VOICE=auto|kokoro|say|espeak|off)")
+    got: list[Any] = []
+    recorder = None
+
+    def on_trial(number: int, trial: Any) -> None:
+        if recorder is not None:
+            recorder.on_trial(number, trial)
+        runlock.note_children(serial)
+
+    def on_result(number: int, result: Any) -> None:
+        got.append(result)
+        if recorder is not None:
+            recorder.on_result(number, result)
+        trial = by_number.get(number)
+        if result.passed and trial is not None:
+            ledger.record(trial, result.observed, None)  # at once: a kill later does not lose it
+
+    interrupted = False
+    old_handlers = {sig: signal.signal(sig, _raise_interrupt) for sig in (signal.SIGTERM, signal.SIGHUP)}
     try:
-        # A human batch never starts on its own: card, voice, then the person's go.
-        with ButtonBar(require_serial(), package=bar_package) if bar else nullcontext() as button_bar:
-            StartGate(require_serial(), speaker=speaker, console=console, bar=button_bar).wait(
+        with ExitStack() as stack:
+            button_bar = None
+            if bar:
+                button_bar = stack.enter_context(ButtonBar(target, package=bar_package))
+            else:
+                ButtonBar(target, package=bar_package).hide_blind()  # a bar left by an earlier run
+                stack.callback(ButtonBar(target, package=bar_package).hide_blind)
+            # Preflight before the person is asked to start: unlock, heads-up, stop card, the foreground app.
+            stack.enter_context(gate)
+            gate.yield_to_human("", shade=False)  # ordinary colors for the go
+            StartGate(target, speaker=speaker, console=console, bar=button_bar).wait(
                 f"Plektra QA: {suite.name}", batch_instruction(len(trials))
             )
-            with recording(require_serial(), speaker, record, record_dir, panel=panel) as recorder:
+            with recording(target, speaker, record, record_dir, panel=panel) as recorder:
                 if recorder is not None:
                     voice = "with the voice" if speaker.enabled else "video only (voice is off)"
                     console.print(f"recording the screen {voice} to {recorder.output}")
-                results = run_chord_batch(
+                    runlock.note_children(serial)
+                run_chord_batch(
                     controller, trials, console, gate, speaker,
-                    on_trial=recorder.on_trial if recorder is not None else None,
-                    on_result=recorder.on_result if recorder is not None else None,
-                    overlay=button_bar,
+                    on_trial=on_trial, on_result=on_result, overlay=button_bar, gate_entered=True,
                 )
-    except (RecordingError, StartGateError, OverlayError) as exc:
+    except KeyboardInterrupt:
+        interrupted = True
+        console.print("interrupted: passes so far are kept.", markup=False)
+    except (RecordingError, StartGateError, OverlayError, RuntimeError) as exc:
         typer.echo(f"refused: {exc}", err=True)
         raise typer.Exit(code=2) from exc
+    finally:
+        for sig, handler in old_handlers.items():
+            signal.signal(sig, handler)
     if recorder is not None:
         for warning in recorder.warnings:
             console.print(f"recording: {warning}", markup=False)
         if recorder.output.is_file():
             console.print(f"recording saved: {recorder.output}", markup=False)
-    spans = {id(item[0]): item for item in recorder.spans} if recorder is not None else {}
-    for trial, item in zip(trials, results):
-        if not item.passed:
-            continue
-        clip = None
-        span = spans.get(id(trial))
-        if span is not None and recorder is not None and recorder.output.is_file():
+        for trial, began, ended, passed, _result in recorder.spans:
+            if not passed:
+                continue
             dest = ledger.clip_path(trial)
-            if cut_clip(recorder.output, span[1], span[2] + TAIL_S, dest):
-                clip = dest
-        ledger.record(trial, item.observed, clip)
+            if recorder.output.is_file() and cut_clip(recorder.output, began, ended + TAIL_S, dest):
+                ledger.attach_clip(trial, dest)
+            else:
+                ledger.forget(trial)  # recorded run: a pass with no clip does not count
+                console.print(f"trial {trial.number}: clip could not be cut, so it is not counted as passed", markup=False)
     _write_final(ledger, all_trials, suite, record_dir)
-    failed = [item for item in results if not item.passed]
+    failed = [item for item in got if not item.passed]
     for item in failed:
         console.print(
-            f"fail {item.phase} | {item.prompt} | expect={item.expect!r} "
+            f"fail {item.number} {item.phase} | {item.prompt} | expect={item.expect!r} "
             f"observed={item.observed!r} error={item.error}"
         )
+    if interrupted:
+        raise typer.Exit(code=130)
     if failed:
         raise typer.Exit(code=1)
+
+
+def _keyboard_build(target: str) -> str:
+    """The installed keyboard build, or BuildError: unknown or not Plektra."""
+    package = os.environ.get("PLEKTRA_QA_PACKAGE", "").strip() or KEYBOARD_PACKAGE
+    return require_plektra_build(ime_build(target), package)
 
 
 def _write_final(ledger: Ledger, trials: list[Any], suite: Path, record_dir: Path | None) -> None:
     """Join the clips of the passed trials, in suite order, into one video; say what is still open."""
     out_dir = record_dir or Path(os.environ.get("PLEKTRA_QA_RECORD_DIR") or Path.home() / "plektra-qa-recordings")
     dest = out_dir / f"{suite.stem}-final.mp4"
-    written, missing = final_video(ledger, trials, dest)
+    written, missing, no_clip = final_video(ledger, trials, dest)
     if written:
         console.print(f"video of the passed trials: {dest}", markup=False)
+    if no_clip:
+        console.print(
+            f"passed, no clip ({len(no_clip)}; --redo --record to film them): "
+            + "; ".join(f"{t.number}. {t.prompt}" for t in no_clip), markup=False,
+        )
     if missing:
-        console.print(f"still to pass ({len(missing)}): " + "; ".join(t.prompt for t in missing), markup=False)
-    else:
+        console.print(
+            f"still to pass ({len(missing)}): " + "; ".join(f"{t.number}. {t.prompt}" for t in missing), markup=False
+        )
+    elif not no_clip:
         console.print("every trial has passed on this keyboard build.", markup=False)
 
 
@@ -223,7 +298,12 @@ def video(suite: Path, record_dir: Path | None = typer.Option(None, "--record-di
     except (KeyNamingError, KeyResolutionError, LiveReadError, ValueError) as exc:
         typer.echo(f"refused: {exc}", err=True)
         raise typer.Exit(code=2) from exc
-    _write_final(Ledger(suite.stem, ime_build(require_serial())), trials, suite, record_dir)
+    try:
+        build = _keyboard_build(require_serial())
+    except BuildError as exc:
+        typer.echo(f"refused: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    _write_final(Ledger(suite.stem, build), trials, suite, record_dir)
 
 
 @app.command("import")
@@ -247,10 +327,15 @@ def import_recording(
     marks = [(int(c["tags"]["title"].split(".")[0]), float(c["start_time"])) for c in info.get("chapters", [])
              if c.get("tags", {}).get("title", "")[:1].isdigit()]
     marks.sort(key=lambda m: m[1])
-    ledger = Ledger(suite.stem, ime_build(require_serial()))
+    try:
+        build = _keyboard_build(require_serial())
+    except BuildError as exc:
+        typer.echo(f"refused: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    ledger = Ledger(suite.stem, build)
     for number in (int(n) for n in passed.split(",")):
         found = [i for i, m in enumerate(marks) if m[0] == number]
-        if not found or number > len(trials):
+        if not found or not 1 <= number <= len(trials):
             console.print(f"trial {number}: no chapter in the recording, skipped", markup=False)
             continue
         i = found[0]

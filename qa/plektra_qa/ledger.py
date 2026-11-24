@@ -31,10 +31,40 @@ def clip_dir(suite: str) -> Path:
     return Path(base) / "clips" / suite
 
 
-def trial_key(trial: Any) -> str:
-    """Stable id of what a trial asks for: edit the prompt or the expectation and it is a new trial."""
-    parts = [getattr(trial, name, "") or "" for name in ("phase", "prompt", "expect", "verify_mode", "sentinel")]
+def _hash(parts: list[str]) -> str:
     return hashlib.sha1("\x1f".join(parts).encode()).hexdigest()[:12]
+
+
+def trial_key(trial: Any) -> str:
+    """Stable id of what a trial asks for: edit the prompt or the expectation and it is a new trial.
+
+    Hashes the prompt as written in the YAML (`raw_prompt`), not the rendered text, so a different live
+    keymap or a fallback reading does not re-key the trials that carry key tokens."""
+    prompt = getattr(trial, "raw_prompt", "") or getattr(trial, "prompt", "") or ""
+    parts = [getattr(trial, name, "") or "" for name in ("phase", "prompt", "expect", "verify_mode", "sentinel")]
+    parts[1] = prompt
+    return _hash(parts)
+
+
+def legacy_trial_key(trial: Any) -> str:
+    """The key before 2026-11-24 (hash of the rendered prompt); old ledger entries are still found by it."""
+    return _hash([getattr(trial, name, "") or "" for name in ("phase", "prompt", "expect", "verify_mode", "sentinel")])
+
+
+class BuildError(RuntimeError):
+    """The installed keyboard cannot be read, or it is not Plektra."""
+
+
+def require_plektra_build(build: str, package: str) -> str:
+    """Refuse to run or record when the keyboard build is unknown or another keyboard (Gboard, ...)."""
+    if not build.strip():
+        raise BuildError("cannot read the installed keyboard build from the phone (adb or the input method failed)")
+    if build.split(" ", 1)[0] != package:
+        raise BuildError(
+            f"the active keyboard is {build.split(' ', 1)[0]}, not {package}: switch to Plektra, "
+            "because passes are recorded against the keyboard build"
+        )
+    return build
 
 
 def ime_build(serial: str, run: Callable[..., Any] = subprocess.run) -> str:
@@ -68,32 +98,54 @@ class Ledger:
         if self.path.is_file():
             self.entries = json.loads(self.path.read_text()).get("trials", {})
 
+    def _entry(self, trial: Any) -> dict[str, Any] | None:
+        return self.entries.get(trial_key(trial)) or self.entries.get(legacy_trial_key(trial))
+
     def passed(self, trial: Any) -> bool:
-        entry = self.entries.get(trial_key(trial))
-        return bool(entry and entry.get("passed") and entry.get("build") == self.build)
+        entry = self._entry(trial)
+        return bool(self.build and entry and entry.get("passed") and entry.get("build") == self.build)
 
     def pending(self, trials: list[Any]) -> list[Any]:
         return [trial for trial in trials if not self.passed(trial)]
 
     def record(self, trial: Any, observed: str, clip: Path | None) -> None:
+        self.entries.pop(legacy_trial_key(trial), None)
         self.entries[trial_key(trial)] = {
             "prompt": trial.prompt,
             "phase": getattr(trial, "phase", ""),
+            "number": getattr(trial, "number", 0),
             "passed": True,
             "observed": observed,
             "build": self.build,
             "at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
             "clip": str(clip) if clip is not None else None,
         }
+        self._save()
+
+    def _save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(".tmp")
         tmp.write_text(json.dumps({"suite": self.suite, "trials": self.entries}, indent=2, ensure_ascii=False))
         tmp.replace(self.path)
 
+    def attach_clip(self, trial: Any, clip: Path) -> None:
+        """Add the clip to a pass that was written when the trial passed."""
+        entry = self._entry(trial)
+        if entry is not None:
+            entry["clip"] = str(clip)
+            self._save()
+
+    def forget(self, trial: Any) -> None:
+        """Drop a pass (a recorded run whose clip could not be cut does not count)."""
+        removed = [self.entries.pop(key, None) for key in (trial_key(trial), legacy_trial_key(trial))]
+        if any(removed):
+            self._save()
+
     def clip_for(self, trial: Any) -> Path | None:
-        if not self.passed(trial):
+        entry = self._entry(trial)
+        if not self.passed(trial) or entry is None:
             return None
-        clip = self.entries[trial_key(trial)].get("clip")
+        clip = entry.get("clip")
         return Path(clip) if clip and Path(clip).is_file() else None
 
     def clip_path(self, trial: Any) -> Path:
@@ -131,9 +183,14 @@ def join_clips(clips: list[Path], dest: Path, run: Callable[..., Any] = subproce
     return done.returncode == 0 and dest.is_file()
 
 
-def final_video(ledger: Ledger, trials: list[Any], dest: Path, run: Callable[..., Any] = subprocess.run) -> tuple[bool, list[Any]]:
-    """Join the clips of every passed trial in suite order. Returns (written, trials still without a passing clip)."""
+def final_video(
+    ledger: Ledger, trials: list[Any], dest: Path, run: Callable[..., Any] = subprocess.run
+) -> tuple[bool, list[Any], list[Any]]:
+    """Join the clips of every passed trial in suite order.
+
+    Returns (written, trials still to pass, trials that passed but have no clip)."""
     have = [(trial, ledger.clip_for(trial)) for trial in trials]
-    missing = [trial for trial, clip in have if clip is None]
+    to_pass = [trial for trial in trials if not ledger.passed(trial)]
+    no_clip = [trial for trial, clip in have if clip is None and ledger.passed(trial)]
     written = join_clips([clip for _, clip in have if clip is not None], dest, run)
-    return written, missing
+    return written, to_pass, no_clip

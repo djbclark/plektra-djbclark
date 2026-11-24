@@ -14,8 +14,8 @@ def ev(type_, code, value):
 
 def test_start_events_are_key_downs_and_new_fingers_only():
     assert is_start_event(ev("EV_KEY", "KEY_A", "DOWN"))
-    assert is_start_event(ev("EV_KEY", "BTN_TOUCH", "DOWN"))
-    assert is_start_event(ev("EV_ABS", "ABS_MT_TRACKING_ID", "00000005"))
+    assert not is_start_event(ev("EV_KEY", "BTN_TOUCH", "DOWN"))  # a touch never starts a batch
+    assert not is_start_event(ev("EV_ABS", "ABS_MT_TRACKING_ID", "00000005"))
     assert not is_start_event(ev("EV_KEY", "KEY_A", "UP"))
     assert not is_start_event(ev("EV_KEY", "KEY_A", "REPEAT"))
     assert not is_start_event(ev("EV_ABS", "ABS_MT_TRACKING_ID", "ffffffff"))
@@ -89,5 +89,6 @@ def test_a_relayed_go_still_posts_the_card_first():
 
 def test_card_names_the_ways_to_start():
     both = card_text("t", "Do it.", phone=True, terminal=True)
-    assert "press any key or tap the screen" in both and "type go" in both
+    assert "press any key" in both and "tap the screen" not in both and "type go" in both
+    assert "press Done on the bar" in card_text("t", "Do it.", phone=True, terminal=False, bar=True)
     assert "type go" not in card_text("t", "Do it.", phone=True, terminal=False)

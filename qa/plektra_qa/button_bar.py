@@ -217,6 +217,13 @@ class ButtonBar:
         except OverlayError:
             pass  # a bar that never showed has nothing to hide
 
+    def hide_blind(self) -> None:
+        """Send HIDE without waiting for an answer (no logcat reader): clears a bar an earlier run left up."""
+        try:
+            self._broadcast("HIDE", [])
+        except Exception:
+            pass
+
     def pressed(self) -> str | None:
         """The oldest unread button (done, next or stop), or None."""
         with self._lock:

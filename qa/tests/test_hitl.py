@@ -3,6 +3,7 @@ import io
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 from rich.console import Console
 
 from plektra_qa.controller import ScreenController
@@ -321,10 +322,13 @@ def test_gate_refuses_a_non_numeric_timeout_before_changing_settings():
 def test_gate_waits_for_an_old_watcher_before_replacing_it():
     shell = _Shell("bitpit.launcher")
 
+    polls = {"alive": 0}
+
     def answering(args):
         if args[:2] == ["sh", "-c"] and "kill -0" in args[2]:
             shell.scripts.append(args[2])
-            return "yes\n"
+            polls["alive"] += 1
+            return "yes\n" if polls["alive"] <= 4 else "\n"  # the old watcher needs a few polls to finish
         if args[:2] == ["sh", "-c"] and f"cat {AWAKE_PID}" in args[2]:
             shell.scripts.append(args[2])
             return "4242\n"
@@ -332,8 +336,31 @@ def test_gate_waits_for_an_old_watcher_before_replacing_it():
 
     gate = ScreenGate("SERIAL", shell=answering, sleep=shell.slept.append)
     with gate:
-        assert shell.slept == [1.2]
+        # polls until the watcher is gone (not a fixed sleep), then a short pause for its last lines
+        assert shell.slept[:3] == [0.5, 0.5, 0.5] and shell.slept[3] == 0.5
+        assert polls["alive"] >= 5
         assert any(AWAKE_RELEASE in line and line.startswith("touch ") for line in shell.scripts)
+
+
+def test_gate_refuses_when_the_old_watcher_never_finishes():
+    shell = _Shell("bitpit.launcher")
+
+    def stuck(args):
+        if args[:2] == ["sh", "-c"] and "kill -0" in args[2]:
+            return "yes\n"
+        if args[:2] == ["sh", "-c"] and f"cat {AWAKE_PID}" in args[2]:
+            return "4242\n"
+        return shell(args)
+
+    with pytest.raises(RuntimeError, match="did not finish restoring"):
+        ScreenGate("SERIAL", shell=stuck, sleep=shell.slept.append).__enter__()
+
+
+def test_gate_refuses_to_save_its_own_stay_awake_timeout_as_the_original():
+    shell = _Shell("bitpit.launcher")
+    shell.values[("system", "screen_off_timeout")] = "86400000"
+    with pytest.raises(RuntimeError, match="86400000"):
+        ScreenGate("SERIAL", shell=shell, sleep=shell.slept.append).__enter__()
 
 
 def test_gate_refuses_to_hold_when_inversion_does_not_stick():

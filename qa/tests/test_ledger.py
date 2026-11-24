@@ -45,8 +45,9 @@ def test_final_video_joins_passed_clips_in_suite_order_and_names_the_rest(tmp_pa
         (tmp_path / "final.mp4").write_bytes(b"v")
         return SimpleNamespace(returncode=0)
 
-    written, missing = final_video(ledger, [a, b, c], tmp_path / "final.mp4", fake_run)
-    assert written and missing == [b]
+    written, missing, no_clip = final_video(ledger, [a, b, c], tmp_path / "final.mp4", fake_run)
+    assert written and missing == []  # b passed: it is not "still to pass", only without a clip
+    assert no_clip == [b]
     listing = calls[0][calls[0].index("-i") + 1]
     assert listing.endswith("clips.txt")
 

@@ -61,7 +61,8 @@ class ScreenController:
         elif self.device(focused=True).exists():
             element = self.device(focused=True)
         else:
-            element = self.device(className=class_name)
+            # Never grab "any" EditText: it may belong to another app (review finding 1).
+            raise RuntimeError("input field not found: the trial names no field and none is focused")
         if not element.exists():
             raise RuntimeError("input field not found")
         info = element.info()

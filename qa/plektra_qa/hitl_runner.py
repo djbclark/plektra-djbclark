@@ -22,6 +22,8 @@ from plektra_qa.speech import Speaker
 
 POLL_S = 0.025
 STOP_CHECK_S = 1.0
+NO_BAR_IDLE_S = 20.0  # no bar and no timeout: this long without a key after the first input ends the trial
+DONE_SETTLE_S = 0.3
 SETTLE_S = 1.5  # a match counts only after the text stays put this long: people fix typos
 STOPPED = "stopped from the phone"
 NOT_STARTED = "never started after the spoken prompts"
@@ -54,6 +56,12 @@ class ChordTrial(BaseModel):
     start_wait_s: float = 10
     max_reprompts: int | None = None  # None: keep reprompting, never give up
     phase: str = ""
+    number: int = 0  # position in the whole suite (1-based): chapters, logs, the table and `import` use it
+    raw_prompt: str = ""  # the prompt as written in the YAML, before key tokens were rendered (ledger identity)
+    # Compare the first letter without regard to case, for trials that do not test autocapitalization.
+    expect_ci_first: bool = False
+    # Always start from a fresh note: leave an open note first, then click `click_resource_id`.
+    fresh: bool = False
 
 
 class TrialResult(BaseModel):
@@ -62,6 +70,7 @@ class TrialResult(BaseModel):
     expect: str
     observed: str
     passed: bool
+    number: int = 0
     accuracy: float
     diff: str
     wpm: float | None
@@ -105,8 +114,57 @@ def load_suite(path: Path, keymap: Keymap | None = None) -> list[ChordTrial]:
             fields = localise_texts(
                 fields, keymap, f"{path.name}, phase '{phase_name}', trial {len(trials) + 1}"
             )
+            fields["number"] = len(trials) + 1
+            fields["raw_prompt"] = str(raw.get("prompt", ""))
             trials.append(ChordTrial.model_validate(fields))
     return trials
+
+
+SETUP_FIELDS = ("package", "activity", "click_resource_id", "resource_id")
+
+
+def plan_trials(all_trials: list[ChordTrial], is_passed: Callable[[ChordTrial], bool]) -> list[ChordTrial]:
+    """The trials to run: a phase is skipped only when every trial in it passed.
+
+    Pending trials run. The first pending trial of a phase gets the phase's setup (the app to open, the
+    button to click, the field), copied from the phase's other trials, so a skipped first trial never
+    leaves the next one with no app open. A trial that keeps the field (`clear_field: false`) depends on
+    the trial before it, so that one runs again too."""
+    by_phase: dict[str, list[ChordTrial]] = {}
+    for trial in all_trials:
+        by_phase.setdefault(trial.phase, []).append(trial)
+    pending_numbers: set[int] = set()
+    for members in by_phase.values():
+        if all(is_passed(t) for t in members):
+            continue
+        for i, trial in enumerate(members):
+            if not is_passed(trial):
+                pending_numbers.add(trial.number)
+                if not trial.clear_field and i > 0:
+                    pending_numbers.add(members[i - 1].number)
+    planned: list[ChordTrial] = []
+    first_seen: set[str] = set()
+    for trial in all_trials:
+        if trial.number not in pending_numbers:
+            continue
+        if trial.phase not in first_seen:
+            first_seen.add(trial.phase)
+            update: dict[str, Any] = {}
+            for name in SETUP_FIELDS:
+                if getattr(trial, name) is None:
+                    for other in by_phase[trial.phase]:
+                        if getattr(other, name) is not None:
+                            update[name] = getattr(other, name)
+                            break
+            if update:
+                trial = trial.model_copy(update=update)
+        planned.append(trial)
+    return planned
+
+
+def allowed_packages(all_trials: list[ChordTrial]) -> set[str]:
+    """Every app any trial of the suite may use, also the trials that are skipped this time."""
+    return {trial.package for trial in all_trials if trial.package}
 
 
 def strip_sentinel(observed: str, sentinel: str) -> str:
@@ -115,15 +173,22 @@ def strip_sentinel(observed: str, sentinel: str) -> str:
     return observed
 
 
-def trial_matched(observed: str, expect: str, sentinel: str) -> bool:
+def _same(observed: str, expect: str, ci_first: bool) -> bool:
     if observed == expect:
         return True
-    if not expect.startswith("\n"):
-        # <Tab|Enter> may be either key: Enter leaves a leading newline, Tab does not.
-        observed = observed.lstrip("\n")
-        if observed == expect:
+    return bool(ci_first and observed and expect and observed[0].casefold() == expect[0].casefold()
+                and observed[1:] == expect[1:])
+
+
+def trial_matched(observed: str, expect: str, sentinel: str, ci_first: bool = False) -> bool:
+    if _same(observed, expect, ci_first):
+        return True
+    if not expect.startswith(("\n", "\t")):
+        # <Tab|Enter> may be either key: Enter leaves a leading newline, Tab a tab (or nothing).
+        observed = observed.lstrip("\n\t")
+        if _same(observed, expect, ci_first):
             return True
-    return bool(sentinel) and strip_sentinel(observed, sentinel) == expect
+    return bool(sentinel) and _same(strip_sentinel(observed, sentinel), expect, ci_first)
 
 
 def character_diff(observed: str, expect: str) -> str:
@@ -153,6 +218,7 @@ def words_per_minute(text: str, t_first: float | None, t_complete: float | None)
 
 def _table(results: list[TrialResult], current: str) -> Table:
     table = Table(title="Plektra chord batch")
+    table.add_column("#", justify="right")
     table.add_column("phase")
     table.add_column("prompt")
     table.add_column("result")
@@ -160,13 +226,14 @@ def _table(results: list[TrialResult], current: str) -> Table:
     for result in results:
         mark = "pass" if result.passed else "fail"
         table.add_row(
+            str(result.number or ""),
             result.phase,
             result.prompt,
             mark,
             "" if result.wpm is None else f"{result.wpm:.1f}",
         )
     if current:
-        table.add_row("", current, "typing", "")
+        table.add_row("", "", current, "typing", "")
     return table
 
 
@@ -183,10 +250,22 @@ def _read_observed(
     return controller.visible_text(target)
 
 
+def _leave_open_note(device: Any, trial: ChordTrial) -> None:
+    """A trial that wants a fresh note: if its field is already on screen, go back to the list first."""
+    if not (trial.fresh and trial.click_resource_id and trial.resource_id):
+        return
+    if device(resourceId=trial.resource_id).exists():
+        from lamda.client import Keys
+
+        device.press_key(Keys.KEY_BACK)
+        time.sleep(0.5)
+
+
 def _open_target(controller: ScreenController, trial: ChordTrial) -> Any:
     device = controller.device
     if trial.package and trial.activity:
         controller.teleport_to_activity(trial.package, trial.activity)
+    _leave_open_note(device, trial)
     if trial.click_resource_id:
         deadline = time.perf_counter() + 3
         opened = False
@@ -225,7 +304,9 @@ def run_chord_batch(
     on_trial: Callable[[int, ChordTrial], None] | None = None,
     on_result: Callable[[int, TrialResult], None] | None = None,
     overlay: ButtonBar | None = None,
+    gate_entered: bool = False,
 ) -> list[TrialResult]:
+    """gate_entered: the caller already entered `gate` (the preflight ran before the person's go)."""
     console = console or Console()
     if speaker is not None:
         phrases = [HANDS_OFF]
@@ -235,7 +316,7 @@ def run_chord_batch(
     device = controller.device
     results: list[TrialResult] = []
     previous_complete: float | None = None
-    with gate if gate is not None else nullcontext():
+    with gate if gate is not None and not gate_entered else nullcontext():
         console.print(
             "Inverted colors: hands off. Ordinary colors: the shade shows the action, then closes. "
             "Type that action. The screen stays on until this command ends. "
@@ -337,7 +418,12 @@ def _run_trials(
 ) -> list[TrialResult]:
     # No limit unless the suite or the operator sets `timeout_s`.
     idle_s_for = lambda trial: float("inf") if trial.timeout_s is None else trial.timeout_s  # noqa: E731
+    # With no bar the person has no Done button, so a wrong text must still end the trial.
+    idle_after_input = lambda trial: (  # noqa: E731
+        NO_BAR_IDLE_S if trial.timeout_s is None and overlay is None else idle_s_for(trial)
+    )
     for index, trial in enumerate(trials):
+        number = trial.number or index + 1
         error = ""
         element = None
         if _phone_stopped(gate):
@@ -369,11 +455,18 @@ def _run_trials(
                 overlay.show(trial.shade or trial.prompt)
             except Exception as exc:
                 error = str(exc)
+        baseline = ""
+        if error == "" and element is not None:
+            # Read it before the voice starts: say() may block, and typing then must not become the baseline.
+            try:
+                baseline = _read_observed(trial, element, device, controller)
+            except Exception as exc:
+                error = f"field lost: {type(exc).__name__}"
         ready = time.perf_counter()
         voice = _Reprompter(speaker, trial)
         if error == "":
             if on_trial is not None:
-                on_trial(index + 1, trial)
+                on_trial(number, trial)
             console.bell()
             if trial.cue_on_device:
                 device.beep()
@@ -383,9 +476,6 @@ def _run_trials(
                 device.set_clipboard("")  # a stale copy must not pass the trial
             except Exception:
                 pass
-        baseline = ""
-        if error == "" and element is not None:
-            baseline = _read_observed(trial, element, device, controller)
         first: float | None = None
         complete: float | None = None
         observed = baseline
@@ -414,12 +504,11 @@ def _run_trials(
                 last_change = now
                 matched_at = None
                 if first is not None:
-                    deadline = last_change + idle_s_for(trial)  # the timeout is idle time, not total time
+                    deadline = last_change + idle_after_input(trial)  # the timeout is idle time, not total time
             if changed and first is None and strip_sentinel(observed, trial.sentinel) != "":
                 first = time.perf_counter()
                 voice.started()
-                if voice.active:
-                    deadline = first + idle_s_for(trial)
+                deadline = first + idle_after_input(trial)
             if overlay is not None:
                 button = overlay.pressed()
                 if button == "stop":
@@ -430,8 +519,13 @@ def _run_trials(
                     break
                 if button == "done":
                     complete = time.perf_counter()  # the person says it is finished
+                    time.sleep(DONE_SETTLE_S)  # a last key or an autocorrect commit may still land
+                    try:
+                        observed = _read_observed(trial, element, device, controller)
+                    except Exception:
+                        pass
                     break
-            elif changed and trial_matched(observed, trial.expect, trial.sentinel):
+            elif changed and trial_matched(observed, trial.expect, trial.sentinel, trial.expect_ci_first):
                 if matched_at is None:
                     matched_at = time.perf_counter()
                 if now - last_change >= SETTLE_S:
@@ -449,7 +543,7 @@ def _run_trials(
         if complete is None:
             complete = time.perf_counter()
         compared = strip_sentinel(observed, trial.sentinel)
-        passed = error == "" and trial_matched(observed, trial.expect, trial.sentinel)
+        passed = error == "" and trial_matched(observed, trial.expect, trial.sentinel, trial.expect_ci_first)
         gap = None if previous_complete is None else round(ready - previous_complete, 4)
         result = TrialResult(
             phase=trial.phase,
@@ -457,6 +551,7 @@ def _run_trials(
             expect=trial.expect,
             observed=compared,
             passed=passed,
+            number=number,
             accuracy=0.0 if error else accuracy(compared, trial.expect),
             diff="" if passed else (error or character_diff(compared, trial.expect)),
             wpm=words_per_minute(compared, first, complete),
@@ -468,7 +563,7 @@ def _run_trials(
         )
         results.append(result)
         if on_result is not None:
-            on_result(index + 1, result)
+            on_result(number, result)
         previous_complete = complete
         live.update(_table(results, ""))
         if error in (STOPPED, NOT_STARTED):

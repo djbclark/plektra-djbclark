@@ -138,9 +138,15 @@ class Speaker:
                     return [name, "-w", text] if name == "spd-say" else [name, text]
             return None
         if self.backend == "kokoro" and self._player:
-            wav = self._render(text)
-            if wav is not None:
-                return [*self._player, str(wav)]
+            wav = self._wav(text)
+            if not (wav.is_file() and wav.stat().st_size > 0) and self._which("say"):
+                # Never block on a Kokoro render (up to 60 s) in the middle of a trial: render it in the
+                # background for next time and speak it with the system voice now.
+                threading.Thread(target=self._render, args=(text,), name="voice-render", daemon=True).start()
+                return ["say", text]
+            wav_ready = self._render(text)
+            if wav_ready is not None:
+                return [*self._player, str(wav_ready)]
             if self._which("say"):
                 return ["say", text]
         return None
