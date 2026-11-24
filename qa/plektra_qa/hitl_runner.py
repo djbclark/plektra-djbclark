@@ -372,7 +372,11 @@ def _run_trials(
                 if _phone_stopped(gate):
                     error = STOPPED
                     break
-            observed = _read_observed(trial, element, device, controller)
+            try:
+                observed = _read_observed(trial, element, device, controller)
+            except Exception as exc:  # the person left the app or the field went away
+                error = f"field lost: {type(exc).__name__}"
+                break
             changed = observed != baseline
             if changed and first is None and strip_sentinel(observed, trial.sentinel) != "":
                 first = time.perf_counter()
