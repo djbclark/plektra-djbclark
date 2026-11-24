@@ -6,7 +6,14 @@ import time
 import pytest
 
 from plektra_qa import hitl_runner
-from plektra_qa.button_bar import ButtonBar, OverlayError, parse_line
+from plektra_qa.button_bar import (
+    ButtonBar,
+    OverlayError,
+    parse_entry,
+    parse_line,
+    parse_pm_uid,
+    uid_from_column,
+)
 from plektra_qa.controller import ScreenController
 from plektra_qa.hitl_runner import SKIPPED, STOPPED, ChordTrial, run_chord_batch
 
@@ -49,16 +56,45 @@ class _Proc:
         self.stdout.push("")
 
 
-def _bar(shell_calls, pipe, ack=0.3):
+APP_UID = 10234
+DEVICE_NOW = "11-24 16:00:00.000"
+
+
+def _line(text: str, uid: str | int = APP_UID) -> str:
+    """A logcat line as `logcat -v threadtime -v uid` prints it."""
+    return f"11-24 16:00:01.000 {uid} 4321 4321 I QAOVERLAY: QAOVERLAY {text}"
+
+
+def _bar(shell_calls, pipe, ack=0.3, *, uid_listing=f"package:x.bar uid:{APP_UID}\n", popen_calls=None):
+    """A bar whose fake phone answers pm, date and the SHOW/HIDE broadcasts (seq 1 and 2)."""
+
     def shell(args):
+        if args[0] == "pm":
+            return uid_listing
+        if args[0] == "date":
+            return DEVICE_NOW + "\n"
         shell_calls.append(list(args))
         if "SHOW" in args[3]:
-            pipe.push("I/QAOVERLAY(1): QAOVERLAY shown seq=1")
+            pipe.push(_line("shown seq=1"))
         if "HIDE" in args[3]:
-            pipe.push("I/QAOVERLAY(1): QAOVERLAY hidden seq=2")
+            pipe.push(_line("hidden seq=2"))
         return ""
 
-    return ButtonBar("serial", package="x.bar", shell=shell, popen=lambda *a, **k: _Proc(pipe), ack_timeout_s=ack)
+    def popen(argv, **_k):
+        if popen_calls is not None:
+            popen_calls.append(list(argv))
+        return _Proc(pipe)
+
+    return ButtonBar("serial", package="x.bar", shell=shell, popen=popen, ack_timeout_s=ack)
+
+
+def _wait_for(read, timeout=1.0):
+    deadline = time.monotonic() + timeout
+    value = read()
+    while value is None and time.monotonic() < deadline:
+        time.sleep(0.01)
+        value = read()
+    return value
 
 
 def test_show_broadcasts_waits_for_the_ack_and_reads_buttons():
@@ -69,24 +105,149 @@ def test_show_broadcasts_waits_for_the_ack_and_reads_buttons():
         assert calls[0][:6] == ["am", "broadcast", "-a", "x.bar.SHOW", "-p", "x.bar"]
         assert "Type hello" in calls[0] and "done,next,stop" in calls[0]
         assert bar.pressed() is None
-        pipe.push("I/QAOVERLAY(1): QAOVERLAY button=done seq=3")
-        deadline = time.monotonic() + 1
-        pressed = None
-        while pressed is None and time.monotonic() < deadline:
-            pressed = bar.pressed()
-            time.sleep(0.01)
-        assert pressed == "done"
+        pipe.push(_line("button=done seq=3"))
+        assert _wait_for(bar.pressed) == "done"
 
 
 def test_show_without_an_ack_raises_instead_of_pretending():
     pipe = _Pipe()
-    bar = ButtonBar("serial", package="x.bar", shell=lambda a: "", popen=lambda *a, **k: _Proc(pipe), ack_timeout_s=0.1)
+
+    def shell(args):
+        return f"package:x.bar uid:{APP_UID}\n" if args[0] == "pm" else ""
+
+    bar = ButtonBar("serial", package="x.bar", shell=shell, popen=lambda *a, **k: _Proc(pipe), ack_timeout_s=0.1)
     bar.start()
     try:
         with pytest.raises(OverlayError, match="did not report shown"):
             bar.show("Type hello")
     finally:
         bar.close()
+
+
+def test_logcat_starts_at_the_phones_clock_and_asks_for_the_uid_column():
+    popen_calls: list[list[str]] = []
+    with _bar([], _Pipe(), popen_calls=popen_calls):
+        pass
+    argv = popen_calls[0]
+    assert argv[argv.index("-T") + 1] == DEVICE_NOW
+    assert argv.count("-v") == 2 and "uid" in argv and "threadtime" in argv
+
+
+def test_logcat_falls_back_to_the_last_line_when_the_phone_clock_is_unreadable():
+    popen_calls: list[list[str]] = []
+    pipe = _Pipe()
+
+    def shell(args):
+        if args[0] == "pm":
+            return f"package:x.bar uid:{APP_UID}\n"
+        if args[0] == "date":
+            raise RuntimeError("no date")
+        return ""
+
+    bar = ButtonBar("s", package="x.bar", shell=shell, popen=lambda a, **k: popen_calls.append(a) or _Proc(pipe))
+    bar.start()
+    bar.close()
+    assert popen_calls[0][popen_calls[0].index("-T") + 1] == "1"
+
+
+def test_start_refuses_when_the_apps_uid_cannot_be_resolved():
+    for listing in ("", "package:x.bar.evil uid:10999\n", "package:x.bar uid:notanumber\n"):
+        bar = _bar([], _Pipe(), uid_listing=listing)
+        with pytest.raises(OverlayError, match="not installed"):
+            bar.start()
+
+
+def test_start_refuses_when_the_uid_lookup_fails():
+    def shell(args):
+        raise RuntimeError("device offline")
+
+    with pytest.raises(OverlayError, match="cannot look up the uid"):
+        ButtonBar("s", package="x.bar", shell=shell, popen=lambda *a, **k: _Proc(_Pipe())).start()
+
+
+def test_pm_uid_and_uid_columns():
+    assert parse_pm_uid("package:a.b uid:10234\npackage:a.b.c uid:5\n", "a.b") == 10234
+    assert parse_pm_uid("package:a.b.c uid:5\n", "a.b") is None
+    assert uid_from_column("10234") == 10234
+    assert uid_from_column("u0_a234") == 10234
+    assert uid_from_column("u10_a7") == 1010007
+    assert uid_from_column("root") is None
+    assert parse_entry(_line("button=done seq=7", uid="u0_a234")) == (10234, 7, "button", "done")
+    assert parse_entry(_line("button=done seq=7", uid="shell"))[0] is None
+
+
+def test_forged_lines_from_another_uid_are_ignored():
+    pipe = _Pipe()
+    with _bar([], pipe) as bar:
+        # Another app (uid 10999), a system column and a line with no readable uid, all claiming to be the bar.
+        pipe.push(_line("button=done seq=1", uid=10999))
+        pipe.push(_line("button=stop seq=2", uid="u0_a999"))
+        pipe.push(_line("shown seq=3", uid="shell"))
+        pipe.push("I/QAOVERLAY( 77): QAOVERLAY button=next seq=4")  # old brief format, no uid column
+        bar.show("Type hello")  # the real app answers shown seq=1
+        time.sleep(0.1)
+        assert bar.pressed() is None
+        pipe.push(_line("button=done seq=2"))
+        assert _wait_for(bar.pressed) == "done"
+
+
+def test_a_forged_shown_does_not_acknowledge_a_bar_that_never_appeared():
+    pipe = _Pipe()
+
+    def shell(args):
+        if args[0] == "pm":
+            return f"package:x.bar uid:{APP_UID}\n"
+        if args[0] == "date":
+            return DEVICE_NOW
+        if "SHOW" in args[3]:
+            pipe.push(_line("shown seq=1", uid=10999))  # forged: the overlay permission was revoked
+        return ""
+
+    bar = ButtonBar("s", package="x.bar", shell=shell, popen=lambda *a, **k: _Proc(pipe), ack_timeout_s=0.2)
+    bar.start()
+    try:
+        with pytest.raises(OverlayError, match="did not report shown"):
+            bar.show("Type hello")
+    finally:
+        bar.close()
+
+
+def test_a_replayed_older_line_is_not_a_new_answer():
+    pipe = _Pipe()
+    with _bar([], pipe) as bar:
+        bar.show("Type hello")  # shown seq=1
+        pipe.push(_line("button=done seq=3"))
+        assert _wait_for(bar.pressed) == "done"
+        pipe.push(_line("button=done seq=3"))  # the same line again
+        pipe.push(_line("button=stop seq=2"))  # older than what was seen
+        time.sleep(0.1)
+        assert bar.pressed() is None
+        pipe.push(_line("button=next seq=4"))
+        assert _wait_for(bar.pressed) == "next"
+
+
+def test_the_counter_restarting_while_a_bar_is_up_is_not_trusted():
+    pipe = _Pipe()
+    with _bar([], pipe) as bar:
+        bar.show("Type hello")
+        pipe.push(_line("button=done seq=5"))
+        assert _wait_for(bar.pressed) == "done"
+        pipe.push(_line("button=stop seq=1"))  # a bar cannot restart its process while showing
+        time.sleep(0.1)
+        assert bar.pressed() is None
+
+
+def test_a_restarted_app_may_start_counting_at_one_after_a_hide():
+    pipe = _Pipe()
+    with _bar([], pipe) as bar:
+        bar.show("first card")  # shown seq=1
+        pipe.push(_line("button=done seq=9"))
+        assert _wait_for(bar.pressed) == "done"
+        bar.hide()  # hidden seq=2 is older than seq 9, accepted because it answers the HIDE
+        # Android killed the idle app; its counter starts again, and the next card still works.
+        bar.show("second card")  # the fake phone answers shown seq=1
+        pipe.push(_line("button=next seq=2"))
+        assert _wait_for(bar.pressed) == "next"
 
 
 class _FakeBar:

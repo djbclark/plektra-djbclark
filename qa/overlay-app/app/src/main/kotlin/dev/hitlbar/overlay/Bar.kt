@@ -117,6 +117,8 @@ object Bar {
                 Button(app).apply {
                     this.text = button.label
                     isAllCaps = false
+                    // Another overlay drawn over a button must not be able to press it for the person.
+                    filterTouchesWhenObscured = true
                     setTextColor(Color.WHITE)
                     minimumWidth = dp(app, 64)
                     minimumHeight = dp(app, 48)

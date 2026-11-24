@@ -39,7 +39,7 @@ App an Host: `Log.i`-Zeilen mit dem Tag `QAOVERLAY` (lesen mit `adb logcat -s QA
 | `QAOVERLAY error=no-permission seq=N` | SHOW kam ohne die Berechtigung zum Einblenden. |
 | `QAOVERLAY error=window-failed seq=N` | Das System hat das Fenster abgelehnt. |
 
-`seq` zählt je Zeile hoch, solange der Prozess lebt (nach einem Neustart des Prozesses durch Android beginnt es wieder bei 1). Der Anweisungstext wird nie protokolliert.
+`seq` zählt je Zeile hoch, solange der Prozess lebt (nach einem Neustart des Prozesses durch Android beginnt es wieder bei 1, was der Host nur direkt nach einem HIDE annimmt). Der Host liest nur Zeilen, die die UID dieser App geschrieben hat (`logcat -v uid`), und ignoriert jedes seq, das nicht höher ist als das letzte. Die drei Schaltflächen ignorieren Berührungen, solange ein anderes Fenster sie verdeckt (`filterTouchesWhenObscured`). Der Anweisungstext wird nie protokolliert.
 
 ## Aufbau
 

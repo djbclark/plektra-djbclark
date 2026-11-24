@@ -39,7 +39,7 @@ App to host: `Log.i` lines with tag `QAOVERLAY` (read with `adb logcat -s QAOVER
 | `QAOVERLAY error=no-permission seq=N` | SHOW arrived without the draw-over-apps permission. |
 | `QAOVERLAY error=window-failed seq=N` | The system refused the window. |
 
-`seq` counts up per line while the process lives (it starts at 1 again if Android restarts the process). The instruction text is never logged.
+`seq` counts up per line while the process lives (it starts at 1 again if Android restarts the process, which the host accepts only right after a HIDE). The host reads only lines written by this app's uid (`logcat -v uid`) and ignores any seq that is not higher than the last one. The three buttons ignore touches while another window covers them (`filterTouchesWhenObscured`). The instruction text is never logged.
 
 ## Design
 
