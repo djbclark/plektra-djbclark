@@ -56,6 +56,10 @@ def connect() -> None:
 def install_watchers(device: Any) -> None:
     """Register the proven dialog watchers and turn the watcher loop on."""
     for name, conditions, target in PROVEN_WATCHERS:
+        try:
+            device.remove_watcher(name)  # an earlier run's copy stays on the phone; re-register it fresh
+        except Exception:
+            pass
         device.register_click_target_selector_watcher(name, [Selector(**conditions)], Selector(**target))
         device.set_watcher_enabled(name, True)
     device.set_watcher_loop_enabled(True)
