@@ -225,6 +225,7 @@ Regeln für Agenten:
 4. Keine unbekannten Dialoge anklicken, nicht Zurück drücken, „Nicht stören“ nicht ändern.
 5. Tasten in Versuchslisten und in Fragen an den Menschen als Token schreiben (`<Ctrl+A>`): `just qa-keys "<Ctrl+A>"` gibt den Text in beiden Fassungen zum Einfügen aus (Abschnitt 7).
 6. Aufnahme (Abschnitt 4) ist aus, solange der Mensch sie nicht wünscht. Zu Beginn jedes geführten Durchlaufs fragen („Bildschirm und Stimme aufnehmen, um es mit der Gruppe zu teilen?“) und `--record` (CLI) oder `record=true` (`request_human_chord_batch`) nur bei einem Ja angeben. Die Antwort gilt nur für diesen Durchlauf. Sagen, wo die Datei liegt.
+7. Ein Durchlauf mit Menschen startet nie von allein. Jeder neue Durchlauf zeigt seine Anweisung in der Benachrichtigungsleiste des Telefons, gibt sie im Terminal aus und spricht sie, und wartet dann auf den Start der Person: ein Tastendruck oder Tipp auf dem Telefon oder `go` im Terminal. Eine Zeitüberschreitung beendet den Lauf mit `refused: not started`; sie startet ihn nie. Die Aufnahme beginnt erst nach dem Start. Hat die Person im Chat gerade „go“ gesagt, `human_said_go=true` übergeben; Karte und Stimme laufen trotzdem zuerst. Kein Lauf, keine Overlay-Prüfung und kein Smoke-Skript umgeht dieses Tor (`plektra_qa/start_gate.py`).
 
 [firerpa-hitl.md](firerpa-hitl.md) (englisch) ist die vollständige Spezifikation, geschrieben als Bau-Anleitung für einen Agenten.
 
@@ -254,6 +255,7 @@ Die Tests nutzen Attrappen und brauchen kein Telefon.
 | Datei | Aufgabe |
 | --- | --- |
 | `plektra_qa/hitl_runner.py` | Suite laden, Versuchsschleife, Bewertung, Erinnerungen. |
+| `plektra_qa/start_gate.py` | Das Starttor: Karte in der Benachrichtigungsleiste, Terminaltext und Stimme, dann Warten auf Tastendruck, Tipp oder getipptes `go` der Person. |
 | `plektra_qa/screen_gate.py` | Invertierte Farben, Benachrichtigungsleiste, Wachbleiben, Stopp-Benachrichtigung und der Wächter auf dem Telefon. Nur adb. |
 | `plektra_qa/speech.py` | Die Sprach-Backends und der Satz-Cache. |
 | `plektra_qa/recording.py` | Optionale Bildschirm- und Sprachaufnahme (scrcpy, ffmpeg), die Tonspur und die Kapitel. |

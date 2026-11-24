@@ -17,6 +17,7 @@ from plektra_qa.keys import localise_texts, resolve_keymap
 from plektra_qa.recording import RecordingError, recording
 from plektra_qa.screen_gate import ScreenGate, require_serial
 from plektra_qa.speech import Speaker
+from plektra_qa.start_gate import StartGate, StartGateError, batch_instruction
 
 mcp = MCPServer("plektra-qa-mcp")
 _device: Any = None
@@ -133,13 +134,21 @@ def execute_ui_action(action: str, selector_kwargs: dict[str, Any]) -> str:
 
 
 @mcp.tool()
-def request_human_chord_batch(trials_json: str, record: bool = False) -> str:
+def request_human_chord_batch(
+    trials_json: str, record: bool = False, human_said_go: bool = False
+) -> str:
     """Block while a person chords the batch. Returns the per-trial report.
 
     record=true also records the screen and the spoken prompts to an mp4 for
     sharing. Set it only after the person said yes to being recorded in this
     session; the default is off. Then the result is {"results": [...],
     "recording": path or null, "warnings": [...]}.
+
+    The batch never starts on its own: the phone shows and speaks the
+    instruction, then waits for a key press or tap on the phone. Set
+    human_said_go=true only when the person has just told you go for this
+    batch; the card and voice still run first. A wait with no start ends the
+    run with {"refused": ...}.
     """
     _device, controller = _session()
     raw = json.loads(trials_json)
@@ -152,12 +161,15 @@ def request_human_chord_batch(trials_json: str, record: bool = False) -> str:
     gate = ScreenGate(require_serial(), allowed_packages=packages)
     speaker = Speaker()
     try:
+        StartGate(require_serial(), speaker=speaker).wait(
+            "Plektra QA batch", batch_instruction(len(trials)), confirmed=human_said_go
+        )
         with recording(require_serial(), speaker, record) as recorder:
             results = run_chord_batch(
                 controller, trials, gate=gate, speaker=speaker,
                 on_trial=recorder.on_trial if recorder is not None else None,
             )
-    except RecordingError as exc:
+    except (RecordingError, StartGateError) as exc:
         return json.dumps({"refused": str(exc)})
     report = [item.model_dump() for item in results]
     if recorder is None:

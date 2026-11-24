@@ -16,6 +16,7 @@ from plektra_qa.keys import Flavor, KeyNamingError, KeyResolutionError, LiveRead
 from plektra_qa.recording import RecordingError, recording
 from plektra_qa.screen_gate import ScreenGate, require_serial
 from plektra_qa.speech import Speaker
+from plektra_qa.start_gate import StartGate, StartGateError, batch_instruction
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 console = Console()
@@ -83,6 +84,10 @@ def run(
     speaker = Speaker()
     console.print(f"voice: {speaker.backend} (PLEKTRA_QA_VOICE=auto|kokoro|say|espeak|off)")
     try:
+        # A human batch never starts on its own: card, voice, then the person's go.
+        StartGate(require_serial(), speaker=speaker, console=console).wait(
+            f"Plektra QA: {suite.name}", batch_instruction(len(trials))
+        )
         with recording(require_serial(), speaker, record, record_dir) as recorder:
             if recorder is not None:
                 voice = "with the voice" if speaker.enabled else "video only (voice is off)"
@@ -91,7 +96,7 @@ def run(
                 controller, trials, console, gate, speaker,
                 on_trial=recorder.on_trial if recorder is not None else None,
             )
-    except RecordingError as exc:
+    except (RecordingError, StartGateError) as exc:
         typer.echo(f"refused: {exc}", err=True)
         raise typer.Exit(code=2) from exc
     if recorder is not None:

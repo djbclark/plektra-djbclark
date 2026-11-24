@@ -223,6 +223,7 @@ Rules for agents:
 4. Do not click dialogs the harness has not seen before, press Back, or change Do Not Disturb.
 5. Name keys with tokens (`<Ctrl+A>`) in trial lists and in questions to the person: `just qa-keys "<Ctrl+A>"` prints the two-version text to paste (section 7).
 6. Recording (section 4) is off unless the person asks for it. Ask at the start of every guided run ("record the screen and voice to share with the group?") and pass `--record` (CLI) or `record=true` (`request_human_chord_batch`) only on a yes. The answer covers that run only. Tell them where the file lands.
+7. A human batch never starts on its own. Every new batch posts its instruction on the phone's notification shade, prints it in the terminal and speaks it, then waits for the person's start: a key press or tap on the phone, or `go` typed in the terminal. A timeout ends the run with `refused: not started`; it never starts the batch. Recording starts only after the start. If the person has just told you go in chat, pass `human_said_go=true`; the card and voice still run first. No run, overlay check or smoke script bypasses this gate (`plektra_qa/start_gate.py`).
 
 [firerpa-hitl.md](firerpa-hitl.md) is the full specification. It is written as a build prompt for an agent.
 
@@ -252,6 +253,7 @@ The tests use fakes and need no phone.
 | File | Role |
 | --- | --- |
 | `plektra_qa/hitl_runner.py` | Suite loading, the trial loop, scoring, reminders. |
+| `plektra_qa/start_gate.py` | The start gate: shade card, terminal text and voice, then wait for the person's key press, tap or typed `go`. |
 | `plektra_qa/screen_gate.py` | Inverted colors, the shade, stay-awake, the stop card and the phone-side watcher. adb only. |
 | `plektra_qa/speech.py` | The voice backends and the phrase cache. |
 | `plektra_qa/recording.py` | Optional screen and voice recording (scrcpy, ffmpeg), the voice track and the chapters. |
