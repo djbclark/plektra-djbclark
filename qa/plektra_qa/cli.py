@@ -18,6 +18,7 @@ from plektra_qa.connection import connect as open_device
 from plektra_qa.connection import require_version
 from plektra_qa.controller import ScreenController
 from plektra_qa.hitl_runner import load_suite, run_chord_batch
+from plektra_qa import runlock
 from plektra_qa.ledger import TAIL_S, Ledger, cut_clip, final_video, ime_build
 from plektra_qa.keys import Flavor, KeyNamingError, KeyResolutionError, LiveReadError, render, resolve_keymap
 from plektra_qa.button_bar import DEFAULT_PACKAGE, ButtonBar, OverlayError
@@ -131,6 +132,11 @@ def run(
         console.print(resolved.describe(), markup=False)
         trials = load_suite(suite, resolved.keymap)
     except (KeyNamingError, KeyResolutionError, LiveReadError, ValueError) as exc:
+        typer.echo(f"refused: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    try:
+        runlock.acquire(require_serial())
+    except runlock.RunLockError as exc:
         typer.echo(f"refused: {exc}", err=True)
         raise typer.Exit(code=2) from exc
     ledger = Ledger(suite.stem, ime_build(require_serial()))
