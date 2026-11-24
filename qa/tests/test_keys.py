@@ -76,12 +76,10 @@ def test_render_the_ctrl_a_ctrl_c_example_in_all_three_flavors():
         "Your Ctrl + A, then your Ctrl + C. Keycaps: hold Fn, tap A; then hold Fn, tap C."
     )
     assert render(text, BASELINE, Flavor.SHADE) == (
-        "Your Ctrl + A, then your Ctrl + C. Keycaps: Fn+A, then Fn+C."
+        "Hold Fn, tap A (Ctrl+A), then hold Fn, tap C (Ctrl+C)."
     )
     assert render(text, BASELINE, Flavor.SPOKEN) == (
-        "Your Control plus letter A, then your Control plus letter C. "
-        "By keycaps, hold the key printed F N, tap letter A. "
-        "Then hold the key printed F N, tap letter C."
+        "Hold the key printed F N, tap letter A, then hold the key printed F N, tap letter C."
     )
 
 
@@ -222,12 +220,12 @@ def test_load_suite_refuses_an_unresolvable_token(tmp_path):
 def test_trial_with_tokens_gets_all_three_versions(tmp_path):
     path = _suite(
         tmp_path,
-        '      - prompt: "<Ctrl+A> in the note"\n        shade: "Press <Ctrl+A>"\n        expect: "x"\n',
+        '      - prompt: "<Ctrl+A> in the note"\n        shade: "Select all: <Ctrl+A>"\n        expect: "x"\n',
     )
     (trial,) = load_suite(path, BASELINE)
     assert trial.prompt == "Your Ctrl + A in the note. Keycaps: hold Fn, tap A."
-    assert trial.shade == "Press your Ctrl + A. Keycaps: Fn+A."
-    assert trial.speak.startswith("Press your Control plus letter A. By keycaps, hold the key printed F N")
+    assert trial.shade == "Select all: hold Fn, tap A (Ctrl+A)."
+    assert trial.speak.startswith("Select all: hold the key printed F N, tap letter A")
 
 
 def test_trial_without_tokens_is_untouched(tmp_path):
@@ -239,21 +237,20 @@ def test_trial_without_tokens_is_untouched(tmp_path):
 def test_spoken_text_falls_back_to_shade_then_prompt():
     fields = {"prompt": "<Tab> then go", "expect": "x"}
     out = localise_texts(fields, BASELINE, "t")
-    assert out["speak"].startswith("Your Tab then go.")
-    assert out["shade"].startswith("Your Tab then go.")
-    explicit = localise_texts({**fields, "speak": "Press <Tab>"}, BASELINE, "t")
-    assert explicit["speak"].startswith("Press your Tab.")
+    assert out["speak"].startswith("Tap the key printed square then go.")
+    assert out["shade"].startswith("Tap □ (Tab) then go.")
+    explicit = localise_texts({**fields, "speak": "Then <Tab>"}, BASELINE, "t")
+    assert explicit["speak"].startswith("Then tap the key printed square.")
 
 
 def test_smoke_suite_uses_tokens_and_keeps_its_expectations():
     trials = load_suite(ROOT / "suites" / "smoke_chords.yaml", BASELINE)
     assert [t.expect for t in trials] == ["Hello", "42", "a, b.", "ok", "alpha", "Beta", "Beta"]
     backspace, tab, chord = trials[3], trials[5], trials[6]
-    assert "your Backspace" in backspace.shade and "Keycaps: ⌫." in backspace.shade
-    assert "your Tab or your Enter" in tab.shade
-    assert "tap □ or tap right ⇧" in tab.shade or "□ or right ⇧" in tab.shade
-    assert chord.shade == "Press your Ctrl + A, then your Ctrl + C. Keycaps: Fn+A, then Fn+C."
-    assert "Control plus letter A" in chord.speak
+    assert "tap ⌫ (Backspace)" in backspace.shade
+    assert "(Tab or Enter)" in tab.shade and "Tap □ or tap right ⇧" in tab.shade
+    assert chord.shade.endswith("hold Fn, tap A (Ctrl+A), then hold Fn, tap C (Ctrl+C).")
+    assert "tap letter A" in chord.speak
     assert chord.verify_mode == "clipboard" and chord.clear_field is False
 
 

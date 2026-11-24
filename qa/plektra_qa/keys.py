@@ -453,6 +453,7 @@ class _KeycapWriter:
     def __init__(self, keymap: Keymap, flavor: Flavor, context: str) -> None:
         self.keymap, self.flavor, self.context = keymap, flavor, context
         self.placed: set[str] = set()
+        self.hints = flavor is not Flavor.SHADE  # say where a keycap is, once per text
 
     def cap(self, function: str, token: str) -> str:
         cap = self.keymap.resolve(function)
@@ -463,7 +464,7 @@ class _KeycapWriter:
             )
         spoken = self.flavor is Flavor.SPOKEN
         name = cap.spoken if spoken else cap.screen
-        if cap.where and self.flavor is not Flavor.SHADE and cap.id not in self.placed:
+        if cap.where and self.hints and cap.id not in self.placed:
             self.placed.add(cap.id)
             name = f"{name}, {cap.where}" if spoken else f"{name} ({cap.where})"
         return name
@@ -491,6 +492,34 @@ class _KeycapWriter:
         return f"Keycaps: {joiner.join(parts)}."
 
 
+def _render_inline(text: str, tokens: list[Token], keymap: Keymap, flavor: Flavor, context: str) -> str:
+    """The phone bar and the voice: each key token becomes the physical action, in place.
+
+    djbclark, 2026-11-24: "your Tab ... Keycaps: ..." made a person decode which key to press.
+    The bar says `Tap □ or tap right ⇧ (Tab or Enter), then type beta.`; the voice says the
+    keycap action only. The terminal table keeps the longer two-part text.
+    """
+    shade = flavor is Flavor.SHADE
+    writer = _KeycapWriter(keymap, Flavor.SCREEN if shade else Flavor.SPOKEN, context)
+    writer.hints = not shade
+    out, last = [], 0
+    for token in tokens:
+        out.append(text[last:token.start])
+        action = " or ".join(writer.chord(chord, token.raw) for chord in token.alternatives)
+        if shade:
+            names = " or ".join("+".join([*chord.mods, chord.key]) for chord in token.alternatives)
+            action = f"{action} ({names})"
+        out.append(action)
+        last = token.end
+    out.append(text[last:])
+    body = "".join(out).strip()
+    if body:
+        body = body[0].upper() + body[1:]
+        if body[-1] not in ".!?":
+            body += "."
+    return body
+
+
 def render(text: str, keymap: Keymap, flavor: Flavor = Flavor.SCREEN, context: str = "") -> str:
     """Expand the key tokens in `text` and append one keycaps line.
 
@@ -503,6 +532,8 @@ def render(text: str, keymap: Keymap, flavor: Flavor = Flavor.SCREEN, context: s
         raise KeyNamingError(f"{context}{exc}") from exc
     if not tokens:
         return text
+    if flavor is not Flavor.SCREEN:
+        return _render_inline(text, tokens, keymap, flavor, context)
     out, last = [], 0
     for token in tokens:
         out.append(text[last:token.start])
