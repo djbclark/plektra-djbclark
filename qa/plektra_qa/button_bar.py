@@ -44,7 +44,7 @@ POLL_S = 0.05
 _LINE = re.compile(r"QAOVERLAY[: ]+(?:(?P<state>shown|hidden)|button=(?P<button>done|next|stop))\b")
 _SEQ = re.compile(r"\bseq=(?P<seq>\d+)\b")
 _APP_UID = re.compile(r"^u(?P<user>\d+)_a(?P<app>\d+)$")
-_PM_UID = re.compile(r"^package:(?P<package>\S+)\s+uid:(?P<uid>\d+)\s*$")
+_PM_UID = re.compile(r"^package:(?P<package>\S+)\s+uid:(?P<uid>\d+)(?:,\d+)*\s*$")  # one uid per user profile: the first is the main user's
 _THREADTIME_UID = re.compile(r"^\S+\s+\S+\s+(?P<uid>\S+)\s+\d+\s+\d+\s+[VDIWEFA]\s+QAOVERLAY\s*:")
 
 

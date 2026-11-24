@@ -356,3 +356,12 @@ def test_a_bar_that_will_not_show_fails_the_trial_loudly():
 
     results, _ = _run(_TimedField([]), Dead([]), [ChordTrial(prompt="a: hello", expect="hello")])
     assert "overlay did not report shown" in results[0].error and not results[0].passed
+
+
+def test_pm_list_with_one_uid_per_user_profile_uses_the_main_user():
+    # Seen on the Titan 2: three profiles, comma-separated.
+    from plektra_qa.button_bar import parse_pm_uid
+
+    out = "package:dev.hitlbar.overlay uid:10711,1010711,1110711\n"
+    assert parse_pm_uid(out, "dev.hitlbar.overlay") == 10711
+    assert parse_pm_uid("package:dev.hitlbar.overlay.other uid:10712\n", "dev.hitlbar.overlay") is None
