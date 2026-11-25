@@ -248,3 +248,9 @@ configuration change itself.
    one QA circle and dismissal by dragging to the bottom ×. Two overlapping voices were heard near
    handback. The second voice's source is open. The host now finishes its spoken line before posting
    the end card, and its overlay log reader survives a terminal Ctrl-C through end-card cleanup.
+
+4. Overlay 0.4.1 installed over 0.4.0. The operator confirmed the translucent colored buttons,
+   single draggable QA circle, and one audible end announcement. After moving the bar, the bench
+   captured physical `p l u m` and displayed `Plum` in Body. Dropping the bubble on the bottom ×
+   logged Stop. The host announced that the phone could be used normally and the device readback
+   showed display inversion off.
