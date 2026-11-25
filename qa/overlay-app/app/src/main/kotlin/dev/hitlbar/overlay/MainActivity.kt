@@ -10,7 +10,7 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 
-/** The only screen: what the app is, and a button to the "draw over other apps" permission page. */
+/** What the app is, a button to the "draw over other apps" permission page and one to the test bench. */
 class MainActivity : Activity() {
     private lateinit var status: TextView
 
@@ -32,7 +32,9 @@ class MainActivity : Activity() {
                 "asks it to, it draws a small bar at the top of the screen, above other apps, with " +
                 "an instruction and small buttons (Done, Redo, Prev, Next, Stop), and reports " +
                 "button presses to the log. It needs the permission to draw over other apps, has " +
-                "no network access and keeps no data."
+                "no network access and keeps no data. Its test bench is a screen of text boxes for " +
+                "testing a keyboard; what is typed there is written to the log, so type no real " +
+                "secrets."
             textSize = 16f
         })
         status = TextView(this).apply { textSize = 16f; setPadding(0, pad, 0, pad) }
@@ -44,6 +46,10 @@ class MainActivity : Activity() {
                     Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")),
                 )
             }
+        })
+        column.addView(Button(this).apply {
+            text = "Open the test bench"
+            setOnClickListener { startActivity(Intent(this@MainActivity, BenchActivity::class.java)) }
         })
         setContentView(column)
     }

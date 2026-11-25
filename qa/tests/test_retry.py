@@ -359,7 +359,8 @@ def test_the_second_app_suite_has_ten_separate_tries_that_read_the_focused_field
     assert all(t.start_resource_id == f"{probe}:id/probe_body" and t.clear_field for t in trials)
     manifest = (SUITES.parent / "overlay-app/app/src/main/AndroidManifest.xml").read_text()
     ids = (SUITES.parent / "overlay-app/app/src/main/res/values/ids.xml").read_text()
-    assert trials[0].activity == f"{probe}.TwoFieldsActivity" and '".TwoFieldsActivity"' in manifest
+    assert trials[0].activity == f"{probe}.BenchActivity" and '".BenchActivity"' in manifest
+    assert all(t.probe_field == "title" for t in trials)
     assert 'name="probe_body"' in ids and 'name="probe_title"' in ids
     assert not trial_matched("eta", "beta", "\n", ci_first=True) and trial_matched("Beta", "beta", "\n", ci_first=True)
 

@@ -21,6 +21,7 @@ Stand: nur im Fork, nicht Teil von Upstream-Plektra. Erprobt auf einem Unihertz 
 9. [Wenn etwas schiefgeht](#9-wenn-etwas-schiefgeht)
 10. [Am Harness entwickeln](#10-am-harness-entwickeln)
 11. [Erfahrungen mit dem Titan 2 Elite](#11-erfahrungen-mit-dem-titan-2-elite)
+12. [Der Prüfstand](#12-der-prüfstand)
 
 ## 1. Wie ein Durchlauf aussieht und klingt
 
@@ -164,7 +165,7 @@ Erwartet: Nach dem ersten Befehl erscheint die Leiste oben unter der Statusleist
 
 ## 5. Ergebnisse lesen
 
-Jeder Versuch ist eine Zeile: Aufforderung, erwarteter Text, Inhalt des Felds, bestanden oder nicht, Genauigkeit, Wörter pro Minute und Abstand zum vorigen Versuch. Ein fehlgeschlagener Durchlauf endet mit Code 1 und gibt pro fehlgeschlagenem Versuch eine `fail`-Zeile aus.
+Jeder Versuch ist eine Zeile: Aufforderung, erwarteter Text, Inhalt des Felds, bestanden oder nicht, Genauigkeit, Wörter pro Minute und Abstand zum vorigen Versuch. Ein fehlgeschlagener Durchlauf endet mit Code 1 und gibt pro fehlgeschlagenem Versuch eine `fail`-Zeile aus. Versuche auf dem Prüfstand melden außerdem die gedrückten Tasten und wer eine Abweichung verursacht hat; ein Tippfehler der Person wird getrennt gezählt (Abschnitt 12).
 
 Mögliche Fehler:
 
@@ -208,9 +209,9 @@ phases:
         clear_field: false       # den Text des vorigen Versuchs behalten
 ```
 
-Alle Felder eines Versuchs: `prompt`, `expect`, `expect_ci_first`, `verify_mode` (`text` oder `clipboard`), `sentinel`, `timeout_s`, `shade`, `speak`, `start_wait_s`, `max_reprompts`, `package`, `activity`, `resource_id`, `text_hint`, `start_resource_id`, `click_resource_id`, `clear_field`, `fresh`, `cue_on_device` (das Telefon piept auch).
+Alle Felder eines Versuchs: `prompt`, `expect`, `expect_ci_first`, `verify_mode` (`text` oder `clipboard`), `sentinel`, `timeout_s`, `shade`, `speak`, `start_wait_s`, `max_reprompts`, `package`, `activity`, `resource_id`, `text_hint`, `start_resource_id`, `click_resource_id`, `clear_field`, `fresh`, `cue_on_device` (das Telefon piept auch) und für den Prüfstand `probe_field` und `prefill` (Abschnitt 12).
 
-`resource_id` ist das Feld, das ein Versuch liest. `start_resource_id` ist das Feld, das zu Beginn eines Versuchs fokussiert (und geleert) wird, wenn der Versuch keines nennt: Ein solcher Versuch liest das Feld, das gerade den Fokus hat, funktioniert also auch, nachdem eine Taste wie Tab ihn verschoben hat. `suites/tab_first_letter.yaml` ist ein Beispiel: zehn Anläufe Tab und dann Tippen im Zwei-Felder-Bildschirm der Leisten-App.
+`resource_id` ist das Feld, das ein Versuch liest. `start_resource_id` ist das Feld, das zu Beginn eines Versuchs fokussiert (und geleert) wird, wenn der Versuch keines nennt: Ein solcher Versuch liest das Feld, das gerade den Fokus hat, funktioniert also auch, nachdem eine Taste wie Tab ihn verschoben hat. `suites/tab_first_letter.yaml` ist ein Beispiel: zehn Anläufe Tab und dann Tippen auf dem Prüfstand (Abschnitt 12).
 
 Tipps:
 
@@ -290,7 +291,7 @@ Regeln für Agenten:
 5. Tasten in Versuchslisten und in Fragen an den Menschen als Token schreiben (`<Ctrl+A>`): `just qa-keys "<Ctrl+A>"` gibt den Text in beiden Fassungen zum Einfügen aus (Abschnitt 7).
 6. Die Aufnahme (Abschnitt 4) ist standardmäßig an. Vor jedem Durchlauf der Person sagen, dass Bildschirm, Stimme und jede Taste aufgenommen werden, und anbieten, die Aufnahme abzuschalten; lehnt sie ab, `--no-record` (CLI) oder `record=false` (`request_human_chord_batch`) übergeben. Mit `human_said_go=true` gibt es keinen Start am Telefon, deshalb die Aufnahme vorher im Chat klären. Die Antwort gilt nur für diesen Durchlauf. Sagen, wo die Datei liegt.
 7. Ein Durchlauf mit Menschen startet nie von allein. Jeder neue Durchlauf zeigt seine Anweisung auf dem Telefon (auf der Schaltflächenleiste, ohne sie in der Benachrichtigungsleiste), gibt sie im Terminal aus und spricht sie, und wartet dann auf den Start der Person: **Done** auf der Leiste (ohne Leiste ein Tastendruck auf dem Telefon; eine Berührung startet nie) oder `go` im Terminal getippt. Ein aufgenommener Durchlauf lässt sich auch ohne Aufnahme starten: **No rec** auf der Leiste oder `norec` im Terminal. Eine Zeitüberschreitung beendet den Lauf mit `refused: not started`; sie startet ihn nie. Die Aufnahme beginnt erst nach dem Start. Hat die Person im Chat gerade „go“ gesagt, `human_said_go=true` übergeben; Karte und Stimme laufen trotzdem zuerst. Kein Lauf, keine Overlay-Prüfung und kein Smoke-Skript umgeht dieses Tor (`plektra_qa/start_gate.py`).
-8. Bevor die Tastatur beschuldigt wird, einen Fehler in einer **anderen App** wiederholen, um einen Fehler der App selbst auszuschließen (djbclark, 2026-11-25, im Wortlaut: „In cases like this we should always try again in a seperate app to make sure we are not running into an app bug.“). Bis dahin nur als in dieser einen App beobachtet melden. `suites/tab_first_letter.yaml` tut das für einen nach Tab verlorenen ersten Buchstaben.
+8. Bevor die Tastatur beschuldigt wird, einen Fehler in einer **anderen App** wiederholen, um einen Fehler der App selbst auszuschließen (djbclark, 2026-11-25, im Wortlaut: „In cases like this we should always try again in a seperate app to make sure we are not running into an app bug.“). Bis dahin nur als in dieser einen App beobachtet melden. `suites/tab_first_letter.yaml` wiederholt einen nach Tab verlorenen ersten Buchstaben auf dem Prüfstand (Abschnitt 12). Der Prüfstand zeigt als Messgerät, wohin ein Buchstabe ging; er ersetzt nicht die Wiederholung in einer echten App. Ein Ergebnis mit `fault: typo` ist ein Tippfehler der Person: nie als Fehler der Tastatur melden.
 
 [firerpa-hitl.md](firerpa-hitl.md) (englisch) ist die vollständige Spezifikation, geschrieben als Bau-Anleitung für einen Agenten.
 
@@ -320,6 +321,7 @@ Die Tests nutzen Attrappen und brauchen kein Telefon.
 | Datei | Aufgabe |
 | --- | --- |
 | `plektra_qa/hitl_runner.py` | Suite laden, Versuchsschleife, Bewertung, Erinnerungen. |
+| `plektra_qa/probe.py` | Der Prüfstand: Zurücksetzen per Intent, seine Logzeilen, wer die Abweichung verursacht hat, wohin ein Buchstabe ging. |
 | `plektra_qa/start_gate.py` | Das Starttor: Karte in der Benachrichtigungsleiste, Terminaltext und Stimme, dann Warten auf den Start der Person: **Done** oder **No rec** auf der Leiste (ohne Leiste ein Tastendruck) oder getipptes `go` bzw. `norec`. |
 | `plektra_qa/screen_gate.py` | Invertierte Farben, Benachrichtigungsleiste, Wachbleiben, Stopp-Benachrichtigung und der Wächter auf dem Telefon. Nur adb. |
 | `plektra_qa/speech.py` | Die Sprach-Backends und der Satz-Cache. |
@@ -331,6 +333,7 @@ Die Tests nutzen Attrappen und brauchen kein Telefon.
 | `plektra_qa/connection.py` | Die per Zertifikat authentifizierte FIRERPA-Verbindung. |
 | `plektra_qa/mcp_server.py` / `cli.py` | Der MCP-Server und der Befehl `plektra-qa`. |
 | `suites/` | Versuchs-Suiten. |
+| `overlay-app/` | Die Android-App: Schaltflächenleiste und Prüfstand. |
 | `keymaps/` | Tastenprofile: Tasten ab Werk plus Hersteller- und Plektra-Remapping. |
 | [titan2-elite-facts.md](titan2-elite-facts.md) (englisch) | Fakten zum Testtelefon: Tastencodes, Einstellungen, Speicherpfade. |
 
@@ -344,3 +347,46 @@ Die Tests nutzen Attrappen und brauchen kein Telefon.
 6. `adb shell uiautomator dump` und jedes Werkzeug darauf schlägt fehl, solange FIRERPA läuft. Android erlaubt nur einen UiAutomation-Client zugleich, und FIRERPA hält ihn; der Dump gibt dann `Killed` und kein XML aus. Solange FIRERPA läuft, `inspect_ui_fast` benutzen; für einen einfachen `uiautomator dump` FIRERPA zuerst beenden.
 7. Geprüfte Alternativen (24.11.2026), keine übernommen. [Mobile MCP](https://github.com/mobile-next/mobile-mcp) 1.0.19 (Apache-2.0): Beide Modi lesen den Bildschirm mit `uiautomator dump` und scheitern neben FIRERPA genauso; der Standardmodus legt zudem `mobilecli.dex` in `/data/local/tmp` ab und kann einen DeviceKit-Agenten auf dem Telefon installieren. Sein Texteingabe-Werkzeug würde außerdem die getestete Tastatur umgehen. [Vercel UI SDK](https://github.com/vercel-labs/ui): nur Web (React, Vue, Svelte, Solid, Web Components), kein Android. [Mobilerun](https://github.com/droidrun/mobilerun) (MIT): ein LLM-Agenten-Framework, das seine Schritte selbst plant, kein skriptgesteuerter Tipp-Harness. [uiautomator2](https://github.com/openatx/uiautomator2) wurde nicht ausprobiert: Es braucht denselben einzigen UiAutomation-Platz wie FIRERPA und bietet nichts, was FIRERPA fehlt. Bei beendetem FIRERPA konnten beide Mobile-MCP-Modi den Bildschirm auflisten (etwa 4 s im Legacy-Modus, etwa 12 s im Standardmodus; ein einfacher `uiautomator dump` lieferte 59 Knoten); das einzige Hindernis ist also der einzige UiAutomation-Platz.
 8. Nach dem Beenden von FIRERPA kann `just start` mit `FIRERPA UIAutomation helpers did not start` scheitern, obwohl der Server läuft. Unter Android 16 findet die Hilfsprozess-Prüfung des Lifecycle-Controllers nie etwas, weil `/proc/PID/maps` den geladenen Treiber `[anon:dalvik-classes.dex extracted in memory from @aab.zip]` nennt und nicht den Dateipfad. Den Wechsel von Hand abschließen: `overrides/aab.zip.patched` über das aktive `aab.zip` kopieren (temporäre Datei, dann `mv -f`), nur die `lamda`-Prozesse beenden, deren maps `@aab.zip` enthalten, und auf ihr Neustarten warten. Danach besteht `just status`.
+
+## 12. Der Prüfstand
+
+Die Leisten-App (ab Version 0.3.0, [overlay-app/README.de.md](overlay-app/README.de.md)) hat einen Testbildschirm, `dev.hitlbar.overlay.BenchActivity`: neun Felder zum Durchtabben (body, title, plain, email, url, number, password, search, nosuggest), Kopfzeilen mit der aktuellen Tastatur-App und den gedrückten Tasten und eine laufende Anzeige aller Ereignisse. Er funktioniert mit jeder Tastatur. Was dort getippt wird, auch Passwörter, landet im Log: keine echten Geheimnisse eintippen.
+
+**In einer Suite.** Ein Versuch auf dem Prüfstand setzt ihn per Intent zurück, ohne den Bildschirm zu berühren; ein **Redo** beginnt deshalb genau wie der erste Anlauf:
+
+```yaml
+phases:
+  - name: bench_example
+    package: dev.hitlbar.overlay
+    activity: dev.hitlbar.overlay.BenchActivity
+    start_resource_id: dev.hitlbar.overlay:id/probe_body   # das Feld mit Fokus zu Beginn
+    probe_field: title                                     # das Feld, um das es in den Versuchen geht
+    prefill: {title: "al"}                                 # optional: Anfangstext je Feld
+    trials:
+      - prompt: "<Tab>, then type pha"
+        expect: "alpha"                                    # der ganze Text des Feldes am Ende
+```
+
+`probe_field` und `prefill` verwenden die Feldnamen `body`, `title`, `plain`, `email`, `url`, `number`, `password`, `search`, `nosuggest`. Ohne `probe_field` geht es im Bericht um das am Ende fokussierte Feld. Ein Versuch mit `clear_field: false` behält, was in den Feldern steht. Das Harness liest ein Passwortfeld nur als Punkte, ein Passwort-Versuch kann also nicht bestehen; sein Bericht zeigt trotzdem den echten Text.
+
+**Was jeder Anlauf meldet** (Terminal, `probe` im Ergebnis und eine Datei je Anlauf, auch für wiederholte, in `probe/<Suite>-<Zeit>/trial-NN-attempt-M.jsonl` unter dem Aufnahmeordner; die letzte Zeile einer Datei ist das Urteil, darüber stehen die Zeilen des Prüfstands):
+
+```text
+trial 3 typing: expected 'beta' | box 'eta' | keys ⇥ b e t a | missing 'b' at 1 | KEYBOARD OR APP
+trial 3 why: the right keys were pressed, the text differs: changed or lost after the keys
+trial 3 layer: 'b' reached the app (seen before the keyboard) and the keyboard sent nothing for it
+```
+
+**Wer die Abweichung verursacht hat** (`fault` eines nicht bestandenen Versuchs). Bestanden oder nicht bleibt das rohe Ergebnis.
+
+| `fault` | Wird nur gesagt, wenn |
+| --- | --- |
+| `typo`: ein Tippfehler der Person, **kein Fehler der Tastatur** | Das Feld genau das zeigt, was die gedrückten Tasten ergeben, und das nicht der erwartete Text ist: eine andere, eine zusätzliche oder eine vertauschte Taste. |
+| `keyboard-or-app` | Die gedrückten Tasten genau den erwarteten Text ergeben und das Feld abweicht: nach den Tasten geändert oder verloren (Autokorrektur, automatische Großschreibung, ein verlorener Buchstabe). |
+| `unknown` | In allen anderen Fällen, zum Beispiel: für einen Buchstaben kam keine Taste in der App an (nicht gedrückt oder vor der App verloren); Alt, Sym, Strg oder Fn, eine gehaltene Taste oder eine Cursortaste wurde benutzt; Zeichen wurden getippt, während ein anderes Feld den Fokus hatte; nur die Groß-/Kleinschreibung weicht ab und Umschalt wurde benutzt; dieselbe Taste zweimal innerhalb von 40 ms (vielleicht eine prellende Taste); Logzeilen fehlen; der Versuch wurde übersprungen. |
+
+Die Tasten werden nach der Tastenbelegung des Systems gelesen. Eine Tastaturbelegung, die Tasten eigen zuordnet (QWERTZ auf QWERTY-Tastenkappen, Zeichen durch langes Drücken), endet deshalb in `unknown` und nicht in einer Schuldzuweisung. **Korrekturen** (jede Folge von Rücktaste, was sie entfernt hat und was danach getippt wurde) werden auch aufgeführt, wenn der Text am Ende stimmt, ebenso ein bestandener Versuch, bei dem die Tasten etwas anderes ergeben (die Tastatur hat korrigiert).
+
+**Wie weit ein fehlender Buchstabe kam** (`layer`): Er kam nie in der App an; er kam an und die Tastatur-App sendete nichts oder etwas anderes; die Tastatur-App sendete ihn und die App hat ihn nicht übernommen; die Tastatur-App reichte die Taste weiter und die App verlor ihn; er stand im Feld und die Tastatur-App, eine Taste oder die App hat ihn entfernt; er landete in einem anderen Feld; oder `unknown`.
+
+**Der Prüfstand ist ein Messgerät, kein Beweis.** Er ist eine einzige App. Ein vermuteter Tastaturfehler wird weiterhin in einer echten zweiten App wiederholt (Abschnitt 8, Regel 8).

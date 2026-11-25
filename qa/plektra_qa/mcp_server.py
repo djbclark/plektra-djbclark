@@ -21,6 +21,7 @@ from plektra_qa import runlock
 from plektra_qa.button_bar import DEFAULT_PACKAGE, ButtonBar, OverlayError
 from plektra_qa.hitl_runner import ChordTrial, run_chord_batch
 from plektra_qa.keys import localise_texts, resolve_keymap
+from plektra_qa.probe import ProbeError, bench_run
 from plektra_qa.recording import RecordingError, recording
 from plektra_qa.screen_gate import ScreenGate, require_serial
 from plektra_qa.speech import Speaker
@@ -172,6 +173,12 @@ def request_human_chord_batch(
     human_said_go=true only when the person has just told you go for this
     batch; the card and voice still run first. A wait with no start ends the
     run with {"refused": ...}.
+
+    A trial on the test bench (package dev.hitlbar.overlay, activity
+    dev.hitlbar.overlay.BenchActivity) also gets "probe" (keys pressed,
+    corrections, difference, where a missing character got to) and, when it
+    failed, "fault": "typo" is the person's typing error and not a keyboard
+    failure, "keyboard-or-app" or "unknown".
     """
     _device, controller = _session()
     raw = json.loads(trials_json)
@@ -200,24 +207,26 @@ def request_human_chord_batch(
             console.print(f"no button bar ({exc}); using the shade card", markup=False)
             bar = None
         try:
-            start = StartGate(target, speaker=speaker, console=console, bar=bar)
-            start.wait(
-                "Plektra QA batch", batch_instruction(len(trials)), confirmed=human_said_go, recording=record
-            )
-            record = record and not start.record_declined
-            with recording(target, speaker, record) as recorder:
-                results = run_chord_batch(
-                    controller, trials, console, gate=gate, speaker=speaker,
-                    on_trial=recorder.on_trial if recorder is not None else None,
-                    on_result=recorder.on_result if recorder is not None else None,
-                    on_redo=(lambda trial: recorder.withdraw(trial.number)) if recorder is not None else None,
-                    on_discard=recorder.on_discard if recorder is not None else None,
-                    overlay=bar,
+            with bench_run(target, trials, "mcp") as probe:
+                start = StartGate(target, speaker=speaker, console=console, bar=bar)
+                start.wait(
+                    "Plektra QA batch", batch_instruction(len(trials)), confirmed=human_said_go, recording=record
                 )
+                record = record and not start.record_declined
+                with recording(target, speaker, record) as recorder:
+                    results = run_chord_batch(
+                        controller, trials, console, gate=gate, speaker=speaker,
+                        on_trial=recorder.on_trial if recorder is not None else None,
+                        on_result=recorder.on_result if recorder is not None else None,
+                        on_redo=(lambda trial: recorder.withdraw(trial.number)) if recorder is not None else None,
+                        on_discard=recorder.on_discard if recorder is not None else None,
+                        overlay=bar,
+                        probe=probe,
+                    )
         finally:
             if bar is not None:
                 bar_cm.__exit__(None, None, None)
-    except (RecordingError, StartGateError, runlock.RunLockError) as exc:
+    except (RecordingError, StartGateError, ProbeError, runlock.RunLockError) as exc:
         return json.dumps({"refused": str(exc)})
     finally:
         if locked:

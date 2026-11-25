@@ -21,6 +21,7 @@ Status: fork-only, not part of upstream Plektra. Proven on a Unihertz Titan 2 El
 9. [If something goes wrong](#9-if-something-goes-wrong)
 10. [Develop the harness](#10-develop-the-harness)
 11. [Lessons learned on the Titan 2 Elite](#11-lessons-learned-on-the-titan-2-elite)
+12. [The test bench](#12-the-test-bench)
 
 ## 1. What a run looks and sounds like
 
@@ -162,7 +163,7 @@ Expected: after the first command the bar appears at the top below the status ba
 
 ## 5. Read the results
 
-Each trial is a row: the prompt, the expected text, what the field held, pass or fail, accuracy, words per minute, and the gap since the previous trial. A failed run exits 1 and prints one `fail` line per failed trial.
+Each trial is a row: the prompt, the expected text, what the field held, pass or fail, accuracy, words per minute, and the gap since the previous trial. A failed run exits 1 and prints one `fail` line per failed trial. Trials on the test bench also report the keys pressed and who made a difference, and a person's typing error is counted apart (section 12).
 
 Errors you may see:
 
@@ -206,9 +207,9 @@ phases:
         clear_field: false       # keep the text from the previous trial
 ```
 
-All trial fields: `prompt`, `expect`, `expect_ci_first`, `verify_mode` (`text` or `clipboard`), `sentinel`, `timeout_s`, `shade`, `speak`, `start_wait_s`, `max_reprompts`, `package`, `activity`, `resource_id`, `text_hint`, `start_resource_id`, `click_resource_id`, `clear_field`, `fresh`, `cue_on_device` (the phone beeps too).
+All trial fields: `prompt`, `expect`, `expect_ci_first`, `verify_mode` (`text` or `clipboard`), `sentinel`, `timeout_s`, `shade`, `speak`, `start_wait_s`, `max_reprompts`, `package`, `activity`, `resource_id`, `text_hint`, `start_resource_id`, `click_resource_id`, `clear_field`, `fresh`, `cue_on_device` (the phone beeps too), and for the test bench `probe_field` and `prefill` (section 12).
 
-`resource_id` is the field a trial reads. `start_resource_id` is the field to focus (and clear) when a trial starts that names none: such a trial reads whichever field has the focus, so it still works after a key such as Tab moves it. `suites/tab_first_letter.yaml` is an example: ten tries of Tab, then typing, in the button bar app's two-field screen.
+`resource_id` is the field a trial reads. `start_resource_id` is the field to focus (and clear) when a trial starts that names none: such a trial reads whichever field has the focus, so it still works after a key such as Tab moves it. `suites/tab_first_letter.yaml` is an example: ten tries of Tab, then typing, on the test bench (section 12).
 
 Tips:
 
@@ -288,7 +289,7 @@ Rules for agents:
 5. Name keys with tokens (`<Ctrl+A>`) in trial lists and in questions to the person: `just qa-keys "<Ctrl+A>"` prints the two-version text to paste (section 7).
 6. Recording (section 4) is on by default. Before every batch, tell the person that the screen, the voice and every key will be recorded, and offer to turn it off; if they decline, pass `--no-record` (CLI) or `record=false` (`request_human_chord_batch`). With `human_said_go=true` there is no start on the phone, so settle recording with them in chat first. Their answer covers that run only. Tell them where the file lands.
 7. A human batch never starts on its own. Every new batch posts its instruction on the phone (on the button bar, or on the notification shade without it), prints it in the terminal and speaks it, then waits for the person's start: **Done** on the bar (without the bar, a key press on the phone; a touch never starts it), or `go` typed in the terminal. A recorded batch can also be started without recording: **No rec** on the bar, or `norec` typed in the terminal. A timeout ends the run with `refused: not started`; it never starts the batch. Recording starts only after the start. If the person has just told you go in chat, pass `human_said_go=true`; the card and voice still run first. No run, overlay check or smoke script bypasses this gate (`plektra_qa/start_gate.py`).
-8. Before blaming the keyboard, repeat a failure in a **separate app**, so that an app's own bug is ruled out (djbclark, 2026-11-25: "In cases like this we should always try again in a seperate app to make sure we are not running into an app bug."). Until then, report it as seen in that one app only. `suites/tab_first_letter.yaml` does this for a first letter lost after Tab.
+8. Before blaming the keyboard, repeat a failure in a **separate app**, so that an app's own bug is ruled out (djbclark, 2026-11-25: "In cases like this we should always try again in a seperate app to make sure we are not running into an app bug."). Until then, report it as seen in that one app only. `suites/tab_first_letter.yaml` repeats a first letter lost after Tab on the test bench (section 12). The bench is an instrument that shows where a letter went; it does not replace the retry in a real app. A trial result with `fault: typo` is the person's typing error: never report it as a keyboard failure.
 
 [firerpa-hitl.md](firerpa-hitl.md) is the full specification. It is written as a build prompt for an agent.
 
@@ -318,6 +319,7 @@ The tests use fakes and need no phone.
 | File | Role |
 | --- | --- |
 | `plektra_qa/hitl_runner.py` | Suite loading, the trial loop, scoring, reminders. |
+| `plektra_qa/probe.py` | The test bench: reset by intent, its log lines, who made a difference, where a letter got lost. |
 | `plektra_qa/start_gate.py` | The start gate: shade card, terminal text and voice, then wait for the person's start: **Done** or **No rec** on the bar (a key press without the bar), or `go` or `norec` typed. |
 | `plektra_qa/screen_gate.py` | Inverted colors, the shade, stay-awake, the stop card and the phone-side watcher. adb only. |
 | `plektra_qa/speech.py` | The voice backends and the phrase cache. |
@@ -329,6 +331,7 @@ The tests use fakes and need no phone.
 | `plektra_qa/connection.py` | The certificate-authenticated FIRERPA connection. |
 | `plektra_qa/mcp_server.py` / `cli.py` | The MCP server and the `plektra-qa` command. |
 | `suites/` | Trial suites. |
+| `overlay-app/` | The Android app: the button bar and the test bench. |
 | `keymaps/` | Key profiles: factory keycaps plus the vendor and Plektra remaps. |
 | [titan2-elite-facts.md](titan2-elite-facts.md) | Facts about the test phone: key codes, settings, storage paths. |
 
@@ -342,3 +345,46 @@ The tests use fakes and need no phone.
 6. `adb shell uiautomator dump`, and any tool built on it, fails while FIRERPA is running. Android allows one UiAutomation client at a time and FIRERPA holds it, so the dump prints `Killed` and no XML. Use `inspect_ui_fast` while FIRERPA is up; stop FIRERPA first if you need a plain `uiautomator dump`.
 7. Alternatives considered (2026-11-24), none adopted. [Mobile MCP](https://github.com/mobile-next/mobile-mcp) 1.0.19 (Apache-2.0): both of its modes read the screen with `uiautomator dump`, so both fail the same way next to FIRERPA, and its default mode also pushes `mobilecli.dex` to `/data/local/tmp` and may install a DeviceKit agent on the phone. Its text-typing tool would also bypass the keyboard under test. [Vercel UI SDK](https://github.com/vercel-labs/ui): web only (React, Vue, Svelte, Solid, Web Components), no Android. [Mobilerun](https://github.com/droidrun/mobilerun) (MIT): an LLM agent framework that plans its own steps, not a scripted typing harness. [uiautomator2](https://github.com/openatx/uiautomator2) was not tried: it needs the same single UiAutomation slot as FIRERPA and adds nothing it lacks. With FIRERPA stopped, both Mobile MCP modes did list the screen (about 4 s in legacy mode, about 12 s in default mode; plain `uiautomator dump` returned 59 nodes), so the only blocker is the single UiAutomation slot.
 8. After stopping FIRERPA, `just start` can fail with `FIRERPA UIAutomation helpers did not start` although the server is up. On Android 16 the lifecycle controller's helper check never matches, because `/proc/PID/maps` names the loaded driver `[anon:dalvik-classes.dex extracted in memory from @aab.zip]` and not the file path. Finish the swap by hand: copy `overrides/aab.zip.patched` over the active `aab.zip` (temp file, then `mv -f`), kill only the `lamda` processes whose maps contain `@aab.zip`, and wait for them to respawn. `just status` then passes.
+
+## 12. The test bench
+
+The button bar app (version 0.3.0 or newer, [overlay-app/README.md](overlay-app/README.md)) has a test screen, `dev.hitlbar.overlay.BenchActivity`: nine boxes to Tab between (body, title, plain, email, URL, number, password, search, no suggestions), a header with the current keyboard and the keys pressed, and a live panel of every event. It works with any keyboard. What is typed there, passwords included, goes to the log: type no real secrets.
+
+**In a suite.** A trial on the bench resets it by intent, with no taps on the screen, so a **Redo** starts exactly like the first try:
+
+```yaml
+phases:
+  - name: bench_example
+    package: dev.hitlbar.overlay
+    activity: dev.hitlbar.overlay.BenchActivity
+    start_resource_id: dev.hitlbar.overlay:id/probe_body   # the box focused at the start
+    probe_field: title                                     # the box the trials are about
+    prefill: {title: "al"}                                 # optional: starting text per box
+    trials:
+      - prompt: "<Tab>, then type pha"
+        expect: "alpha"                                    # the whole text of the box at the end
+```
+
+`probe_field` and `prefill` use the box names `body`, `title`, `plain`, `email`, `url`, `number`, `password`, `search`, `nosuggest`. Without `probe_field` the report is about the box focused at the end. A trial with `clear_field: false` keeps what the boxes hold. The harness reads a password box only as dots, so a password trial cannot pass; its report still shows the real text.
+
+**What each try reports** (terminal, the result's `probe`, and one file per attempt, redone ones included, in `probe/<suite>-<time>/trial-NN-attempt-M.jsonl` below the recordings folder; the last line of a file is the verdict, the lines above it are the bench's):
+
+```text
+trial 3 typing: expected 'beta' | box 'eta' | keys ⇥ b e t a | missing 'b' at 1 | KEYBOARD OR APP
+trial 3 why: the right keys were pressed, the text differs: changed or lost after the keys
+trial 3 layer: 'b' reached the app (seen before the keyboard) and the keyboard sent nothing for it
+```
+
+**Who made the difference** (`fault` of a failed trial). The trial's pass or fail stays the raw result.
+
+| `fault` | Said only when |
+| --- | --- |
+| `typo`: a typing error by the person, **not a keyboard failure** | The box shows exactly what the pressed keys spell, and that is not the expected text: a different, an extra or a swapped key. |
+| `keyboard-or-app` | The keys pressed spell exactly the expected text, and the box differs: changed or lost after the keys (autocorrect, auto-capitals, a lost letter). |
+| `unknown` | Anything else, for example: no key for a letter reached the app (not pressed, or lost before the app); Alt, Sym, Ctrl or Fn, a held key or a cursor key was used; characters were typed while another box had the focus; only the case differs and Shift was used; the same key twice within 40 ms (perhaps a bouncing key); probe lines are missing; the try was skipped. |
+
+The keys are read by the system's key map. A keyboard layout that maps keys its own way (QWERTZ over QWERTY keycaps, long-press characters) therefore ends in `unknown`, not in blame. **Corrections** (each run of Backspace, what it removed and what was typed next) are listed even when the final text is right, and so is a pass where the keys spell something else (the keyboard corrected it).
+
+**Where a missing letter got to** (`layer`): it never reached the app; it reached the app and the keyboard sent nothing, or something else; the keyboard sent it and the app did not apply it; the keyboard passed the key on and the app lost it; it was in the box and the keyboard, a key or the app removed it; it landed in another box; or `unknown`.
+
+**The bench is an instrument, not proof.** It is one app. A suspected keyboard bug is still repeated in a real second app (section 8, rule 8).

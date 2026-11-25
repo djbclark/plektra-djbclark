@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from rich.console import Console
 from rich.live import Live
 from rich.table import Table
@@ -18,6 +18,9 @@ from rich.table import Table
 from plektra_qa.controller import ScreenController
 from plektra_qa.keys import Keymap, localise_texts, resolve_keymap
 from plektra_qa.button_bar import ButtonBar
+from plektra_qa.probe import FIELDS as BENCH_FIELDS
+from plektra_qa.probe import ProbeRun, field_of, is_bench, report_lines
+from plektra_qa.probe import resource_id as bench_id
 from plektra_qa.speech import Speaker
 
 POLL_S = 0.025
@@ -76,6 +79,19 @@ class ChordTrial(BaseModel):
     # The field to focus at the start of a trial that names none (it reads whatever has the focus, so a
     # key may move the focus elsewhere). `plan_trials` fills it from the phase. Never used for reading.
     start_resource_id: str | None = None
+    # Test bench trials only: the box the trial is about (default: the one focused at the end), and
+    # the text each box starts with (box name: text; the others start empty).
+    probe_field: str | None = None
+    prefill: dict[str, str] | None = None
+
+    @field_validator("probe_field", "prefill")
+    @classmethod
+    def _bench_boxes(cls, value: Any) -> Any:
+        named = [value] if isinstance(value, str) else list(value or {})
+        unknown = [name for name in named if name not in BENCH_FIELDS]
+        if unknown:
+            raise ValueError(f"no such test bench box: {', '.join(unknown)} (boxes: {', '.join(BENCH_FIELDS)})")
+        return value
 
 
 class TrialResult(BaseModel):
@@ -93,6 +109,11 @@ class TrialResult(BaseModel):
     t_complete: float | None
     gap_s: float | None
     error: str = ""
+    # Test bench trials only. `fault` says who made a failed trial differ ("typo": the person;
+    # "keyboard-or-app"; "unknown"); `passed` stays the raw result either way.
+    fault: str = ""
+    probe: dict[str, Any] | None = None  # the bench's report: keys, corrections, difference, layer
+    probe_log: str = ""  # the file with the try's probe lines and that report
 
 
 def load_suite(path: Path, keymap: Keymap | None = None) -> list[ChordTrial]:
@@ -121,6 +142,8 @@ def load_suite(path: Path, keymap: Keymap | None = None) -> list[ChordTrial]:
                 "start_resource_id": phase.get("start_resource_id"),
                 "package": phase.get("package"),
                 "activity": phase.get("activity"),
+                "probe_field": phase.get("probe_field"),
+                "prefill": phase.get("prefill"),
                 "phase": phase_name,
             }
             for key, value in raw.items():
@@ -372,7 +395,10 @@ class _Screens:
     left dirty). Elsewhere the changed fields are cleared one by one. The host never types, so text
     a trial keeps from the one before it comes back by replaying that trial."""
 
-    def __init__(self, controller: ScreenController, trials: list[ChordTrial], redoable: bool) -> None:
+    def __init__(
+        self, controller: ScreenController, trials: list[ChordTrial], redoable: bool, probe: ProbeRun | None = None
+    ) -> None:
+        self.probe = probe
         self.controller = controller
         self.device = controller.device
         self.trials = trials
@@ -385,6 +411,8 @@ class _Screens:
         """Open the screen for trial `index` and return the field that has the focus."""
         trial = self.trials[index]
         setup = _setup_of(self.trials, index)
+        if self.probe is not None and is_bench(setup.package, setup.activity):
+            return self._bench(trial, setup, trial.number or index + 1)
         key = trial.phase or f"#{index}"
         saved = self.starts.get(index) if redo else None
         can_reopen = bool(setup.click_resource_id and setup.resource_id)
@@ -434,6 +462,22 @@ class _Screens:
             self.starts[index] = _Start(focus, text, fields or {}, self._clipboard(trial))
         self._reset_clipboard(trial, saved)
         return element
+
+    def _bench(self, trial: ChordTrial, setup: ChordTrial, number: int) -> Any:
+        """The test bench resets by intent: no taps, and a redo starts exactly like the first try."""
+        rid = trial.resource_id or setup.resource_id
+        fresh = trial.clear_field or trial.prefill is not None or trial.phase not in self.begun
+        if fresh:
+            self.probe.reset(number, field_of(rid) or "body", trial.prefill or {}, trial.expect)
+        else:
+            self.probe.keep()
+        self.begun.add(trial.phase)
+        self._reset_clipboard(trial, None)
+        if trial.resource_id:
+            return self.device(resourceId=trial.resource_id)
+        if fresh:
+            return self.device(resourceId=bench_id(field_of(rid) or "body"))
+        return self.device(focused=True)
 
     def _open(self, target: ChordTrial, spare: str | None) -> Any:
         try:
@@ -497,8 +541,11 @@ def run_chord_batch(
     gate_entered: bool = False,
     on_redo: Callable[[ChordTrial], None] | None = None,
     on_discard: Callable[[int, ChordTrial], None] | None = None,
+    probe: ProbeRun | None = None,
 ) -> list[TrialResult]:
-    """gate_entered: the caller already entered `gate` (the preflight ran before the person's go).
+    """probe: the test bench session; trials on the bench then reset by intent and get a report.
+
+    gate_entered: the caller already entered `gate` (the preflight ran before the person's go).
 
     on_redo: a redo goes back over this trial; any earlier result of it is withdrawn.
     on_discard: the attempt under way was dropped (Redo or ◀ Prev on the bar): it gets no result."""
@@ -534,6 +581,7 @@ def run_chord_batch(
                     overlay,
                     on_redo,
                     on_discard,
+                    probe,
                 )
             finally:
                 if overlay is not None:
@@ -620,6 +668,7 @@ def _run_trials(
     overlay: ButtonBar | None = None,
     on_redo: Callable[[ChordTrial], None] | None = None,
     on_discard: Callable[[int, ChordTrial], None] | None = None,
+    probe: ProbeRun | None = None,
 ) -> list[TrialResult]:
     # No limit unless the suite or the operator sets `timeout_s`.
     idle_s_for = lambda trial: float("inf") if trial.timeout_s is None else trial.timeout_s  # noqa: E731
@@ -649,7 +698,7 @@ def _run_trials(
         if on_discard is not None:
             on_discard(number, trial)
 
-    screens = _Screens(controller, trials, redoable=overlay is not None)
+    screens = _Screens(controller, trials, redoable=overlay is not None, probe=probe)
     index = 0
     redo_target: int | None = None  # the trial whose screen must be put back before it runs again
     handed_off = False
@@ -666,6 +715,7 @@ def _run_trials(
         again = ""  # "retry" or "redo": the person dropped this attempt
         by_press = False  # the bar already shows the wait card when a button ended the trial
         element = None
+        benched = False  # this attempt has probe lines to report
         if _phone_stopped(gate):
             error = STOPPED
         if gate is not None and error == "":
@@ -679,6 +729,10 @@ def _run_trials(
         if error == "":
             try:
                 element = screens.prepare(index, redoing)
+                setup = _setup_of(trials, index)
+                benched = (
+                    probe is not None and trial.verify_mode == "text" and is_bench(setup.package, setup.activity)
+                )
             except Exception as exc:
                 error = str(exc) or type(exc).__name__
         if error == "" and _phone_stopped(gate):
@@ -797,6 +851,10 @@ def _run_trials(
             time.sleep(POLL_S)
         if again:
             voice.started()  # stop reading this trial's action
+            if benched:
+                _bench_report(
+                    probe, console, number, trial, strip_sentinel(observed, trial.sentinel), False, discarded=True
+                )
             discard(number, trial)
             _wait_card(overlay, pressed=True)
             index = redo_target = redo_this(index) if again == "retry" else rewind(index - 1)
@@ -806,6 +864,9 @@ def _run_trials(
         compared = strip_sentinel(observed, trial.sentinel)
         passed = error == "" and trial_matched(observed, trial.expect, trial.sentinel, trial.expect_ci_first)
         gap = None if previous_complete is None else round(ready - previous_complete, 4)
+        report, log = None, ""
+        if benched:
+            report, log = _bench_report(probe, console, number, trial, compared, passed, error=error)
         result = TrialResult(
             phase=trial.phase,
             prompt=trial.prompt,
@@ -821,6 +882,9 @@ def _run_trials(
             t_complete=complete,
             gap_s=gap,
             error=error,
+            fault="" if passed or report is None else report["fault"],
+            probe=report,
+            probe_log=log,
         )
         results.append(result)
         if on_result is not None:
@@ -833,6 +897,25 @@ def _run_trials(
         if overlay is not None:
             _wait_card(overlay, pressed=by_press)
     return results
+
+
+def _bench_report(
+    probe: ProbeRun, console: Console, number: int, trial: ChordTrial, observed: str, passed: bool,
+    error: str = "", discarded: bool = False,
+) -> tuple[dict[str, Any] | None, str]:
+    """The bench's report of an attempt, printed unless the attempt was dropped, and its file."""
+    try:
+        report, path = probe.finish(
+            number, phase=trial.phase, field=trial.probe_field, expect=trial.expect, observed=observed,
+            passed=passed, error=error, discarded=discarded,
+        )
+    except Exception as exc:  # the telemetry must never cost a trial
+        console.print(f"trial {number}: no probe report ({type(exc).__name__}: {exc})", markup=False)
+        return None, ""
+    if not discarded:
+        for line in report_lines(number, report, passed):
+            console.print(line, markup=False, highlight=False)
+    return report, str(path)
 
 
 def _wait_card(overlay: Any, pressed: bool) -> None:

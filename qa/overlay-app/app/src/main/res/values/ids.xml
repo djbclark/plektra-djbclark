@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <item name="probe_title" type="id" />
+    <!-- The test bench's boxes, in Tab order. The host addresses them by these names. -->
     <item name="probe_body" type="id" />
+    <item name="probe_title" type="id" />
+    <item name="probe_plain" type="id" />
+    <item name="probe_email" type="id" />
+    <item name="probe_url" type="id" />
+    <item name="probe_number" type="id" />
+    <item name="probe_password" type="id" />
+    <item name="probe_search" type="id" />
+    <item name="probe_nosuggest" type="id" />
 </resources>

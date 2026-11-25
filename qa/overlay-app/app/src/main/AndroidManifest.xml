@@ -4,6 +4,13 @@
     <!-- The only permission: draw over other apps. No network, no storage. -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
+    <!-- To name the keyboard in use and its version on the test bench. -->
+    <queries>
+        <intent>
+            <action android:name="android.view.InputMethod" />
+        </intent>
+    </queries>
+
     <application
         android:allowBackup="false"
         android:label="HITL button bar"
@@ -20,15 +27,19 @@
         </activity>
 
         <!--
-          Two empty text fields: the second app of qa/suites/tab_first_letter.yaml. Holds no data.
-          Keyboard configuration changes do not restart it.
+          The test bench: text boxes of several kinds and a panel of what happens in them. Holds no
+          data. Keyboard configuration changes do not restart it. Its intent extras rewrite the boxes,
+          so from outside only the adb shell user (DUMP) can start it; the app's own button also can.
         -->
         <activity
-            android:name=".TwoFieldsActivity"
-            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|uiMode"
+            android:name=".BenchActivity"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density|fontScale|touchscreen"
             android:exported="true"
+            android:label="QA test bench"
             android:launchMode="singleTask"
-            android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
+            android:permission="android.permission.DUMP"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+            android:windowSoftInputMode="adjustResize" />
 
         <!--
           Exported so that `adb shell am broadcast` can reach it, but only senders that hold

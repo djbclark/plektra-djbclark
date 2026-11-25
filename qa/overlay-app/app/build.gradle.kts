@@ -13,8 +13,9 @@ android {
         applicationId = "dev.hitlbar.overlay"
         minSdk = 30
         targetSdk = 36
-        versionCode = 2 // the host reads it: from 2 the app shows the wait card itself on a tap
-        versionName = "0.2.0"
+        // The host reads it: from 2 the app shows the wait card itself on a tap, from 3 it has the test bench.
+        versionCode = 3
+        versionName = "0.3.0"
     }
 
     compileOptions {

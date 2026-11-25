@@ -70,7 +70,8 @@ class SeqCounter {
     fun next(): Int = ++value
 }
 
-// The only lines the app ever logs. The instruction text is never part of them.
+// The only lines the bar logs (the test bench has its own, see ProbeProtocol.kt). The instruction text
+// is never part of them.
 fun shownLine(seq: Int) = "$LOG_TAG shown seq=$seq"
 fun hiddenLine(seq: Int) = "$LOG_TAG hidden seq=$seq"
 fun buttonLine(button: BarButton, seq: Int) = "$LOG_TAG button=${button.wire} seq=$seq"

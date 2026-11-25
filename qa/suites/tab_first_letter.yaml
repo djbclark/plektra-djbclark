@@ -1,21 +1,24 @@
 name: tab_first_letter
 # Does the first letter typed after Tab moves the cursor arrive? Seen once (2026-11-25), in Pinnote
-# only: the title read "Eta" after "beta". This repeats the step in a second app, the two-field screen
-# of the button bar app (qa/overlay-app, version 0.2.0 or newer), to tell a keyboard fault from an
-# app's own bug (qa/README.md section 8). That screen handles keyboard configuration changes itself, so a
-# loss there cannot come from the app restarting (titan2-elite-facts.md, sections 7 and 10).
+# only: the title read "Eta" after "beta". This repeats the step on the test bench of the button bar
+# app (qa/overlay-app, version 0.3.0 or newer), a second app that also records what happened: every
+# try reports the keys pressed, and for a failed one whether the person typed something else, and how
+# far a missing letter got (qa/README.md section 12). The bench handles keyboard configuration changes
+# itself, so a loss there cannot come from the app restarting (titan2-elite-facts.md, sections 7 and 10).
 #
-# Each try starts with both fields empty and the cursor in the lower one. A try reads the field that
-# has the focus, so it checks the letters, not which field they landed in: watch that Tab moved the
-# cursor to the upper field. Leave about two seconds between tries. A passed try is remembered for
-# this keyboard build: --redo runs all ten again.
+# Each try starts with all boxes empty and the cursor in box 1 (Body). Tab moves it to box 2 (Title).
+# A try reads the box that has the focus, so also watch that Tab moved the cursor there. Leave about
+# two seconds between tries. A passed try is remembered for this keyboard build: --redo runs all ten
+# again. A failure that also happens in a real second app is the keyboard's; the bench alone does not
+# prove it (qa/README.md section 8).
 start_wait_s: 10
 sentinel: "\n"
 phases:
-  - name: tab_first_letter_probe
+  - name: tab_first_letter_bench
     package: dev.hitlbar.overlay
-    activity: dev.hitlbar.overlay.TwoFieldsActivity
+    activity: dev.hitlbar.overlay.BenchActivity
     start_resource_id: dev.hitlbar.overlay:id/probe_body
+    probe_field: title
     trials:
       - prompt: "try 1 of 10: <Tab>, then type beta"
         shade: "Try 1 of 10: <Tab>, then type beta"

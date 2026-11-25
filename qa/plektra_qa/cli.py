@@ -25,6 +25,7 @@ from plektra_qa.ledger import TAIL_S, BuildError, Ledger, cut_clip, final_video,
 from plektra_qa.keys import DEFAULT_PACKAGE as KEYBOARD_PACKAGE
 from plektra_qa.keys import Flavor, KeyNamingError, KeyResolutionError, LiveReadError, render, resolve_keymap
 from plektra_qa.button_bar import DEFAULT_PACKAGE, ButtonBar, OverlayError
+from plektra_qa.probe import bench_run, fault_summary
 from plektra_qa.recording import RecordingError, recording
 from plektra_qa.screen_gate import ScreenGate, require_serial
 from plektra_qa.speech import Speaker
@@ -228,6 +229,8 @@ def _run_locked(
             else:
                 ButtonBar(target, package=bar_package).hide_blind()  # a bar left by an earlier run
                 stack.callback(ButtonBar(target, package=bar_package).hide_blind)
+            # Test bench trials need its app: refuse before the person is asked to start.
+            probe = stack.enter_context(bench_run(target, all_trials, suite.stem, record_dir))
             # Preflight before the person is asked to start: unlock, heads-up, stop card, the foreground app.
             stack.enter_context(gate)
             gate.yield_to_human("", shade=False)  # ordinary colors for the go
@@ -244,7 +247,7 @@ def _run_locked(
                 run_chord_batch(
                     controller, trials, console, gate, speaker,
                     on_trial=on_trial, on_result=on_result, overlay=button_bar, gate_entered=True,
-                    on_redo=on_redo, on_discard=on_discard,
+                    on_redo=on_redo, on_discard=on_discard, probe=probe,
                 )
     except KeyboardInterrupt:
         interrupted = True
@@ -276,7 +279,14 @@ def _run_locked(
         console.print(
             f"fail {item.number} {item.phase} | {item.prompt} | expect={item.expect!r} "
             f"observed={item.observed!r} error={item.error}"
+            + (f" fault={item.fault}" if item.fault else "")
         )
+    summary = fault_summary(failed)
+    if summary:
+        console.print(summary, markup=False)
+    logs = sorted({str(Path(item.probe_log).parent) for item in got.values() if item.probe_log})
+    for folder in logs:
+        console.print(f"test bench lines and reports: {folder}", markup=False)
     if interrupted:
         raise typer.Exit(code=130)
     if failed:
