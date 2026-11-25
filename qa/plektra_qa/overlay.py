@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import bisect
 import os
+import math
 import textwrap
 from collections.abc import Iterator, Sequence
 from pathlib import Path
@@ -21,7 +22,7 @@ from plektra_qa.inputlog import Shown
 FPS = 30
 BAND_H = 112
 PANEL_W = 720  # the terminal-style log panel beside the phone
-PANEL_MIN_S = 0.2
+PANEL_HZ = 5  # each refresh is exactly 5 source frames at 25 fps, or 6 output frames at 30 fps
 MIN_CHAPTER_S = 10.0  # YouTube ignores chapter lists with shorter chapters
 MONO_FONTS = (
     "/System/Library/Fonts/Menlo.ttc",
@@ -224,14 +225,20 @@ def write_panel(
 ) -> Path:
     """Write PNG states and an ffmpeg concat list; return the list's path."""
     cols, rows = panel_geometry(width, height)
-    starts = [0.0] + [max(0.0, t) for t, _kind, _text in notes]
+    # Group dense events on the same absolute clock tick. Giving each event its own
+    # minimum duration stretches the panel timeline relative to the recording.
+    latest_at_tick = {0: 0}
+    for count, (t, _kind, _text) in enumerate(notes, start=1):
+        latest_at_tick[math.ceil(max(0.0, t) * PANEL_HZ)] = count
+    states = list(latest_at_tick.items())
     entries: list[str] = []
-    for index, begin in enumerate(starts):
-        end = starts[index + 1] if index + 1 < len(starts) else max(length, begin + PANEL_MIN_S)
+    for index, (tick, count) in enumerate(states):
+        begin = tick / PANEL_HZ
+        end = states[index + 1][0] / PANEL_HZ if index + 1 < len(states) else max(length, begin + 1 / PANEL_HZ)
         png = work / f"panel-{index:05d}.png"
-        panel_image(panel_lines(notes, index, cols, rows), width, height, title).save(png)
-        entries.append(f"file '{png}'\nduration {max(end - begin, PANEL_MIN_S):.3f}")
-    entries.append(f"file '{work / f'panel-{len(starts) - 1:05d}.png'}'")
+        panel_image(panel_lines(notes, count, cols, rows), width, height, title).save(png)
+        entries.append(f"file '{png}'\nduration {end - begin:.3f}")
+    entries.append(f"file '{work / f'panel-{len(states) - 1:05d}.png'}'")
     listing = work / "panel.txt"
     listing.write_text("\n".join(entries) + "\n")
     return listing
