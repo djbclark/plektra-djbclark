@@ -140,9 +140,9 @@ cd qa && just qa-release                                      # it will not run 
 
 ### Button bar (the default; `--no-bar` uses the shade card)
 
-`just qa-run SUITE` (same as `--bar`) shows a small on-screen bar instead of pulling down the notification shade: a translucent instruction panel with one row of buttons under it (40 dp tall, each a fifth of the bar wide, each in its own color and always in the same place). A matching text does not end a trial; you end it with **Done**, so you can fix a typo first. The batch starts only on the bar's **Done** (or **No rec**, on the start card of a recorded run) or a typed `go` (or `norec`), never on a key or a touch. With `--no-bar`, only a key press (not a touch) or the typed word starts the batch, and a trial with no `timeout_s` ends after 20 s without a key once typing began.
+`just qa-run SUITE` (same as `--bar`) shows a small on-screen bar instead of pulling down the notification shade: a translucent instruction panel with one row of translucent buttons under it (40 dp tall, each a fifth of the bar wide, each in its own color and always in the same place). A matching text does not end a trial; you end it with **Done**, so you can fix a typo first. The batch starts only on the bar's **Done** (or **No rec**, on the start card of a recorded run) or a typed `go` (or `norec`), never on a key or a touch. With `--no-bar`, only a key press (not a touch) or the typed word starts the batch, and a trial with no `timeout_s` ends after 20 s without a key once typing began.
 
-Drag the instruction to reposition the bar. Tap **−** to minimize it to a bubble. Drag the bubble to move it, or tap **QA** to expand it. Tap **×** beside the bubble or drag it to the **×** at the bottom of the screen to dismiss it. Dismissing an active trial stops the batch. The bar stays put as instructions change.
+Drag the instruction to reposition the bar. Tap **−** to minimize it to a bubble. Drag the bubble to move it, or tap **QA** to expand it. Drag the bubble to the **×** at the bottom of the screen to dismiss it. Dismissing an active trial stops the batch. The bar stays put as instructions change.
 
 | Button | Color | Where | What it does |
 | --- | --- | --- | --- |

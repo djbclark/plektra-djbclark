@@ -32,7 +32,7 @@ class MainActivity : Activity() {
                 "asks it to, it draws a movable, translucent bar above other apps with " +
                 "an instruction and small buttons (Done, Redo, Prev, Next, Stop), and reports " +
                 "button presses to the log. Drag the instruction to move the bar. The minus button " +
-                "minimizes it to a movable bubble. Tap the bubble to reopen it or tap × to dismiss it. " +
+                "minimizes it to a movable bubble. Tap the bubble to reopen it or drag it onto the bottom × to dismiss it. " +
                 "It needs the permission to draw over other apps, has " +
                 "no network access and keeps no data. Its test bench is a screen of text boxes for " +
                 "testing a keyboard; what is typed there is written to the log, so type no real " +

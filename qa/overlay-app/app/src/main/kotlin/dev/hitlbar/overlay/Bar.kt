@@ -64,7 +64,7 @@ object Bar {
         val bubble = collapsed && item.buttons.isNotEmpty()
         val wm = app.getSystemService(WindowManager::class.java)
         val area = availableArea(wm, app)
-        val width = if (bubble) dp(app, BUBBLE_WIDTH_DP) else {
+        val width = if (bubble) dp(app, BUBBLE_SIZE_DP) else {
             minOf(dp(app, 360), (area.width * 0.88f).roundToInt()).coerceAtLeast(1)
         }
         val layout = layoutParams(width.coerceAtMost(area.width), item.buttons.isEmpty())
@@ -306,7 +306,7 @@ object Bar {
                 render(app, item)
             }
         }
-        row.addView(bubble, LinearLayout.LayoutParams(dp(app, 48), dp(app, 48)))
+        row.addView(bubble, LinearLayout.LayoutParams(dp(app, BUBBLE_SIZE_DP), dp(app, BUBBLE_SIZE_DP)))
         val terminate = dismissButton(item.buttons)
         val close = {
             if (terminate != null) {
@@ -318,15 +318,6 @@ object Bar {
             }
         }
         makeDraggable(app, bubble, row, onDrop = close)
-        val description = if (terminate == BarButton.STOP) "Dismiss QA bubble and stop this batch"
-            else "Dismiss QA bubble"
-        val dismiss = control(app, "×", description, 18).apply {
-            background = surface(app, 22)
-            setOnClickListener { close() }
-        }
-        row.addView(dismiss, LinearLayout.LayoutParams(dp(app, 44), dp(app, 44)).apply {
-            marginStart = dp(app, 6)
-        })
         return row
     }
 
@@ -367,6 +358,7 @@ object Bar {
         background = GradientDrawable().apply {
             cornerRadius = dp(app, 8).toFloat()
             setColor(Color.parseColor(button.color))
+            alpha = 128
         }
     }
 
@@ -380,8 +372,8 @@ object Bar {
         Log.i(LOG_TAG, line)
     }
 
-    private const val BAR_SURFACE = "#AA161B22"
-    private const val BUBBLE_WIDTH_DP = 98
+    private const val BAR_SURFACE = "#80161B22"
+    private const val BUBBLE_SIZE_DP = 48
     private const val BUTTON_HEIGHT_DP = 40
 
     /** The most opaque a window may be and still pass touches through (Android 12+). */
