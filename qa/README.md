@@ -63,7 +63,7 @@ The harness keeps the screen on during a pass. When the pass ends (normally, aft
 ## 2. What you need
 
 1. A Mac or a Linux computer with [`uv`](https://docs.astral.sh/uv/), [`just`](https://just.systems/) and `adb` (Android platform-tools). `uv` downloads Python 3.14 on its own.
-2. An Android phone with a hardware keyboard, developer options and USB debugging on, and Plektra installed and chosen as the keyboard.
+2. An Android phone with developer options and USB debugging on, a physical keyboard, and a debuggable Plektra build selected as the keyboard. Debuggable builds let the host read the active key map and keyboard mode.
 3. FIRERPA 10.12 running on the phone as the `shell` user, started with a client certificate (`lamda.pem`). No root, no APK.
 4. Optional: a voice. [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) through [kokoro-cli](https://pypi.org/project/kokoro-cli/) sounds best and runs offline. Without it the harness uses macOS `say`, or `spd-say` / `espeak-ng` on Linux, or stays silent.
 5. The [overlay app](overlay-app/README.md) for the demo and built-in test bench. The separate smoke suite also uses Pinnote (`branislav667.pinnote`).
@@ -78,7 +78,7 @@ The harness keeps the screen on during a pass. When the pass ends (normally, aft
    uv tool install --python 3.13 kokoro-cli && kokoro setup && kokoro doctor
    ```
 
-3. Create `qa/.env`. The file is gitignored; never commit it. Use your own values:
+3. Copy `qa/.env.example` to `qa/.env`, run `chmod 600 qa/.env`, and enter your own values. The file is gitignored.
 
    ```dotenv
    FIRERPA_HOST=192.0.2.10          # the phone's address, or 127.0.0.1 with adb forward
@@ -86,6 +86,7 @@ The harness keeps the screen on during a pass. When the pass ends (normally, aft
    FIRERPA_CERT=/absolute/path/to/lamda.pem
    FIRERPA_VERSION=10.12
    ADB_TARGET=SERIAL_OR_IP:5555     # a device that `adb devices` lists right now
+   # PLEKTRA_QA_PACKAGE=rocks.pkb.plektra.djb  # active debuggable app ID if it differs from this default
    # PLEKTRA_QA_VOICE=auto          # auto, kokoro, say, espeak or off
    # PLEKTRA_QA_VOICE_NAME=af_heart # a Kokoro voice; `kokoro voices` lists them
    # PLEKTRA_QA_KEYMAP=/path/to/profile.yaml  # key profile, default keymaps/titan2-elite-baseline.yaml (section 7)

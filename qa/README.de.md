@@ -79,6 +79,7 @@ Der Harness hält den Bildschirm während eines Durchlaufs an. Am Ende (normal, 
    FIRERPA_CERT=/absoluter/pfad/zu/lamda.pem
    FIRERPA_VERSION=10.12
    ADB_TARGET=SERIENNUMMER_ODER_IP:5555  # ein Gerät, das `adb devices` gerade listet
+   # PLEKTRA_QA_PACKAGE=rocks.pkb.plektra.djb  # App-ID des aktiven Debug-Builds, falls sie abweicht
    # PLEKTRA_QA_VOICE=auto          # auto, kokoro, say, espeak oder off
    # PLEKTRA_QA_VOICE_NAME=af_heart # eine Kokoro-Stimme; `kokoro voices` listet sie
    # PLEKTRA_QA_KEYMAP=/pfad/zum/profil.yaml  # Tastenprofil, Standard keymaps/titan2-elite-baseline.yaml (Abschnitt 7)
