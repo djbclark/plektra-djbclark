@@ -230,9 +230,11 @@ phases:
         clear_field: false       # keep the text from the previous trial
 ```
 
-All trial fields: `prompt`, `expect`, `expect_ci_first`, `verify_mode` (`text` or `clipboard`), `sentinel`, `timeout_s`, `shade`, `speak`, `start_wait_s`, `max_reprompts`, `package`, `activity`, `resource_id`, `text_hint`, `start_resource_id`, `click_resource_id`, `clear_field`, `fresh`, `cue_on_device` (the phone beeps too), and for the test bench `probe_field` and `prefill` (section 12).
+All trial fields: `prompt`, `expect`, `expect_ci_first`, `verify_mode` (`text` or `clipboard`), `sentinel`, `timeout_s`, `shade`, `speak`, `start_wait_s`, `max_reprompts`, `package`, `activity`, `resource_id`, `text_hint`, `start_resource_id`, `click_resource_id`, `clear_field`, `fresh`, `cue_on_device` (the phone beeps too), `software_keyboard` (`hidden` by default, or `shown`), and for the test bench `probe_field` and `prefill` (section 12).
 
 `resource_id` is the field a trial reads. `start_resource_id` is the field to focus (and clear) when a trial starts that names none: such a trial reads whichever field has the focus, so it still works after a key such as Tab moves it. `suites/tab_first_letter.yaml` is an example: three tries of Tab, then typing, on the test bench (section 12).
+
+The bar, notification shade, voice, and terminal use the original suite numbers (`T1`, `T2`, …), including on retries or runs that skip earlier passes. The harness checks Plektra's software keyboard mode and Android's IME window after each trial and before a trial that needs the full keyboard shown. Use `software_keyboard: shown` when the trial requires the on-screen keys.
 
 **At most three times the same action.** A person is not asked to do the same thing over and over (djbclark, 2026-11-25: "10 times is too many times to have a human do the same thing unless we really think that is neccisary. Limit to 3 max on a regular basis."). A suite that asks for the same action more than 3 times is refused before anything touches the phone. The same action is the same instruction on the phone (`shade`, else `prompt`), or the same spoken instruction (`speak`, else that one) with the same `expect`. Numbering such as `try 2 of 10` does not make it a new action, and neither does putting it in another phase.
 
@@ -248,6 +250,7 @@ Tips:
 2. Find resource ids with the MCP tool `inspect_ui_fast`, or `adb shell uiautomator dump` with FIRERPA stopped (section 11, item 6).
 3. Open an app's exported launcher activity, then click into the editor with `click_resource_id`. Activities that are not exported cannot be started directly.
 4. Avoid search boxes as targets: Enter submits them.
+5. Say “space” when you want a space. Use a clear word such as “plum” for sample text. If a trial calls for an arrow, give the keyboard chord as well. For Plektra’s default Ctrl layer, use `<Ctrl+E>` for Up, `<Ctrl+S>` for Left, `<Ctrl+D>` for Down, and `<Ctrl+F>` for Right.
 
 ## 7. Naming keys
 

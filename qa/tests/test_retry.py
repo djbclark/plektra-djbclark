@@ -472,6 +472,30 @@ def test_the_start_card_becomes_the_wait_card(line, pressed):
     assert calls == [pressed]
 
 
+def test_keyboard_guard_reads_override_and_window_and_restores_the_next_surface(monkeypatch):
+    monkeypatch.setenv("PLEKTRA_QA_PACKAGE", "example.ime")
+    actions = []
+    snapshots = iter([
+        '<string name="software_keyboard_mode">force_hardware</string>\n'
+        '<string name="software_keyboard_mode_runtime_override">force_virtual</string>\n'
+        'mCurId=example.ime/.Service\nmInputShown=true\n',
+        '<string name="software_keyboard_mode_runtime_override">force_hardware</string>\n'
+        'mCurId=example.ime/.Service\nmInputShown=true\n',
+    ])
+
+    def shell(args):
+        actions.append(args)
+        return next(snapshots) if args[0] == "sh" else "Status: ok"
+
+    gate = ScreenGate("SERIAL", shell=shell)
+    initial = gate.keyboard_state()
+    assert initial.override == "force_virtual" and initial.view_shown
+    restored = gate.restore_keyboard("hidden", initial)
+    assert restored.mode == "force_hardware" and restored.view_shown  # compact control bar
+    assert gate.restore_keyboard("hidden", restored) is restored
+    assert len(actions) == 3 and "SoftwareKeyboardModeActionActivity" in actions[1][-1]
+
+
 def test_hands_off_and_yield_are_one_adb_call_each():
     calls = []
 
@@ -481,8 +505,9 @@ def test_hands_off_and_yield_are_one_adb_call_each():
 
     gate = ScreenGate("SERIAL", shell=shell)
     gate.hold("Preparing the field")
-    gate.yield_to_human("x", shade=False)
+    gate.yield_to_human("T1. Type hello", shade=False)
     assert len(calls) == 2 and "notification post" in calls[0][2] and "statusbar collapse" in calls[0][2]
+    assert "notification post" in calls[1][2] and "T1. Type hello" in calls[1][2]
 
 
 # --- recording and import ----------------------------------------------------------------------------

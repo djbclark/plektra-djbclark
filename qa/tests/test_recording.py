@@ -170,6 +170,26 @@ def test_scrcpy_that_writes_no_video_refuses(tmp_path):
         recorder.start()
 
 
+def test_scrcpy_retries_one_failed_start_and_keeps_the_first_log(tmp_path):
+    attempts = []
+
+    def popen(cmd, **kwargs):
+        raw = Path(cmd[cmd.index("--record") + 1])
+        assert kwargs["start_new_session"] is True
+        proc = _Proc(raw)
+        proc.done = not attempts
+        attempts.append(raw)
+        return proc
+
+    recorder = Recorder("S", tmp_path, popen=popen, run=_fake_run([]), which=lambda n: n, stamp="t",
+                        capture_input=False)
+    recorder.start()
+    assert recorder.finish() == recorder.output
+    assert [p.name for p in attempts] == ["plektra-qa-t.raw.mkv", "plektra-qa-t.retry.raw.mkv"]
+    assert (tmp_path / "plektra-qa-t.scrcpy.log").is_file()
+    assert "retrying scrcpy once" in recorder.warnings[0]
+
+
 def test_say_lines_are_rendered_with_say_for_the_track(tmp_path):
     calls: list[list[str]] = []
     recorder, _ = _recorder(tmp_path, calls)
