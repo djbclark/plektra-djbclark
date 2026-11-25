@@ -188,4 +188,8 @@ configuration change itself.
    Plektra trial 6 log, `configuration_changed 48` and `wm_relaunch_resume_activity … NoteEditActivity,30` appeared
    twice per try, 1-1.7 s apart (consistent with section 7 item 5: one at the Recent press, one at the first letter;
    key times were not lined up with the log).
-6. Not checked: the same steps in Pinnote with a Tab sent by a key of the keyboard device (no configuration flip).
+6. Tab from a keyboard key instead (Plektra Ctrl+T, `qa` run 2026-11-25, 3 tries, Pinnote, cursor in the body): focus
+   moved to the **⋮** button of the bottom bar, not to the title, and the typed letters appeared in neither field.
+   Logcat showed no configuration change and no relaunch during the tries. So the Tab-to-title behaviour in item 1
+   probably comes from the relaunch (not proven), and this run says nothing about the first letter.
+7. Not checked: vendor Tab, then a keyboard key that types nothing (Shift), a pause, then typing.

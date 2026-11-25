@@ -324,6 +324,7 @@ Rules for agents:
 8. Before blaming the keyboard, repeat a failure in a **separate app**, so that an app's own bug is ruled out (djbclark, 2026-11-25: "In cases like this we should always try again in a seperate app to make sure we are not running into an app bug."). Until then, report it as seen in that one app only. `suites/tab_first_letter.yaml` repeats a first letter lost after Tab on the test bench (section 12). The bench is an instrument that shows where a letter went; it does not replace the retry in a real app. A trial result with `fault: typo` is the person's typing error: never report it as a keyboard failure.
 9. Ask a person for the same action at most 3 times in a batch (section 6). `repeat_reason` is for the rare case that really needs more; it is not a way past the check.
 10. Tell the person the truth about what comes next: pass `--more-coming` (CLI) or `more_coming=true` only when you will start another batch right after, and run `just qa-release` or call `release_phone` if you then do not.
+11. Aim each batch at about 10 minutes of continuous human work: collect the pending checks into one suite rather than asking for a start several times for short runs (djbclark, 2026-11-25). Rule 9 still limits repeats of one action. Where you can, check a new step without the person first, so a design error does not waste the batch.
 
 [firerpa-hitl.md](firerpa-hitl.md) is the full specification. It is written as a build prompt for an agent.
 
