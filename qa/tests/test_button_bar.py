@@ -133,6 +133,26 @@ def test_logcat_starts_at_the_phones_clock_and_asks_for_the_uid_column():
     assert argv.count("-v") == 2 and "uid" in argv and "threadtime" in argv
 
 
+def test_logcat_survives_a_terminal_interrupt_until_the_end_card_finishes():
+    pipe = _Pipe()
+    options = {}
+
+    def popen(_argv, **kwargs):
+        options.update(kwargs)
+        return _Proc(pipe)
+
+    def shell(args):
+        if args[0] == "pm":
+            return f"package:x.bar uid:{APP_UID}"
+        if args[0] == "date":
+            return DEVICE_NOW
+        pipe.push(_line("hidden seq=1"))
+        return ""
+
+    with ButtonBar("s", package="x.bar", shell=shell, popen=popen, ack_timeout_s=0.3):
+        assert options["start_new_session"] is True
+
+
 def test_logcat_falls_back_to_the_last_line_when_the_phone_clock_is_unreadable():
     popen_calls: list[list[str]] = []
     pipe = _Pipe()
