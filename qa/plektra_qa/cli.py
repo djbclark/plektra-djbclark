@@ -19,8 +19,9 @@ from rich.console import Console
 from plektra_qa.connection import connect as open_device
 from plektra_qa.connection import require_version
 from plektra_qa.controller import ScreenController
-from plektra_qa.hitl_runner import allowed_packages, load_suite, plan_trials, run_chord_batch
-from plektra_qa import runlock
+from plektra_qa.end_state import RELEASE_HINT, EndNotice
+from plektra_qa.hitl_runner import allowed_packages, load_suite, plan_trials, read_suite, run_chord_batch
+from plektra_qa import end_state, runlock
 from plektra_qa.ledger import TAIL_S, BuildError, Ledger, cut_clip, final_video, ime_build, require_plektra_build
 from plektra_qa.keys import DEFAULT_PACKAGE as KEYBOARD_PACKAGE
 from plektra_qa.keys import Flavor, KeyNamingError, KeyResolutionError, LiveReadError, render, resolve_keymap
@@ -128,6 +129,12 @@ def run(
     redo: bool = typer.Option(
         False, "--redo", help="Run every trial again, also those that already passed on this keyboard build."
     ),
+    more_coming: bool = typer.Option(
+        False,
+        "--more-coming",
+        help="Another batch follows this one: at the end the person is told to wait and leave the phone. Without "
+        "it they are told the phone may be used normally. If the promised batch will not run: plektra-qa release.",
+    ),
 ) -> None:
     """Run a YAML chord suite. A person types on the keyboard; the host does not.
 
@@ -137,7 +144,7 @@ def run(
     try:
         resolved = resolve_keymap(on_live_failure="error")
         console.print(resolved.describe(), markup=False)
-        all_trials = load_suite(suite, resolved.keymap)
+        all_trials, repeat_reason = read_suite(suite, resolved.keymap)
         build = _keyboard_build(target)
     except (KeyNamingError, KeyResolutionError, LiveReadError, ValueError, BuildError) as exc:
         typer.echo(f"refused: {exc}", err=True)
@@ -158,7 +165,10 @@ def run(
         typer.echo(f"refused: {exc}", err=True)
         raise typer.Exit(code=2) from exc
     try:
-        _run_locked(suite, all_trials, build, target, serial, record, panel, record_dir, bar, bar_package, redo)
+        _run_locked(
+            suite, all_trials, build, target, serial, record, panel, record_dir, bar, bar_package, redo,
+            more_coming=more_coming, repeat_reason=repeat_reason,
+        )
     finally:
         runlock.release(serial)
 
@@ -170,6 +180,7 @@ def _raise_interrupt(signum: int, _frame: Any) -> None:
 def _run_locked(
     suite: Path, all_trials: list[Any], build: str, target: str, serial: str, record: bool, panel: bool,
     record_dir: Path | None, bar: bool, bar_package: str, redo: bool,
+    more_coming: bool = False, repeat_reason: str = "",
 ) -> None:
     ledger = Ledger(suite.stem, build)
     trials = all_trials
@@ -183,6 +194,7 @@ def _run_locked(
             )
         if not trials:
             console.print("nothing left to run.", markup=False)
+            console.print(RELEASE_HINT, markup=False)
             _write_final(ledger, all_trials, suite, record_dir)
             return
     by_number = {trial.number: trial for trial in trials}
@@ -195,6 +207,7 @@ def _run_locked(
     console.print(f"voice: {speaker.backend} (PLEKTRA_QA_VOICE=auto|kokoro|say|espeak|off)")
     got: dict[int, Any] = {}  # latest result per trial: a redo replaces it
     recorder = None
+    notice = EndNotice(target, more_coming=more_coming, speaker=speaker, console=console)
 
     def on_trial(number: int, trial: Any) -> None:
         if recorder is not None:
@@ -219,6 +232,11 @@ def _run_locked(
         if recorder is not None:
             recorder.on_discard(number, trial)
 
+    def hand_back() -> None:
+        # No longer filmed: restore the phone and tell the person now, not after the video is written.
+        gate.__exit__(None, None, None)
+        notice.finish(gate)
+
     interrupted = False
     old_handlers = {sig: signal.signal(sig, _raise_interrupt) for sig in (signal.SIGTERM, signal.SIGHUP)}
     try:
@@ -229,17 +247,26 @@ def _run_locked(
             else:
                 ButtonBar(target, package=bar_package).hide_blind()  # a bar left by an earlier run
                 stack.callback(ButtonBar(target, package=bar_package).hide_blind)
+            # The person's last word. Registered here, so it runs after the gate has restored the phone
+            # and while the bar is still there, however the batch ends.
+            notice.bar = button_bar
+            stack.callback(notice.finish, gate)
             # Test bench trials need its app: refuse before the person is asked to start.
             probe = stack.enter_context(bench_run(target, all_trials, suite.stem, record_dir))
             # Preflight before the person is asked to start: unlock, heads-up, stop card, the foreground app.
             stack.enter_context(gate)
             gate.yield_to_human("", shade=False)  # ordinary colors for the go
             start = StartGate(target, speaker=speaker, console=console, bar=button_bar)
-            start.wait(f"Plektra QA: {suite.name}", batch_instruction(len(trials)), recording=record)
+            notice.starting()  # an earlier batch's "done" or "wait" card no longer holds
+            start.wait(
+                f"Plektra QA: {suite.name}", batch_instruction(len(trials)), recording=record,
+                repeat_reason=repeat_reason,
+            )
+            notice.started = True
             if record and start.record_declined:
                 record = False
                 console.print("not recording: the person started the run without it.", markup=False)
-            with recording(target, speaker, record, record_dir, panel=panel) as recorder:
+            with recording(target, speaker, record, record_dir, panel=panel, captured=hand_back) as recorder:
                 if recorder is not None:
                     voice = "with the voice" if speaker.enabled else "video only (voice is off)"
                     console.print(f"recording the screen {voice} to {recorder.output}")
@@ -247,13 +274,17 @@ def _run_locked(
                 run_chord_batch(
                     controller, trials, console, gate, speaker,
                     on_trial=on_trial, on_result=on_result, overlay=button_bar, gate_entered=True,
-                    on_redo=on_redo, on_discard=on_discard, probe=probe,
+                    on_redo=on_redo, on_discard=on_discard, probe=probe, notice=notice,
                 )
     except KeyboardInterrupt:
         interrupted = True
         console.print("interrupted: passes so far are kept.", markup=False)
+        if not notice.started:
+            console.print(RELEASE_HINT, markup=False)
     except (RecordingError, StartGateError, OverlayError, RuntimeError) as exc:
         typer.echo(f"refused: {exc}", err=True)
+        if not notice.started:
+            typer.echo(RELEASE_HINT, err=True)
         raise typer.Exit(code=2) from exc
     finally:
         for sig, handler in old_handlers.items():
@@ -376,6 +407,28 @@ def import_recording(
             console.print(f"trial {number} added: {trial.prompt}", markup=False)
         else:
             console.print(f"trial {number}: could not cut the clip", markup=False)
+
+
+@app.command()
+def release(
+    bar_package: str = typer.Option(
+        DEFAULT_PACKAGE, "--bar-package", envvar="PLEKTRA_QA_BAR_PACKAGE", help="Package of the button-bar app."
+    ),
+) -> None:
+    """Tell the person that no more batches are coming: the phone may be used normally.
+
+    For a batch announced with --more-coming that will not run. Posts the notification, says it and
+    shows it on the button bar. Refused while a run is driving the phone."""
+    target = require_serial()
+    try:
+        notice = end_state.release(target, console=console, bar_package=bar_package)
+    except runlock.RunLockError as exc:
+        typer.echo(f"refused: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    if not notice.posted:
+        typer.echo("release failed: the notification could not be posted on the phone", err=True)
+        raise typer.Exit(code=1)
+    console.print("the phone has been released.", markup=False)
 
 
 @app.command()

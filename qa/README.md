@@ -31,7 +31,8 @@ Status: fork-only, not part of upstream Plektra. Proven on a Unihertz Titan 2 El
 | The bar says `Wait a few seconds...` and has no buttons | The computer is getting the next step ready. | Wait for the next card. |
 | Ordinary colors. The shade opens for 4 seconds with the action, closes, then the computer beeps and says the action out loud. | Your turn. | Type that action on the phone's keyboard. |
 | `Still waiting.` and the action again | Nothing reached the field for 10 quiet seconds. | Start typing. After 3 reminders the run stops, assuming you have left. |
-| `Testing finished.` | The pass is over and the phone's settings are back to normal. | Read the table on the computer. |
+| `Done. No more batches: the phone may be used normally.` (end-of-batch card, section 4) | The batch is over, any recording has stopped and the phone's settings are back to normal. | Use the phone as usual. Read the table on the computer. |
+| `Wait. Another batch is coming: please leave the phone for now.` (end-of-batch card, section 4) | This batch is over and another one will follow. | Leave the phone alone until its start card appears. |
 | The shade card `Swipe away to stop testing` | Always there during a pass. | Swipe it away only to stop testing. The phone then restores its own settings, even if the computer has lost contact. |
 
 The harness keeps the screen on during a pass. When the pass ends (normally, after Ctrl-C, or after a swipe) it puts back color inversion, the screen timeout, stay-awake, and heads-up notifications.
@@ -107,6 +108,28 @@ A recorded run saves one mp4 in `~/plektra-qa-recordings/` (`--record-dir` or `P
 
 Keys and touches come from the phone's `getevent`; sync with the picture is within about a tenth of a second. The recording shows the whole screen, the status bar and every key the person presses, so it is shared only with their say-so. Do not use it for anything private: turn recording off for that.
 
+### The end of a batch: is the phone free?
+
+Every batch you started ends with one of two messages, however it ended (completed, stopped, or failed after your start):
+
+| Message | When |
+| --- | --- |
+| `Done. No more batches: the phone may be used normally.` | The default. Also every time you press **Stop** or swipe the stop card away. |
+| `Wait. Another batch is coming: please leave the phone for now.` | The batch was run with `--more-coming` (over MCP, `more_coming=true`) and you did not stop it. |
+
+It comes after the phone is no longer filmed and its settings are restored; the computer may still be writing the video. It is shown on the bar for 10 seconds, without buttons, so touches go through (without the bar app, the notification shade opens for 10 seconds instead); it stays in the shade as a notification (tag `plektra-qa-state`); and it is said out loud. It replaces the spoken `Testing finished.` of earlier versions.
+
+When the next batch posts its start card, the old notification changes to `A test batch is starting. Follow the cards on the screen.` A batch that is never started puts the notification back to **Done** or **Wait** (by its own `--more-coming`) without a sound.
+
+If the promised batch will not run, release the phone. This sends the **Done** message:
+
+```bash
+cd qa && just qa-run suites/smoke_chords.yaml --more-coming   # another batch follows: "Wait"
+cd qa && just qa-release                                      # it will not run after all: "Done"
+```
+
+`just qa-release` is `plektra-qa release`; an agent calls the MCP tool `release_phone`. It is refused while a run is driving the phone, and exits 1 if the notification could not be posted. A run that is refused before its start card (a bad suite, no recorder, a locked phone) does not change an earlier **Wait** card, so release the phone if you give up on it.
+
 ### Remembered passes, one run per phone, stopping a run
 
 - **Ledger.** A trial that passed on the installed Plektra build is not run again (`run --redo` runs everything). Each pass is written to `~/.local/state/plektra-qa/ledger/<suite>.json` the moment the trial passes, so a kill, Ctrl-C or crash loses nothing; in a recorded run the clip is attached afterwards, and a recorded pass whose clip cannot be cut does not count. **◀ Prev** on the bar (below) withdraws a pass again, and so does **Redo** where it replays an earlier trial. A phase is skipped only when all its trials passed; otherwise its pending trials run, the first of them with the phase's setup (app, activity, click, and the field to start in; a trial that names no field still reads whichever field has the focus) and, for a trial that keeps the field (`clear_field: false`), the trial before it. Trial numbers (log, table, chapters, `import --passed`) are the numbers in the suite. The ledger key hashes the prompt as written in the YAML, so a different keymap does not re-key it; older entries are still found. The run refuses when the keyboard build cannot be read or the active keyboard is not Plektra. The end of a run lists "still to pass" and, separately, "passed, no clip".
@@ -137,8 +160,8 @@ Keys and touches come from the phone's `getevent`; sync with the picture is with
   4. A trial that keeps the text (`clear_field: false`) after another trial of its phase: **both run again**, because the computer never types. The run goes back to the trial that fills the field, and the results from there on are withdrawn. With no earlier trial to replay, the field must still read as it did at the start; only clearing can put it back.
 - **Reset failed card.** If the starting state cannot be restored, the bar says `Reset failed: …. Fix the screen by hand, then Redo. Next skips this trial.` with **Redo**, **Next** and **Stop**.
 - **A normal trial start** keeps old text out of the way too. In a phase with a "new note" button, a trial that clears its field gets a new note when it is the first of its phase in the run, when another field was left changed, or with `fresh: true`. Elsewhere changed fields are cleared where possible.
-- **Wait card.** A tap on any button turns the card into `Wait a few seconds...` at once, with no buttons, so a button cannot be pressed twice. It stays until the next card, lets touches through to the app behind it, and is also shown when a trial ends without a tap. The bar is hidden only when the batch ends or is interrupted.
-- **End card.** After the last trial the bar says `All trials done. ◀ Prev redoes the last one. Done finishes.` and shows **Done** and **◀ Prev** for up to 60 s. **Done** or silence finishes the batch. A batch that was stopped, or never started typing, ends without this card.
+- **Wait card.** A tap on any button turns the card into `Wait a few seconds...` at once, with no buttons, so a button cannot be pressed twice. It stays until the next card, lets touches through to the app behind it, and is also shown when a trial ends without a tap. The bar is hidden only after the end-of-batch card (above) or when the batch is interrupted before its start.
+- **End card.** After the last trial the bar says `All trials done. ◀ Prev redoes the last one. Done finishes.` and shows **Done** and **◀ Prev** for up to 60 s. **Done** or silence finishes the batch. A batch that was stopped, or never started typing, ends without this card. The end-of-batch card (above) follows in every case.
 - **A field that cannot be read** (for example while the focus moves) does not end a trial while the bar is in use; the terminal says `field unreadable (…), still waiting`. If the field is still unreadable when you press **Done**, the trial fails with `field lost`; **◀ Prev** on the next card retries it, or press **Redo** before **Done**. Without the bar, a trial fails with `field lost` after the field has been unreadable for 10 s (at once if it is already unreadable when the trial starts).
 
 The bar is a companion app (`--bar-package`, default `dev.hitlbar.overlay`; it needs the draw-over-apps permission). The host talks to it by `am broadcast -a <package>.SHOW|HIDE` and reads the answers from logcat lines with tag `QAOVERLAY` (`shown`, `hidden`, `button=done|norec|retry|redo|next|stop`; `retry` is **Redo**, `redo` is **◀ Prev**). If the bar does not report `shown` within 5 s, the host hides it and tries once more (Android may have restarted the idle app), then the trial fails with a clear error. Any app can write to logcat, so the host trusts only lines from the bar app's own uid (read with `pm list packages -U --show-versioncode`, which also gives the app's version; it refuses to start if the app is not installed), only lines from the phone's current time on, and only lines whose `seq` is higher than every one accepted before (the counter may restart at 1 after a hide, when Android restarted the app). The app is in `qa/overlay-app/` (see its README); the host side is in `plektra_qa/button_bar.py`.
@@ -209,7 +232,15 @@ phases:
 
 All trial fields: `prompt`, `expect`, `expect_ci_first`, `verify_mode` (`text` or `clipboard`), `sentinel`, `timeout_s`, `shade`, `speak`, `start_wait_s`, `max_reprompts`, `package`, `activity`, `resource_id`, `text_hint`, `start_resource_id`, `click_resource_id`, `clear_field`, `fresh`, `cue_on_device` (the phone beeps too), and for the test bench `probe_field` and `prefill` (section 12).
 
-`resource_id` is the field a trial reads. `start_resource_id` is the field to focus (and clear) when a trial starts that names none: such a trial reads whichever field has the focus, so it still works after a key such as Tab moves it. `suites/tab_first_letter.yaml` is an example: ten tries of Tab, then typing, on the test bench (section 12).
+`resource_id` is the field a trial reads. `start_resource_id` is the field to focus (and clear) when a trial starts that names none: such a trial reads whichever field has the focus, so it still works after a key such as Tab moves it. `suites/tab_first_letter.yaml` is an example: three tries of Tab, then typing, on the test bench (section 12).
+
+**At most three times the same action.** A person is not asked to do the same thing over and over (djbclark, 2026-11-25: "10 times is too many times to have a human do the same thing unless we really think that is neccisary. Limit to 3 max on a regular basis."). A suite that asks for the same action more than 3 times is refused before anything touches the phone. The same action is the same instruction on the phone (`shade`, else `prompt`), or the same spoken instruction (`speak`, else that one) with the same `expect`. Numbering such as `try 2 of 10` does not make it a new action, and neither does putting it in another phase.
+
+Cut the repeats, or let a script drive the timing. Only if more tries are really necessary, say why at the top of the suite, in at most 80 characters. The start card then shows `Repeats on purpose: …` on the phone and in the terminal:
+
+```yaml
+repeat_reason: "a timing race that hits about one try in five"
+```
 
 Tips:
 
@@ -278,7 +309,8 @@ The keymap is read once at the start. Change a key setting during a run and the 
 | `teleport_and_prep_input` | Open an activity and focus and clear a field (behind the screen gate). |
 | `inspect_ui_fast` | The screen's UI tree, optionally with a JPEG screenshot. |
 | `execute_ui_action` | One click or key press on a selector (behind the screen gate). |
-| `request_human_chord_batch` | Run trials (a JSON list of trial objects) with a person typing, and return the report. It blocks until the person is done. The run is recorded by default (`record=true`, section 4); tell the person first and pass `record=false` if they decline. |
+| `request_human_chord_batch` | Run trials (a JSON list of trial objects) with a person typing, and return the report. It blocks until the person is done. The run is recorded by default (`record=true`, section 4); tell the person first and pass `record=false` if they decline. The same action at most 3 times, unless `repeat_reason` says why (section 6). `more_coming=true` tells the person at the end to wait for another batch (section 4). |
+| `release_phone` | Tell the person that no more batches are coming and the phone may be used normally (section 4). |
 
 Rules for agents:
 
@@ -290,6 +322,8 @@ Rules for agents:
 6. Recording (section 4) is on by default. Before every batch, tell the person that the screen, the voice and every key will be recorded, and offer to turn it off; if they decline, pass `--no-record` (CLI) or `record=false` (`request_human_chord_batch`). With `human_said_go=true` there is no start on the phone, so settle recording with them in chat first. Their answer covers that run only. Tell them where the file lands.
 7. A human batch never starts on its own. Every new batch posts its instruction on the phone (on the button bar, or on the notification shade without it), prints it in the terminal and speaks it, then waits for the person's start: **Done** on the bar (without the bar, a key press on the phone; a touch never starts it), or `go` typed in the terminal. A recorded batch can also be started without recording: **No rec** on the bar, or `norec` typed in the terminal. A timeout ends the run with `refused: not started`; it never starts the batch. Recording starts only after the start. If the person has just told you go in chat, pass `human_said_go=true`; the card and voice still run first. No run, overlay check or smoke script bypasses this gate (`plektra_qa/start_gate.py`).
 8. Before blaming the keyboard, repeat a failure in a **separate app**, so that an app's own bug is ruled out (djbclark, 2026-11-25: "In cases like this we should always try again in a seperate app to make sure we are not running into an app bug."). Until then, report it as seen in that one app only. `suites/tab_first_letter.yaml` repeats a first letter lost after Tab on the test bench (section 12). The bench is an instrument that shows where a letter went; it does not replace the retry in a real app. A trial result with `fault: typo` is the person's typing error: never report it as a keyboard failure.
+9. Ask a person for the same action at most 3 times in a batch (section 6). `repeat_reason` is for the rare case that really needs more; it is not a way past the check.
+10. Tell the person the truth about what comes next: pass `--more-coming` (CLI) or `more_coming=true` only when you will start another batch right after, and run `just qa-release` or call `release_phone` if you then do not.
 
 [firerpa-hitl.md](firerpa-hitl.md) is the full specification. It is written as a build prompt for an agent.
 
@@ -321,6 +355,7 @@ The tests use fakes and need no phone.
 | `plektra_qa/hitl_runner.py` | Suite loading, the trial loop, scoring, reminders. |
 | `plektra_qa/probe.py` | The test bench: reset by intent, its log lines, who made a difference, where a letter got lost. |
 | `plektra_qa/start_gate.py` | The start gate: shade card, terminal text and voice, then wait for the person's start: **Done** or **No rec** on the bar (a key press without the bar), or `go` or `norec` typed. |
+| `plektra_qa/end_state.py` | The end of a batch: the "phone is free" or "another batch is coming" card (bar, notification, voice), and `release`. |
 | `plektra_qa/screen_gate.py` | Inverted colors, the shade, stay-awake, the stop card and the phone-side watcher. adb only. |
 | `plektra_qa/speech.py` | The voice backends and the phrase cache. |
 | `plektra_qa/recording.py` | Screen and voice recording, on by default (scrcpy, ffmpeg), the voice track and the chapters. |
@@ -337,7 +372,7 @@ The tests use fakes and need no phone.
 
 ## 11. Lessons learned on the Titan 2 Elite
 
-1. This Android build has no `cmd notification cancel`. The harness removes a card by snoozing it, and unsnoozes it before posting it again. A snoozed tag stays hidden even when posted again.
+1. This Android build has no `cmd notification cancel`. The harness removes a card by snoozing it, and unsnoozes it before posting it again. A snoozed tag stays hidden even when posted again. The end-of-batch card (`plektra-qa-state`) is therefore never snoozed by the harness: the next batch replaces it by posting the same tag again.
 2. `adb shell` splits a multi-word notification title into tag and text unless the whole command is one quoted argument.
 3. `svc power stayon true` reads back as `15` (AC, USB, wireless, dock) on Android 16, not `7`. Any non-zero value counts.
 4. An overlay window cannot be the "your turn" signal: it needs an install, can take keyboard focus, and Android 12+ blocks touches through it. The notification shade is the trusted surface.

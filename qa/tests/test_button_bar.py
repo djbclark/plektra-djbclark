@@ -14,6 +14,7 @@ from plektra_qa.button_bar import (
     uid_from_column,
 )
 from plektra_qa.controller import ScreenController
+from plektra_qa.end_state import END_DONE_TEXT
 from plektra_qa.hitl_runner import SKIPPED, STOPPED, ChordTrial, run_chord_batch
 
 from test_settle import _TimedField
@@ -310,7 +311,7 @@ def test_done_ends_the_trial_only_after_the_person_fixed_a_typo():
     bar = _FakeBar([(0.6, "done")])
     results, gate = _run(field, bar, [ChordTrial(prompt="a: hello", shade="Type hello", expect="hello")])
     assert results[0].passed and results[0].observed == "hello"
-    assert bar.shown == ["Type hello"] and bar.hidden == 1
+    assert bar.shown == ["Type hello", END_DONE_TEXT] and bar.hidden == 1
     assert gate.calls == [("Type hello", {"shade": False})]  # no shade card
 
 

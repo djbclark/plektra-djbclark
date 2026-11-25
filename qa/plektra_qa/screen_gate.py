@@ -29,6 +29,8 @@ STAY_KEY = "stay_on_while_plugged_in"
 NOTIFY_TAG = "plektra-qa-presence"
 STOP_TAG = "plektra-qa-stop"
 START_TAG = "plektra-qa-start"
+# The end-of-batch card (end_state.py). It must outlive the run: never add it to anything that snoozes.
+STATE_TAG = "plektra-qa-state"
 RETIRE_WAIT_S = 10.0  # how long an earlier run's phone watcher may take to restore the settings
 STOP_TEXT = "Swipe away to stop testing"
 SNOOZE_MS = "2147483647"
@@ -81,6 +83,23 @@ def adb_shell(serial: str, args: Sequence[str]) -> str:
     return proc.stdout.replace("\r", "")
 
 
+def unsnooze(shell: Shell, wanted: Callable[[str], bool]) -> None:
+    """Unsnooze every notification whose tag `wanted` accepts. A later post of a snoozed tag stays hidden."""
+    try:
+        listing = shell(["cmd", "notification", "snoozed"])
+    except Exception:
+        return
+    for line in listing.splitlines():
+        key = line.split(" snoozed", 1)[0].strip()
+        parts = [part.strip() for part in key.split("|")]
+        if len(parts) < 4 or not wanted(parts[3]):
+            continue
+        try:
+            shell(["cmd", "notification", "unsnooze", key])
+        except Exception:
+            continue
+
+
 def _heads_restore_line(saved: str) -> str:
     if saved in {"0", "1"}:
         return f"settings put global {HEADS_UP_KEY} {saved}"
@@ -121,8 +140,11 @@ class ScreenGate:
         self._saved_heads: str | None = None
         self._saved_timeout: str | None = None
         self._saved_stay: str | None = None
+        self.took_screen = False  # True once an earlier run's stop mark is gone, so user_stopped() is this run's
+        self._restored = False
 
     def __enter__(self) -> ScreenGate:
+        self._restored = False
         self._retire_previous_watcher()
         self._saved_heads = self._get("global", HEADS_UP_KEY).strip()
         timeout = self._digits("system", TIMEOUT_KEY)
@@ -144,6 +166,7 @@ class ScreenGate:
             self._hold_awake()
             self._wake_and_unlock()
             self._shell(["sh", "-c", f"rm -f {AWAKE_STOPPED}"])
+            self.took_screen = True
             self._unsnooze_ours()
             self._notify(STOP_TEXT, STOP_TEXT, STOP_TAG)
             self._start_watcher()
@@ -156,7 +179,9 @@ class ScreenGate:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> bool:
-        self._restore()
+        if not self._restored:  # a recorded run restores the phone early, before the video is written
+            self._restore()
+            self._restored = True
         return False
 
     def hold(self, reason: str) -> None:
@@ -187,6 +212,14 @@ class ScreenGate:
     def user_stopped(self) -> bool:
         text = self._shell(["sh", "-c", f"test -f {AWAKE_STOPPED} && echo yes || true"])
         return text.strip() == "yes"
+
+    def settle_watcher(self) -> None:
+        """After exit or a swipe: wait, bounded, until the phone watcher is gone. Its last steps put the
+        settings back and hide the button bar, so a card shown before that would vanish."""
+        waited = 0.0
+        while waited < RETIRE_WAIT_S and self._watcher_alive():
+            self._sleep(0.5)
+            waited += 0.5
 
     def foreground_package(self) -> str:
         text = self._shell(["dumpsys", "activity", "activities"])
@@ -404,19 +437,7 @@ class ScreenGate:
         # Exit snoozes these tags because this Android build has no cancel.
         # A later post of a snoozed tag stays hidden, and a hidden stop card
         # must not look like the person swiped it.
-        try:
-            listing = self._shell(["cmd", "notification", "snoozed"])
-        except Exception:
-            return
-        for line in listing.splitlines():
-            key = line.split(" snoozed", 1)[0].strip()
-            parts = [part.strip() for part in key.split("|")]
-            if len(parts) < 4 or not self._our_tag(parts[3]):
-                continue
-            try:
-                self._shell(["cmd", "notification", "unsnooze", key])
-            except Exception:
-                continue
+        unsnooze(self._shell, self._our_tag)
 
     def _tag_listed(self, tag: str) -> bool:
         try:

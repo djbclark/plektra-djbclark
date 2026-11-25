@@ -30,6 +30,7 @@ def _patch(monkeypatch, bar_error=None):
         def wait(self, *a, **k): return "relayed"
 
     def batch(controller, trials, console, **k):
+        seen["notice"] = k.get("notice")
         seen["console"], seen["overlay"] = console, k.get("overlay")
         seen["lock"] = dict(runlock._HELD)
         return []
@@ -57,6 +58,17 @@ def test_the_batch_uses_the_bar_logs_to_stderr_and_locks_on_the_real_serial(monk
     assert seen["console"].stderr is True and seen["start_console"].stderr is True
     assert list(seen["lock"]) == ["REALSERIAL"]
     assert runlock._HELD == {}
+
+
+@pytest.mark.parametrize("more", [False, True])
+def test_the_batch_is_started_and_passes_more_coming_on(monkeypatch, more):
+    seen = _patch(monkeypatch)
+    mcp_server.request_human_chord_batch(
+        json.dumps([{"prompt": "a", "expect": "a"}]), human_said_go=True, more_coming=more
+    )
+    notice = seen["notice"]
+    assert notice.started and notice.announced and notice.more_coming is more
+    assert notice.told == notice.text()  # the fake batch delivered nothing, so the caller did
 
 
 def test_without_the_overlay_app_the_batch_falls_back_to_the_shade_card(monkeypatch):

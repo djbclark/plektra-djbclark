@@ -19,6 +19,7 @@ from collections.abc import Callable, Sequence
 from typing import Any
 
 from rich.console import Console
+from rich.markup import escape
 
 from plektra_qa.inputlog import Event, parse_event
 from plektra_qa.screen_gate import START_TAG, adb_shell
@@ -49,12 +50,22 @@ def batch_instruction(count: int) -> str:
 NO_RECORD_WORDS = {"norec", "no record", "go norec", "go no record"}
 # The bar holds about four short lines, so a recorded run gets its own start text there.
 BAR_RECORD_CARD = "Recorded: screen, voice, keys. Done starts. No rec starts without recording."
+BAR_PLAIN_CARD = "Done starts."  # after the repeat reason, when the run is not recorded
+
+
+def repeat_line(reason: str) -> str:
+    """Why this batch asks for the same action more than three times."""
+    return f"Repeats on purpose: {reason.rstrip(' .')}."
 
 
 def card_text(
-    title: str, instruction: str, *, phone: bool, terminal: bool, bar: bool = False, recording: bool = False
+    title: str, instruction: str, *, phone: bool, terminal: bool, bar: bool = False, recording: bool = False,
+    repeat_reason: str = "",
 ) -> str:
-    """The start card. `recording`: the run will be recorded, so say so and say how to start without."""
+    """The start card. `recording`: the run will be recorded, so say so and say how to start without.
+    `repeat_reason`: why an action repeats more than the limit; it comes first, so it is seen."""
+    if repeat_reason:
+        instruction = f"{repeat_line(repeat_reason)} {instruction}"
     ways = []
     if bar:
         ways.append("press Done on the bar")
@@ -107,7 +118,10 @@ class StartGate:
         self.timeout_s = timeout_s
         self.record_declined = False  # set by wait(): the person started the batch without recording
 
-    def wait(self, title: str, instruction: str, *, confirmed: bool = False, recording: bool = False) -> str:
+    def wait(
+        self, title: str, instruction: str, *, confirmed: bool = False, recording: bool = False,
+        repeat_reason: str = "",
+    ) -> str:
         """Block until the person starts the batch; return how they did.
 
         confirmed: the person already said go to the agent in chat (the agent
@@ -117,17 +131,19 @@ class StartGate:
         recording: the run is about to be recorded. The card says so, and the
         person can start it without (the bar's No rec, or norec in the terminal);
         then record_declined is True.
+
+        repeat_reason: shown on the card and in the terminal (see card_text).
         """
         self.record_declined = False
         text = card_text(
             title, instruction, phone=True, terminal=self._terminal_enabled, bar=self.bar is not None,
-            recording=recording,
+            recording=recording, repeat_reason=repeat_reason,
         )
-        self.console.print(f"[bold]{title}[/bold]\n{text}")
-        self._show_card(
-            title, text, ("done", "norec") if recording else ("done",),
-            bar_text=BAR_RECORD_CARD if recording else None,
-        )
+        self.console.print(f"[bold]{escape(title)}[/bold]\n{escape(text)}")
+        bar_text = BAR_RECORD_CARD if recording else None
+        if repeat_reason:  # the bar holds 200 characters: the reason and how to start
+            bar_text = f"{repeat_line(repeat_reason)} {bar_text or BAR_PLAIN_CARD}"
+        self._show_card(title, text, ("done", "norec") if recording else ("done",), bar_text=bar_text)
         if self.speaker is not None:
             self.speaker.say(text)
         if confirmed:

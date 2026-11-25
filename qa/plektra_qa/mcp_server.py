@@ -17,9 +17,10 @@ from mcp.server.mcpserver import MCPServer
 
 from plektra_qa.connection import connect, server_status
 from plektra_qa.controller import ScreenController, obj_info
-from plektra_qa import runlock
+from plektra_qa import end_state, runlock
 from plektra_qa.button_bar import DEFAULT_PACKAGE, ButtonBar, OverlayError
-from plektra_qa.hitl_runner import ChordTrial, run_chord_batch
+from plektra_qa.end_state import EndNotice
+from plektra_qa.hitl_runner import ChordTrial, RepeatError, check_repeats, run_chord_batch
 from plektra_qa.keys import localise_texts, resolve_keymap
 from plektra_qa.probe import ProbeError, bench_run
 from plektra_qa.recording import RecordingError, recording
@@ -155,9 +156,17 @@ def execute_ui_action(action: str, selector_kwargs: dict[str, Any]) -> str:
     return action
 
 
+def _bar_package() -> str:
+    return os.environ.get("PLEKTRA_QA_BAR_PACKAGE", "").strip() or DEFAULT_PACKAGE
+
+
 @mcp.tool()
 def request_human_chord_batch(
-    trials_json: str, record: bool = True, human_said_go: bool = False
+    trials_json: str,
+    record: bool = True,
+    human_said_go: bool = False,
+    more_coming: bool = False,
+    repeat_reason: str = "",
 ) -> str:
     """Block while a person chords the batch. Returns the per-trial report.
 
@@ -174,6 +183,15 @@ def request_human_chord_batch(
     batch; the card and voice still run first. A wait with no start ends the
     run with {"refused": ...}.
 
+    Ask for the same action at most 3 times ("try 2 of 10" numbering does not
+    make it a new action); more is refused unless repeat_reason says why it is
+    really necessary (at most 80 characters, shown on the start card).
+
+    When the batch ends the person is told that the phone may be used normally.
+    Pass more_coming=true when you will start another batch right after: they
+    are then told to wait and leave the phone (a stop by them always frees it).
+    If that batch will not run, call release_phone.
+
     A trial on the test bench (package dev.hitlbar.overlay, activity
     dev.hitlbar.overlay.BenchActivity) also gets "probe" (keys pressed,
     corrections, difference, where a missing character got to) and, when it
@@ -187,13 +205,18 @@ def request_human_chord_batch(
         ChordTrial.model_validate(localise_texts(item, keymap, f"trial {index}"))
         for index, item in enumerate(raw, start=1)
     ]
+    try:
+        reason = check_repeats(trials, repeat_reason, "this batch")
+    except RepeatError as exc:
+        return json.dumps({"refused": str(exc)})
     packages = {trial.package for trial in trials if trial.package}
     target = require_serial()
-    bar_package = os.environ.get("PLEKTRA_QA_BAR_PACKAGE", "").strip() or DEFAULT_PACKAGE
+    bar_package = _bar_package()
     # stdout is the JSON-RPC channel: everything the batch prints goes to stderr.
     console = Console(stderr=True)
     gate = ScreenGate(target, allowed_packages=packages, overlay_package=bar_package)
     speaker = Speaker()
+    notice = EndNotice(target, more_coming=more_coming, speaker=speaker, console=console)
     locked = False
     serial = runlock.device_serial(target)
     bar_cm = ButtonBar(target, package=bar_package)
@@ -206,14 +229,18 @@ def request_human_chord_batch(
         except OverlayError as exc:
             console.print(f"no button bar ({exc}); using the shade card", markup=False)
             bar = None
+        notice.bar = bar
         try:
             with bench_run(target, trials, "mcp") as probe:
                 start = StartGate(target, speaker=speaker, console=console, bar=bar)
+                notice.starting()  # an earlier batch's "done" or "wait" card no longer holds
                 start.wait(
-                    "Plektra QA batch", batch_instruction(len(trials)), confirmed=human_said_go, recording=record
+                    "Plektra QA batch", batch_instruction(len(trials)), confirmed=human_said_go, recording=record,
+                    repeat_reason=reason,
                 )
+                notice.started = True
                 record = record and not start.record_declined
-                with recording(target, speaker, record) as recorder:
+                with recording(target, speaker, record, captured=lambda: notice.finish(gate)) as recorder:
                     results = run_chord_batch(
                         controller, trials, console, gate=gate, speaker=speaker,
                         on_trial=recorder.on_trial if recorder is not None else None,
@@ -222,8 +249,10 @@ def request_human_chord_batch(
                         on_discard=recorder.on_discard if recorder is not None else None,
                         overlay=bar,
                         probe=probe,
+                        notice=notice,
                     )
         finally:
+            notice.finish(gate)  # failed or never started: the person still learns where they stand
             if bar is not None:
                 bar_cm.__exit__(None, None, None)
     except (RecordingError, StartGateError, ProbeError, runlock.RunLockError) as exc:
@@ -242,6 +271,20 @@ def request_human_chord_batch(
             "warnings": recorder.warnings,
         }
     )
+
+
+@mcp.tool()
+def release_phone() -> str:
+    """Tell the person that no more batches are coming and the phone may be used normally.
+
+    Call it when a batch announced with more_coming=true will not run. Posts the
+    notification, says it and shows it on the button bar. Refused while a run is
+    driving the phone."""
+    try:
+        notice = end_state.release(require_serial(), console=Console(stderr=True), bar_package=_bar_package())
+    except runlock.RunLockError as exc:
+        return json.dumps({"refused": str(exc)})
+    return json.dumps({"released": notice.posted, "told": notice.told, "bar": notice.on_bar})
 
 
 def main() -> None:

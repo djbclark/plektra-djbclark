@@ -374,7 +374,8 @@ def test_run_with_a_partly_passed_ledger_runs_the_phase_setup_and_writes_passes_
     ledger.record(suite_trials[0], "Hello", None)  # trial 1 passed; the rest did not
     captured = {}
 
-    def batch(controller, trials, console, gate, speaker, on_trial, on_result, overlay, gate_entered, on_redo, on_discard, probe):
+    def batch(controller, trials, console, gate, speaker, on_trial, on_result, overlay, gate_entered, on_redo,
+              on_discard, probe, notice):
         captured["trials"], captured["entered"] = trials, gate_entered
         for t in trials:
             on_trial(t.number, t)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import difflib
+import re
 import time
 from collections.abc import Callable
 from contextlib import nullcontext
@@ -16,6 +17,8 @@ from rich.live import Live
 from rich.table import Table
 
 from plektra_qa.controller import ScreenController
+from plektra_qa.end_state import EndNotice
+from plektra_qa.end_state import phone_stopped as _phone_stopped
 from plektra_qa.keys import Keymap, localise_texts, resolve_keymap
 from plektra_qa.button_bar import ButtonBar
 from plektra_qa.probe import FIELDS as BENCH_FIELDS
@@ -43,7 +46,6 @@ STOPPED = "stopped from the phone"
 NOT_STARTED = "never started after the spoken prompts"
 SKIPPED = "skipped from the phone"
 HANDS_OFF = "Hands off. Get ready."
-FINISHED = "Testing finished."
 REPROMPT = "Still waiting. "
 
 
@@ -116,10 +118,100 @@ class TrialResult(BaseModel):
     probe_log: str = ""  # the file with the try's probe lines and that report
 
 
+# djbclark, 2026-11-25: "10 times is too many times to have a human do the same thing unless we really
+# think that is neccisary. Limit to 3 max on a regular basis."
+MAX_SAME_ACTION = 3
+MAX_REASON_CHARS = 80  # the reason has to fit on the bar's start card
+
+_COUNT = r"(?:\d+|(?:one|two|three|four|five|six|seven|eight|nine|ten|eins|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn)\b)"
+_OF = r"(?:\s*/\s*|\s+(?:of|out\s+of|von)\s+)"
+_LABEL = (
+    r"(?:try|trial|attempt|round|take|rep|repetition|repeat|iteration|versuch|anlauf|durchgang|wiederholung)"
+    r"(?:\s*(?:no\.|nr\.|number|#))?\s*"
+)
+_START = r"(?:^|(?<=[.:;,!?(\[\n–—-]))\s*"  # the start of the text or of a clause
+_NUMBERING = tuple(
+    re.compile(pattern, re.IGNORECASE)
+    for pattern in (
+        rf"\b{_LABEL}{_COUNT}{_OF}{_COUNT}",  # "try 2 of 10", "Versuch 2 von 10", anywhere
+        rf"{_START}\b{_LABEL}{_COUNT}",  # "Try 2.", "(attempt 3)"; not "type round 2"
+        r"[(\[]\s*#?\d+\s*(?:/|of|out of|von)\s*\d+\s*[)\]]",  # "(2/10)", "[2 of 10]"
+        r"^\s*[(\[]\s*#?\d+\s*[)\]]|[(\[]\s*#?\d+\s*[)\]](?=\s*\.?\s*$)",  # "[3] ...", "... (3)"
+        rf"^\s*#?\d+{_OF}\d+",  # "2 of 10: ..."
+        r"^\s*(?:#\d+|\d+[.)](?=\s))",  # "#3 ...", "3. ..."
+        rf"[,;:–—-]\s*\d+{_OF}\d+(?=\s*\.?\s*$)",  # "..., 2 of 10."
+        r"\s#\d+(?=\s*\.?\s*$)",  # "... #3"
+        rf"{_START}(?:(?:first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|next|last|final|another|"
+        r"\d+(?:st|nd|rd|th))\s+(?:try|attempt|time|round|go)|once\s+more|once\s+again|one\s+more\s+time|again|"
+        r"noch\s*(?:ein)?mal)\s*[:,.!–—-]",  # "Again: ...", "Last try, ..."
+    )
+)
+
+
+class RepeatError(ValueError):
+    """A batch asks the person for the same action too often and does not say why."""
+
+
+def action_text(text: str) -> str:
+    """An instruction without its numbering, so that "try 2 of 10: X" and "try 3 of 10: X" are one action."""
+    for pattern in _NUMBERING:
+        text = pattern.sub(" ", text)
+    text = re.sub(r"[(\[]\s*[)\]]", " ", text)  # brackets the numbering left empty
+    text = re.sub(r"\s+[.:,;](?=\s|$)", " ", text)  # and its punctuation
+    text = re.sub(r"^[\s:.,;|–—-]+|[\s:,;|–—-]+$", "", " ".join(text.split()))
+    return text[:1].lower() + text[1:]
+
+
+def check_repeats(trials: list[ChordTrial], reason: object, where: str) -> str:
+    """Refuse a batch that asks for the same action more than MAX_SAME_ACTION times without a reason.
+
+    The same action: the same instruction on the phone (`shade`, else `prompt`), or the same spoken
+    instruction with the same expected text; numbering is ignored. Returns the reason to show on the
+    start card, or "" when nothing repeats too often."""
+    if reason is not None and not isinstance(reason, str):
+        raise RepeatError(f"{where}: repeat_reason must be a text that says why, not {reason!r}")
+    why = " ".join((reason or "").split())
+    if len(why) > MAX_REASON_CHARS:
+        raise RepeatError(
+            f"{where}: repeat_reason has {len(why)} characters; keep it to {MAX_REASON_CHARS} so that it "
+            "fits on the start card"
+        )
+    shown: dict[str, list[int]] = {}
+    said: dict[tuple[str, str], list[int]] = {}
+    for position, trial in enumerate(trials, start=1):
+        number = trial.number or position
+        shown.setdefault(action_text(trial.shade or trial.prompt), []).append(number)
+        said.setdefault((action_text(spoken_action(trial)), trial.expect), []).append(number)
+    groups = [(text, numbers) for text, numbers in shown.items()]
+    groups += [(text, numbers) for (text, _expect), numbers in said.items()]
+    text, numbers = max(groups, key=lambda group: len(group[1]), default=("", []))
+    if len(numbers) <= MAX_SAME_ACTION:
+        return ""
+    if not why:
+        raise RepeatError(
+            f"{where} asks the person for the same action {len(numbers)} times (trials "
+            f"{', '.join(map(str, numbers))}: {text!r}); the limit is {MAX_SAME_ACTION}. Cut the repeats. Only if "
+            "they are really necessary, say why in a non-empty repeat_reason (a top-level suite field; the "
+            "repeat_reason argument over MCP), which the start card shows to the person."
+        )
+    return why
+
+
+class Suite(NamedTuple):
+    trials: list[ChordTrial]
+    repeat_reason: str  # for the start card; "" unless the suite repeats an action more than the limit
+
+
 def load_suite(path: Path, keymap: Keymap | None = None) -> list[ChordTrial]:
+    """The trials of a suite (see `read_suite`, which also refuses the suite)."""
+    return read_suite(path, keymap).trials
+
+
+def read_suite(path: Path, keymap: Keymap | None = None) -> Suite:
     """Read a suite. Key tokens in prompt/shade/speak are expanded with `keymap`
     (default: the live or profile keymap, see `keys.resolve_keymap`); a bare key
-    name or a token no keycap can produce refuses the whole suite."""
+    name or a token no keycap can produce refuses the whole suite, and so does
+    asking for the same action too often (`check_repeats`)."""
     data = yaml.safe_load(path.read_text())
     if keymap is None:
         keymap = resolve_keymap().keymap
@@ -155,7 +247,7 @@ def load_suite(path: Path, keymap: Keymap | None = None) -> list[ChordTrial]:
             fields["number"] = len(trials) + 1
             fields["raw_prompt"] = str(raw.get("prompt", ""))
             trials.append(ChordTrial.model_validate(fields))
-    return trials
+    return Suite(trials, check_repeats(trials, data.get("repeat_reason"), path.name))
 
 
 SETUP_FIELDS = ("package", "activity", "click_resource_id")  # what opens a phase's screen
@@ -542,56 +634,68 @@ def run_chord_batch(
     on_redo: Callable[[ChordTrial], None] | None = None,
     on_discard: Callable[[int, ChordTrial], None] | None = None,
     probe: ProbeRun | None = None,
+    notice: EndNotice | None = None,
 ) -> list[TrialResult]:
     """probe: the test bench session; trials on the bench then reset by intent and get a report.
+
+    notice: the caller's end-of-batch message. The batch only marks it stopped; the caller delivers it
+    with `notice.finish(gate)` once the phone is no longer filmed and the gate has restored it, so
+    that "the phone may be used normally" is true when the person reads it. Without one, the batch says
+    that itself (bar and voice) when it ends.
 
     gate_entered: the caller already entered `gate` (the preflight ran before the person's go).
 
     on_redo: a redo goes back over this trial; any earlier result of it is withdrawn.
     on_discard: the attempt under way was dropped (Redo or ◀ Prev on the bar): it gets no result."""
     console = console or Console()
+    own_notice = notice is None
+    if own_notice:
+        notice = EndNotice(speaker=speaker, bar=overlay, console=console)
+    if notice.bar is None:
+        notice.bar = overlay
     if speaker is not None:
         phrases = [HANDS_OFF]
         for trial in trials:
             phrases += [spoken_action(trial), REPROMPT + spoken_action(trial)]
-        speaker.prepare([*phrases, FINISHED])
+        speaker.prepare([*phrases, *notice.phrases()])
     device = controller.device
     results: list[TrialResult] = []
     previous_complete: float | None = None
-    with gate if gate is not None and not gate_entered else nullcontext():
-        console.print(
-            "Inverted colors: hands off. Ordinary colors: the shade shows the action, then closes. "
-            "Type that action. The screen stays on until this command ends. "
-            "Swipe away the stop card to leave testing mode."
-        )
-        with Live(_table(results, ""), console=console, refresh_per_second=8) as live:
-            try:
-                results = _run_trials(
-                    controller,
-                    trials,
-                    console,
-                    gate,
-                    device,
-                    live,
-                    results,
-                    previous_complete,
-                    speaker,
-                    on_trial,
-                    on_result,
-                    overlay,
-                    on_redo,
-                    on_discard,
-                    probe,
-                )
-            finally:
-                if overlay is not None:
-                    # The one HIDE of a batch: between trials the bar stays up (it shows the wait card).
-                    try:
-                        overlay.hide()
-                    except Exception:
-                        pass
-                if speaker is not None:
-                    speaker.say(FINISHED)
+    entered = False
+    try:
+        with gate if gate is not None and not gate_entered else nullcontext():
+            entered = True
+            console.print(
+                "Inverted colors: hands off. Ordinary colors: the shade shows the action, then closes. "
+                "Type that action. The screen stays on until this command ends. "
+                "Swipe away the stop card to leave testing mode."
+            )
+            with Live(_table(results, ""), console=console, refresh_per_second=8) as live:
+                try:
+                    results = _run_trials(
+                        controller,
+                        trials,
+                        console,
+                        gate,
+                        device,
+                        live,
+                        results,
+                        previous_complete,
+                        speaker,
+                        on_trial,
+                        on_result,
+                        overlay,
+                        on_redo,
+                        on_discard,
+                        probe,
+                    )
+                finally:
+                    # Asked while the gate still holds the phone. A Stop, on the bar or the stop card, frees it.
+                    notice.stopped = _phone_stopped(gate) or any(item.error == STOPPED for item in results)
+    finally:
+        if own_notice and entered:
+            notice.started = True
+            notice.finish(None if gate_entered else gate)
     return results
 
 
@@ -639,18 +743,6 @@ class _Reprompter:
     def started(self) -> None:
         if self.speaker is not None and self.speaker.speaking():
             self.speaker.stop()
-
-
-def _phone_stopped(gate: Any | None) -> bool:
-    if gate is None:
-        return False
-    check = getattr(gate, "user_stopped", None)
-    if not callable(check):
-        return False
-    try:
-        return bool(check())
-    except Exception:
-        return False
 
 
 def _run_trials(

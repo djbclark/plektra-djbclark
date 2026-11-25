@@ -8,9 +8,9 @@ name: tab_first_letter
 #
 # Each try starts with all boxes empty and the cursor in box 1 (Body). Tab moves it to box 2 (Title).
 # A try reads the box that has the focus, so also watch that Tab moved the cursor there. Leave about
-# two seconds between tries. A passed try is remembered for this keyboard build: --redo runs all ten
-# again. A failure that also happens in a real second app is the keyboard's; the bench alone does not
-# prove it (qa/README.md section 8).
+# two seconds between tries. A passed try is remembered for this keyboard build: --redo runs all three
+# again. Three tries is the limit for one action (qa/README.md section 6). A failure that also happens
+# in a real second app is the keyboard's; the bench alone does not prove it (qa/README.md section 8).
 start_wait_s: 10
 sentinel: "\n"
 phases:
@@ -20,53 +20,18 @@ phases:
     start_resource_id: dev.hitlbar.overlay:id/probe_body
     probe_field: title
     trials:
-      - prompt: "try 1 of 10: <Tab>, then type beta"
-        shade: "Try 1 of 10: <Tab>, then type beta"
+      - prompt: "try 1 of 3: <Tab>, then type beta"
+        shade: "Try 1 of 3: <Tab>, then type beta"
         speak: "Try 1. <Tab>, then type beta."
         expect: "beta"
         expect_ci_first: true
-      - prompt: "try 2 of 10: <Tab>, then type beta"
-        shade: "Try 2 of 10: <Tab>, then type beta"
+      - prompt: "try 2 of 3: <Tab>, then type beta"
+        shade: "Try 2 of 3: <Tab>, then type beta"
         speak: "Try 2. <Tab>, then type beta."
         expect: "beta"
         expect_ci_first: true
-      - prompt: "try 3 of 10: <Tab>, then type beta"
-        shade: "Try 3 of 10: <Tab>, then type beta"
+      - prompt: "try 3 of 3: <Tab>, then type beta"
+        shade: "Try 3 of 3: <Tab>, then type beta"
         speak: "Try 3. <Tab>, then type beta."
-        expect: "beta"
-        expect_ci_first: true
-      - prompt: "try 4 of 10: <Tab>, then type beta"
-        shade: "Try 4 of 10: <Tab>, then type beta"
-        speak: "Try 4. <Tab>, then type beta."
-        expect: "beta"
-        expect_ci_first: true
-      - prompt: "try 5 of 10: <Tab>, then type beta"
-        shade: "Try 5 of 10: <Tab>, then type beta"
-        speak: "Try 5. <Tab>, then type beta."
-        expect: "beta"
-        expect_ci_first: true
-      - prompt: "try 6 of 10: <Tab>, then type beta"
-        shade: "Try 6 of 10: <Tab>, then type beta"
-        speak: "Try 6. <Tab>, then type beta."
-        expect: "beta"
-        expect_ci_first: true
-      - prompt: "try 7 of 10: <Tab>, then type beta"
-        shade: "Try 7 of 10: <Tab>, then type beta"
-        speak: "Try 7. <Tab>, then type beta."
-        expect: "beta"
-        expect_ci_first: true
-      - prompt: "try 8 of 10: <Tab>, then type beta"
-        shade: "Try 8 of 10: <Tab>, then type beta"
-        speak: "Try 8. <Tab>, then type beta."
-        expect: "beta"
-        expect_ci_first: true
-      - prompt: "try 9 of 10: <Tab>, then type beta"
-        shade: "Try 9 of 10: <Tab>, then type beta"
-        speak: "Try 9. <Tab>, then type beta."
-        expect: "beta"
-        expect_ci_first: true
-      - prompt: "try 10 of 10: <Tab>, then type beta"
-        shade: "Try 10 of 10: <Tab>, then type beta"
-        speak: "Try 10. <Tab>, then type beta."
         expect: "beta"
         expect_ci_first: true

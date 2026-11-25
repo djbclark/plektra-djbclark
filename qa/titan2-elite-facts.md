@@ -149,7 +149,9 @@ FIRERPA install and the HITL harness spec: `qa/firerpa-hitl.md`.
 ## 8. Remapped key release lost in a restartInput gap (QA S4; fix 47e15a70 on plk/key-remap-v2)
 1. Repro: KeyProbe mode "restart 1x", N=100 ms, "Swap right Shift and Enter" on, press printed ⏎ (acts as Shift) so the
    release lands between the app's restartInput and the IME's onStartInput(restarting): about 150-160 ms on this phone
-   (a ~100 ms tap releases before the restart, ~260 ms after the start). Hand timing misses often: ask for 10-15 presses.
+   (a ~100 ms tap releases before the restart, ~260 ms after the start). Hand timing misses often. A person is
+   asked for at most 3 tries unless the batch states why it needs more (qa/README.md section 6), so drive the timing by
+   script where possible.
 2. Before the fix (djb-20261114.0856-0ff87be5): app log `sendKeyEvent on inactive InputConnection`, KeyProbe `held: A=[SHIFT_RIGHT]` for good.
 3. After (djb-20261114.1333-6275dd3f, 2026-11-14): same warning, then Plektra re-sends a CANCELED UP through the new
    connection (`route=new (sent again)`, `cancelled UP ... taken=true`); KeyProbe `held=[]`. PASS.

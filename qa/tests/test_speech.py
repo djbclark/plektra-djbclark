@@ -5,8 +5,8 @@ from types import SimpleNamespace
 from rich.console import Console
 
 from plektra_qa.controller import ScreenController
+from plektra_qa.end_state import END_DONE_TEXT
 from plektra_qa.hitl_runner import (
-    FINISHED,
     HANDS_OFF,
     NOT_STARTED,
     REPROMPT,
@@ -117,7 +117,7 @@ def test_voice_reprompts_after_a_quiet_spell_then_stops_the_batch():
         "Type hello",
         REPROMPT + "Type hello",
         REPROMPT + "Type hello",
-        FINISHED,
+        END_DONE_TEXT,
     ]
     assert "Type hello" in speaker.prepared
     assert REPROMPT + "digits: 42" in speaker.prepared
@@ -134,7 +134,7 @@ def test_typing_ends_the_reprompts_and_the_trial_passes():
         speaker,
     )
     assert results[0].passed
-    assert speaker.said == [HANDS_OFF, "Type hello now", FINISHED]
+    assert speaker.said == [HANDS_OFF, "Type hello now", END_DONE_TEXT]
 
 
 def test_without_a_voice_the_old_start_window_still_applies():

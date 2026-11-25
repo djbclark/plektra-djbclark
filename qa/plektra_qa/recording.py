@@ -144,6 +144,7 @@ class Recorder:
         self._notes: list[tuple[float, str, str]] = []  # (clock, kind, text) for the log panel
         self._panel = panel
         self._touches_was: str | None = None  # show_touches before we turned it on
+        self._captured: tuple[float, list[Shown], list[Shown]] | None = None  # length, keys, touches
         self._input: InputLogger | None = (
             InputLogger(serial, clock=clock) if capture_input else None
         )
@@ -366,8 +367,10 @@ class Recorder:
         merged.sort(key=lambda note: note[0])
         return [(max(t - self._t0, 0.0), kind, text) for t, kind, text in merged]
 
-    def finish(self) -> Path | None:
-        """Stop everything and write the mp4. None, with warnings, if it could not."""
+    def stop_capture(self) -> None:
+        """Stop filming the screen and reading the keys; `finish` writes the file later. Safe to repeat."""
+        if self._captured is not None:
+            return
         length = self._clock() - self._t0
         self._show_touches(False)
         keys: list[Shown] = []
@@ -375,6 +378,12 @@ class Recorder:
         if self._input is not None:
             keys, touches = self._input.stop()
         self._terminate()
+        self._captured = (length, keys, touches)
+
+    def finish(self) -> Path | None:
+        """Stop everything and write the mp4. None, with warnings, if it could not."""
+        self.stop_capture()
+        length, keys, touches = self._captured
         if not self._raw.is_file() or self._raw.stat().st_size == 0:
             self.warnings.append(f"no video was recorded ({self._tail()})")
             return None
@@ -457,6 +466,8 @@ def recording(
     speaker: Any,
     enabled: bool,
     out_dir: Path | None = None,
+    *,
+    captured: Callable[[], None] | None = None,
     **kwargs: Any,
 ) -> Iterator[Recorder | None]:
     """Record around a run when `enabled`; otherwise do nothing. Never prints.
@@ -464,6 +475,7 @@ def recording(
     Raises RecordingError before the run if recording cannot start. After the
     run it waits for the last spoken line to finish, then writes the file;
     read `.output` and `.warnings` on the yielded Recorder afterwards.
+    `captured` runs once the phone is no longer filmed, before the file is written (which takes a while).
     """
     if not enabled:
         yield None
@@ -480,4 +492,9 @@ def recording(
             wait(IDLE_TIMEOUT_S)
         if hasattr(speaker, "listener"):
             speaker.listener = None
-        recorder.finish()
+        recorder.stop_capture()
+        try:
+            if captured is not None:
+                captured()
+        finally:
+            recorder.finish()

@@ -13,6 +13,7 @@ from typer.testing import CliRunner
 from plektra_qa import cli, hitl_runner
 from plektra_qa.button_bar import WAIT_TEXT, ButtonBar, parse_line, parse_pm_uid, parse_pm_version
 from plektra_qa.controller import ScreenController
+from plektra_qa.end_state import END_DONE_TEXT
 from plektra_qa.hitl_runner import (
     LATER_BUTTONS,
     RECOVERY_BUTTONS,
@@ -206,7 +207,8 @@ def test_redo_restarts_this_trial_on_a_clean_screen_and_records_no_result_for_th
     assert [r.number for r in results] == [6] and results[0].passed
     assert seen == {"discard": [6], "redo": []}
     assert bar.seen[1] == bar.seen[0] == (*CLEAN, "mine")  # title gone, focus back, clipboard back
-    assert all("retry" in buttons for _text, buttons in bar.cards)
+    assert all("retry" in buttons for _text, buttons in bar.cards[:-1])
+    assert bar.cards[-1] == (END_DONE_TEXT, ())  # the end card asks for nothing
 
 
 def test_prev_after_a_tab_opens_a_fresh_note_and_replays_the_previous_trial(smoke):
@@ -237,7 +239,7 @@ def test_redo_of_a_trial_that_keeps_the_field_replays_the_trial_that_fills_it(sm
         (copy, "done"),
     )
     results, seen = _run(notes, bar, smoke[4:7])
-    assert [c[0] for c in bar.cards] == [smoke[i].shade for i in (4, 5, 6, 5, 6)]
+    assert [c[0] for c in bar.cards] == [*(smoke[i].shade for i in (4, 5, 6, 5, 6)), END_DONE_TEXT]
     assert [r.number for r in results] == [5, 6, 7] and all(r.passed for r in results)
     assert seen == {"discard": [7], "redo": [6]}
     assert bar.seen[3][:2] == CLEAN and bar.seen[4] == (TITLE, {BODY: "", TITLE: "Beta"}, "")
@@ -319,7 +321,7 @@ def test_between_trials_the_bar_waits_and_is_hidden_once_at_the_end(smoke):
     notes = _Notes()
     bar = _Bar(notes, (_type("alpha"), "done"), (_typed(_tab, _type("Beta")), "next"))
     _run(notes, bar, smoke[4:6])
-    assert bar.log == ["show", "wait:True", "show", "wait:True", "hide"]
+    assert bar.log == ["show", "wait:True", "show", "wait:True", "show", "hide"]  # the last card: the end state
 
 
 def test_a_trial_no_button_ended_asks_the_host_to_show_the_wait_card():
@@ -350,10 +352,10 @@ def test_restore_field_only_ever_clears():
     assert ScreenController(object()).editable_fields() is None
 
 
-def test_the_second_app_suite_has_ten_separate_tries_that_read_the_focused_field():
+def test_the_second_app_suite_has_three_separate_tries_that_read_the_focused_field():
     keymap = resolve_keymap(env={"PLEKTRA_QA_KEYMAP_SOURCE": "profile"}).keymap
     trials = load_suite(SUITES / "tab_first_letter.yaml", keymap)
-    assert len(trials) == 10 and len({trial_key(t) for t in trials}) == 10  # each try is its own ledger entry
+    assert len(trials) == 3 and len({trial_key(t) for t in trials}) == 3  # each try is its own ledger entry
     probe = "dev.hitlbar.overlay"
     assert all(t.package == probe and not t.resource_id for t in trials)
     assert all(t.start_resource_id == f"{probe}:id/probe_body" and t.clear_field for t in trials)

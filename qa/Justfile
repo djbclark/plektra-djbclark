@@ -20,8 +20,13 @@ qa-prep:
 # Run one YAML suite. The human chords; this process only watches the field.
 # The run is recorded by default (screen, spoken prompts and every key, as an mp4): tell the person first.
 # Add --no-record to turn it off; the start card also offers that (No rec on the bar, norec in the terminal).
+# Add --more-coming when another batch follows: the person is then told to wait instead of "use the phone".
 qa-run suite *flags:
     cd "{{ justfile_directory() }}" && uv run --python 3.14 plektra-qa run "{{ suite }}" {{ flags }}
+
+# A promised batch will not run: tell the person that the phone may be used normally.
+qa-release *flags:
+    cd "{{ justfile_directory() }}" && uv run --python 3.14 plektra-qa release {{ flags }}
 
 # Print the screen, shade and spoken versions of key tokens, e.g. just qa-keys "<Ctrl+A>, then <Ctrl+C>".
 # Live keymap from the phone when ADB_TARGET is set, else the profile.

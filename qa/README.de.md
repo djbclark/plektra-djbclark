@@ -31,7 +31,8 @@ Stand: nur im Fork, nicht Teil von Upstream-Plektra. Erprobt auf einem Unihertz 
 | Die Leiste zeigt `Wait a few seconds...` ohne Schaltflächen | Der Computer bereitet den nächsten Schritt vor. | Auf die nächste Karte warten. |
 | Normale Farben. Die Benachrichtigungsleiste zeigt 4 Sekunden lang die Aktion, schließt sich, dann piept der Computer und spricht die Aktion aus. | Du bist dran. | Diese Aktion auf der Tastatur des Telefons tippen. |
 | `Still waiting.` und noch einmal die Aktion | 10 ruhige Sekunden lang kam nichts im Feld an. | Anfangen zu tippen. Nach 3 Erinnerungen hält der Durchlauf an, weil er annimmt, dass du weg bist. |
-| `Testing finished.` | Der Durchlauf ist vorbei, die Einstellungen des Telefons sind wiederhergestellt. | Die Tabelle am Computer lesen. |
+| `Done. No more batches: the phone may be used normally.` (Karte am Ende eines Durchlaufs, Abschnitt 4) | Der Durchlauf ist vorbei, eine Aufnahme ist beendet, die Einstellungen des Telefons sind wiederhergestellt. | Das Telefon normal benutzen. Die Tabelle am Computer lesen. |
+| `Wait. Another batch is coming: please leave the phone for now.` (Karte am Ende eines Durchlaufs, Abschnitt 4) | Dieser Durchlauf ist vorbei, ein weiterer folgt. | Das Telefon in Ruhe lassen, bis dessen Startkarte erscheint. |
 | Die Benachrichtigung `Swipe away to stop testing` | Während eines Durchlaufs immer da. | Nur zum Beenden wegwischen. Das Telefon stellt dann seine Einstellungen selbst wieder her, auch wenn der Computer die Verbindung verloren hat. |
 
 Die Sprachansagen und die Texte auf dem Telefon sind englisch.
@@ -109,6 +110,28 @@ Ein aufgenommener Durchlauf speichert ein mp4 in `~/plektra-qa-recordings/` (`--
 
 Tasten und Berührungen kommen aus `getevent` des Telefons; der Gleichlauf mit dem Bild stimmt auf etwa eine Zehntelsekunde. Die Aufnahme zeigt den ganzen Bildschirm, die Statusleiste und jede Taste, die die Person drückt; sie wird nur mit deren Einverständnis geteilt. Nicht für Privates verwenden: dafür die Aufnahme abschalten.
 
+### Das Ende eines Durchlaufs: Ist das Telefon frei?
+
+Jeder von dir gestartete Durchlauf endet mit einer von zwei Meldungen, egal wie er endete (fertig, gestoppt oder nach deinem Start fehlgeschlagen):
+
+| Meldung | Wann |
+| --- | --- |
+| `Done. No more batches: the phone may be used normally.` (fertig, keine weiteren Durchläufe, das Telefon darf normal benutzt werden) | Der Standard. Außerdem immer, wenn du **Stop** drückst oder die Stopp-Benachrichtigung wegwischst. |
+| `Wait. Another batch is coming: please leave the phone for now.` (warten, ein weiterer Durchlauf kommt, das Telefon vorerst liegen lassen) | Der Durchlauf lief mit `--more-coming` (über MCP `more_coming=true`) und du hast ihn nicht gestoppt. |
+
+Die Meldung kommt, nachdem das Telefon nicht mehr gefilmt wird und seine Einstellungen wiederhergestellt sind; der Computer schreibt dann vielleicht noch das Video. Sie steht 10 Sekunden lang ohne Schaltflächen auf der Leiste, Berührungen gehen also hindurch (ohne Leisten-App öffnet sich stattdessen 10 Sekunden lang die Benachrichtigungsleiste); sie bleibt dort als Benachrichtigung (Tag `plektra-qa-state`); und sie wird ausgesprochen. Sie ersetzt das gesprochene `Testing finished.` früherer Versionen.
+
+Sobald der nächste Durchlauf seine Startkarte zeigt, ändert sich die alte Benachrichtigung in `A test batch is starting. Follow the cards on the screen.` Ein Durchlauf, der nie gestartet wird, setzt die Benachrichtigung ohne Ton wieder auf **Done** oder **Wait** (nach seinem eigenen `--more-coming`).
+
+Läuft der angekündigte Durchlauf doch nicht, gib das Telefon frei. Das sendet die **Done**-Meldung:
+
+```bash
+cd qa && just qa-run suites/smoke_chords.yaml --more-coming   # ein weiterer Durchlauf folgt: „Wait“
+cd qa && just qa-release                                      # er läuft doch nicht: „Done“
+```
+
+`just qa-release` ist `plektra-qa release`; ein Agent ruft das MCP-Werkzeug `release_phone` auf. Es wird verweigert, solange ein Lauf das Telefon steuert, und endet mit Exit-Code 1, wenn sich die Benachrichtigung nicht posten ließ. Ein Lauf, der schon vor seiner Startkarte abgelehnt wird (fehlerhafte Suite, kein Rekorder, gesperrtes Telefon), ändert eine frühere **Wait**-Karte nicht; gib das Telefon frei, wenn du ihn aufgibst.
+
 ### Gemerkte Erfolge, ein Durchlauf pro Telefon, Abbrechen
 
 - **Ledger.** Ein Versuch, der mit dem installierten Plektra-Build bestanden wurde, läuft nicht noch einmal (`run --redo` führt alles aus). Jeder Erfolg wird in `~/.local/state/plektra-qa/ledger/<Suite>.json` geschrieben, sobald der Versuch besteht; ein Kill, Strg-C oder Absturz verliert nichts. In einem aufgenommenen Durchlauf wird der Clip danach angehängt; ein aufgenommener Erfolg, dessen Clip sich nicht schneiden lässt, zählt nicht. **◀ Prev** auf der Leiste (siehe unten) nimmt einen Erfolg wieder zurück, ebenso **Redo**, wo es einen früheren Versuch wiederholt. Eine Phase wird nur übersprungen, wenn alle ihre Versuche bestanden sind; sonst laufen die offenen Versuche, der erste mit dem Setup der Phase (App, Activity, Klick und das Startfeld; ein Versuch, der kein Feld nennt, liest weiterhin das Feld mit dem Fokus) und, bei einem Versuch, der das Feld behält (`clear_field: false`), auch der Versuch davor. Versuchsnummern (Log, Tabelle, Kapitel, `import --passed`) sind die Nummern in der Suite. Der Schlüssel hasht den Prompt wie im YAML geschrieben; ältere Einträge werden weiter gefunden. Der Lauf bricht ab, wenn der Keyboard-Build nicht lesbar ist oder nicht Plektra die aktive Tastatur ist. Am Ende steht „still to pass“ und getrennt „passed, no clip“.
@@ -139,8 +162,8 @@ Tasten und Berührungen kommen aus `getevent` des Telefons; der Gleichlauf mit d
   4. Ein Versuch, der den Text behält (`clear_field: false`) und auf einen anderen Versuch seiner Phase folgt: **beide laufen erneut**, denn der Computer tippt nie. Der Durchlauf geht zu dem Versuch zurück, der das Feld füllt, und die Ergebnisse ab dort werden zurückgenommen. Gibt es keinen früheren Versuch zum Wiederholen, muss das Feld noch so lauten wie beim Start; nur durch Leeren lässt sich das herstellen.
 - **Karte „Reset failed“.** Lässt sich der Ausgangszustand nicht herstellen, zeigt die Leiste `Reset failed: …. Fix the screen by hand, then Redo. Next skips this trial.` mit **Redo**, **Next** und **Stop**.
 - **Auch ein normaler Versuchsstart** räumt alten Text weg. In einer Phase mit „Neue Notiz“-Schaltfläche bekommt ein Versuch, der sein Feld leert, eine neue Notiz, wenn er der erste seiner Phase im Durchlauf ist, wenn ein anderes Feld verändert zurückgeblieben ist, oder mit `fresh: true`. Sonst werden veränderte Felder nach Möglichkeit geleert.
-- **Wartekarte.** Ein Tipp auf irgendeine Schaltfläche macht die Karte sofort zu `Wait a few seconds...` ohne Schaltflächen, sodass keine zweimal gedrückt werden kann. Sie bleibt bis zur nächsten Karte, lässt Berührungen zur App dahinter durch und erscheint auch, wenn ein Versuch ohne Tipp endet. Die Leiste wird erst ausgeblendet, wenn der Durchlauf endet oder abgebrochen wird.
-- **Schlusskarte.** Nach dem letzten Versuch zeigt die Leiste `All trials done. ◀ Prev redoes the last one. Done finishes.` mit **Done** und **◀ Prev**, bis zu 60 s lang. **Done** oder Stille beendet den Durchlauf. Ein gestoppter Durchlauf, oder einer, bei dem nie getippt wurde, endet ohne diese Karte.
+- **Wartekarte.** Ein Tipp auf irgendeine Schaltfläche macht die Karte sofort zu `Wait a few seconds...` ohne Schaltflächen, sodass keine zweimal gedrückt werden kann. Sie bleibt bis zur nächsten Karte, lässt Berührungen zur App dahinter durch und erscheint auch, wenn ein Versuch ohne Tipp endet. Die Leiste wird erst nach der Karte am Ende des Durchlaufs (oben) ausgeblendet, oder wenn der Durchlauf vor seinem Start abgebrochen wird.
+- **Schlusskarte.** Nach dem letzten Versuch zeigt die Leiste `All trials done. ◀ Prev redoes the last one. Done finishes.` mit **Done** und **◀ Prev**, bis zu 60 s lang. **Done** oder Stille beendet den Durchlauf. Ein gestoppter Durchlauf, oder einer, bei dem nie getippt wurde, endet ohne diese Karte. Die Karte am Ende des Durchlaufs (oben) folgt in jedem Fall.
 - **Ein Feld, das sich nicht lesen lässt** (zum Beispiel während der Fokus wandert), beendet mit der Leiste keinen Versuch; das Terminal meldet `field unreadable (…), still waiting`. Ist das Feld beim Druck auf **Done** noch immer unlesbar, schlägt der Versuch mit `field lost` fehl; **◀ Prev** auf der nächsten Karte wiederholt ihn, oder du drückst **Redo** vor **Done**. Ohne Leiste schlägt ein Versuch mit `field lost` fehl, wenn das Feld 10 s lang unlesbar war (sofort, wenn es schon beim Start des Versuchs unlesbar ist).
 
 Die Leiste ist eine Begleit-App (`--bar-package`, Standard `dev.hitlbar.overlay`; sie braucht die Berechtigung „über anderen Apps einblenden“). Der Host steuert sie per `am broadcast -a <package>.SHOW|HIDE` und liest die Antworten aus Logcat-Zeilen mit dem Tag `QAOVERLAY` (`shown`, `hidden`, `button=done|norec|retry|redo|next|stop`; `retry` ist **Redo**, `redo` ist **◀ Prev**). Meldet die Leiste nicht innerhalb von 5 s `shown`, blendet der Host sie aus und versucht es noch einmal (Android kann die untätige App neu gestartet haben), danach schlägt der Versuch mit einer klaren Fehlermeldung fehl. Jede App kann in Logcat schreiben; der Host vertraut deshalb nur Zeilen der eigenen UID der Leisten-App (gelesen mit `pm list packages -U --show-versioncode`, was auch die App-Version liefert; ohne installierte App startet er nicht), nur Zeilen ab der aktuellen Uhrzeit des Telefons und nur Zeilen, deren `seq` höher ist als jedes zuvor angenommene (nach einem Hide darf der Zähler wieder bei 1 beginnen, wenn Android die App neu gestartet hat). Die App liegt in `qa/overlay-app/` (siehe deren README); die Host-Seite steht in `plektra_qa/button_bar.py`.
@@ -211,7 +234,15 @@ phases:
 
 Alle Felder eines Versuchs: `prompt`, `expect`, `expect_ci_first`, `verify_mode` (`text` oder `clipboard`), `sentinel`, `timeout_s`, `shade`, `speak`, `start_wait_s`, `max_reprompts`, `package`, `activity`, `resource_id`, `text_hint`, `start_resource_id`, `click_resource_id`, `clear_field`, `fresh`, `cue_on_device` (das Telefon piept auch) und für den Prüfstand `probe_field` und `prefill` (Abschnitt 12).
 
-`resource_id` ist das Feld, das ein Versuch liest. `start_resource_id` ist das Feld, das zu Beginn eines Versuchs fokussiert (und geleert) wird, wenn der Versuch keines nennt: Ein solcher Versuch liest das Feld, das gerade den Fokus hat, funktioniert also auch, nachdem eine Taste wie Tab ihn verschoben hat. `suites/tab_first_letter.yaml` ist ein Beispiel: zehn Anläufe Tab und dann Tippen auf dem Prüfstand (Abschnitt 12).
+`resource_id` ist das Feld, das ein Versuch liest. `start_resource_id` ist das Feld, das zu Beginn eines Versuchs fokussiert (und geleert) wird, wenn der Versuch keines nennt: Ein solcher Versuch liest das Feld, das gerade den Fokus hat, funktioniert also auch, nachdem eine Taste wie Tab ihn verschoben hat. `suites/tab_first_letter.yaml` ist ein Beispiel: drei Anläufe Tab und dann Tippen auf dem Prüfstand (Abschnitt 12).
+
+**Höchstens dreimal dieselbe Aktion.** Ein Mensch wird nicht immer wieder um dasselbe gebeten (djbclark, 2026-11-25, im Wortlaut: „10 times is too many times to have a human do the same thing unless we really think that is neccisary. Limit to 3 max on a regular basis.“). Eine Suite, die dieselbe Aktion mehr als dreimal verlangt, wird abgelehnt, bevor irgendetwas das Telefon berührt. Dieselbe Aktion ist dieselbe Anweisung auf dem Telefon (`shade`, sonst `prompt`) oder dieselbe gesprochene Anweisung (`speak`, sonst diese) mit demselben `expect`. Eine Nummerierung wie `try 2 of 10` macht daraus keine neue Aktion, eine andere Phase auch nicht.
+
+Streiche die Wiederholungen, oder lass ein Skript das Timing steuern. Nur wenn mehr Anläufe wirklich nötig sind, begründe das oben in der Suite mit höchstens 80 Zeichen. Die Startkarte zeigt dann `Repeats on purpose: …` auf dem Telefon und im Terminal:
+
+```yaml
+repeat_reason: "a timing race that hits about one try in five"
+```
 
 Tipps:
 
@@ -280,7 +311,8 @@ Der Keymap wird einmal am Anfang gelesen. Wer während eines Durchlaufs eine Tas
 | `teleport_and_prep_input` | Eine Activity öffnen, ein Feld fokussieren und leeren (hinter dem Bildschirm-Gate). |
 | `inspect_ui_fast` | Der UI-Baum des Bildschirms, optional mit JPEG-Screenshot. |
 | `execute_ui_action` | Ein Klick oder Tastendruck auf einen Selektor (hinter dem Bildschirm-Gate). |
-| `request_human_chord_batch` | Versuche (eine JSON-Liste von Versuchsobjekten) mit tippendem Menschen ausführen und den Bericht zurückgeben. Blockiert, bis der Mensch fertig ist. Der Durchlauf wird standardmäßig aufgenommen (`record=true`, Abschnitt 4); vorher dem Menschen sagen und `record=false` übergeben, wenn er ablehnt. |
+| `request_human_chord_batch` | Versuche (eine JSON-Liste von Versuchsobjekten) mit tippendem Menschen ausführen und den Bericht zurückgeben. Blockiert, bis der Mensch fertig ist. Der Durchlauf wird standardmäßig aufgenommen (`record=true`, Abschnitt 4); vorher dem Menschen sagen und `record=false` übergeben, wenn er ablehnt. Dieselbe Aktion höchstens dreimal, außer `repeat_reason` begründet es (Abschnitt 6). `more_coming=true` sagt dem Menschen am Ende, dass er auf einen weiteren Durchlauf warten soll (Abschnitt 4). |
+| `release_phone` | Dem Menschen sagen, dass keine Durchläufe mehr kommen und das Telefon normal benutzt werden darf (Abschnitt 4). |
 
 Regeln für Agenten:
 
@@ -292,6 +324,8 @@ Regeln für Agenten:
 6. Die Aufnahme (Abschnitt 4) ist standardmäßig an. Vor jedem Durchlauf der Person sagen, dass Bildschirm, Stimme und jede Taste aufgenommen werden, und anbieten, die Aufnahme abzuschalten; lehnt sie ab, `--no-record` (CLI) oder `record=false` (`request_human_chord_batch`) übergeben. Mit `human_said_go=true` gibt es keinen Start am Telefon, deshalb die Aufnahme vorher im Chat klären. Die Antwort gilt nur für diesen Durchlauf. Sagen, wo die Datei liegt.
 7. Ein Durchlauf mit Menschen startet nie von allein. Jeder neue Durchlauf zeigt seine Anweisung auf dem Telefon (auf der Schaltflächenleiste, ohne sie in der Benachrichtigungsleiste), gibt sie im Terminal aus und spricht sie, und wartet dann auf den Start der Person: **Done** auf der Leiste (ohne Leiste ein Tastendruck auf dem Telefon; eine Berührung startet nie) oder `go` im Terminal getippt. Ein aufgenommener Durchlauf lässt sich auch ohne Aufnahme starten: **No rec** auf der Leiste oder `norec` im Terminal. Eine Zeitüberschreitung beendet den Lauf mit `refused: not started`; sie startet ihn nie. Die Aufnahme beginnt erst nach dem Start. Hat die Person im Chat gerade „go“ gesagt, `human_said_go=true` übergeben; Karte und Stimme laufen trotzdem zuerst. Kein Lauf, keine Overlay-Prüfung und kein Smoke-Skript umgeht dieses Tor (`plektra_qa/start_gate.py`).
 8. Bevor die Tastatur beschuldigt wird, einen Fehler in einer **anderen App** wiederholen, um einen Fehler der App selbst auszuschließen (djbclark, 2026-11-25, im Wortlaut: „In cases like this we should always try again in a seperate app to make sure we are not running into an app bug.“). Bis dahin nur als in dieser einen App beobachtet melden. `suites/tab_first_letter.yaml` wiederholt einen nach Tab verlorenen ersten Buchstaben auf dem Prüfstand (Abschnitt 12). Der Prüfstand zeigt als Messgerät, wohin ein Buchstabe ging; er ersetzt nicht die Wiederholung in einer echten App. Ein Ergebnis mit `fault: typo` ist ein Tippfehler der Person: nie als Fehler der Tastatur melden.
+9. Einen Menschen in einem Durchlauf höchstens dreimal um dieselbe Aktion bitten (Abschnitt 6). `repeat_reason` ist für den seltenen Fall, der wirklich mehr braucht, und kein Weg an der Prüfung vorbei.
+10. Dem Menschen die Wahrheit darüber sagen, was als Nächstes kommt: `--more-coming` (CLI) oder `more_coming=true` nur übergeben, wenn direkt danach wirklich ein weiterer Durchlauf startet, und `just qa-release` ausführen oder `release_phone` aufrufen, wenn er dann doch ausfällt.
 
 [firerpa-hitl.md](firerpa-hitl.md) (englisch) ist die vollständige Spezifikation, geschrieben als Bau-Anleitung für einen Agenten.
 
@@ -323,6 +357,7 @@ Die Tests nutzen Attrappen und brauchen kein Telefon.
 | `plektra_qa/hitl_runner.py` | Suite laden, Versuchsschleife, Bewertung, Erinnerungen. |
 | `plektra_qa/probe.py` | Der Prüfstand: Zurücksetzen per Intent, seine Logzeilen, wer die Abweichung verursacht hat, wohin ein Buchstabe ging. |
 | `plektra_qa/start_gate.py` | Das Starttor: Karte in der Benachrichtigungsleiste, Terminaltext und Stimme, dann Warten auf den Start der Person: **Done** oder **No rec** auf der Leiste (ohne Leiste ein Tastendruck) oder getipptes `go` bzw. `norec`. |
+| `plektra_qa/end_state.py` | Das Ende eines Durchlaufs: die Karte „Telefon ist frei“ oder „ein weiterer Durchlauf kommt“ (Leiste, Benachrichtigung, Stimme) und `release`. |
 | `plektra_qa/screen_gate.py` | Invertierte Farben, Benachrichtigungsleiste, Wachbleiben, Stopp-Benachrichtigung und der Wächter auf dem Telefon. Nur adb. |
 | `plektra_qa/speech.py` | Die Sprach-Backends und der Satz-Cache. |
 | `plektra_qa/recording.py` | Bildschirm- und Sprachaufnahme, standardmäßig an (scrcpy, ffmpeg), die Tonspur und die Kapitel. |
@@ -339,7 +374,7 @@ Die Tests nutzen Attrappen und brauchen kein Telefon.
 
 ## 11. Erfahrungen mit dem Titan 2 Elite
 
-1. Dieses Android-Build hat kein `cmd notification cancel`. Der Harness entfernt eine Benachrichtigung per Snooze und hebt den Snooze vor dem nächsten Posten auf. Ein gesnoozter Tag bleibt auch beim erneuten Posten verborgen.
+1. Dieses Android-Build hat kein `cmd notification cancel`. Der Harness entfernt eine Benachrichtigung per Snooze und hebt den Snooze vor dem nächsten Posten auf. Ein gesnoozter Tag bleibt auch beim erneuten Posten verborgen. Die Karte am Ende des Durchlaufs (`plektra-qa-state`) wird deshalb vom Harness nie gesnoozt: Der nächste Durchlauf ersetzt sie, indem er denselben Tag neu postet.
 2. `adb shell` teilt einen mehrwortigen Benachrichtigungstitel in Tag und Text, außer der ganze Befehl ist ein einziges gequotetes Argument.
 3. `svc power stayon true` liest unter Android 16 als `15` zurück (Netzteil, USB, kabellos, Dock), nicht als `7`. Jeder Wert ungleich null zählt.
 4. Ein Overlay-Fenster taugt nicht als „Du bist dran“-Signal: Es braucht eine Installation, kann den Tastaturfokus nehmen, und ab Android 12 blockiert Android Berührungen durch das Overlay. Die Benachrichtigungsleiste ist die vertrauenswürdige Oberfläche.
