@@ -23,6 +23,10 @@ from plektra_qa.speech import Speaker
 POLL_S = 0.025
 STOP_CHECK_S = 1.0
 NO_BAR_IDLE_S = 20.0  # no bar and no timeout: this long without a key after the first input ends the trial
+FIELD_LOST_GRACE_S = 10.0  # no bar: the field may be unreadable this long (focus moving) before the trial fails
+END_CARD_S = 60.0  # how long the last card offers "redo last" before the batch ends by itself
+END_CARD = "All trials done. Redo last repeats the last one. Done finishes."
+TRIAL_BUTTONS = ("done", "next", "stop")
 DONE_SETTLE_S = 0.3
 SETTLE_S = 1.5  # a match counts only after the text stays put this long: people fix typos
 STOPPED = "stopped from the phone"
@@ -305,8 +309,11 @@ def run_chord_batch(
     on_result: Callable[[int, TrialResult], None] | None = None,
     overlay: ButtonBar | None = None,
     gate_entered: bool = False,
+    on_redo: Callable[[ChordTrial], None] | None = None,
 ) -> list[TrialResult]:
-    """gate_entered: the caller already entered `gate` (the preflight ran before the person's go)."""
+    """gate_entered: the caller already entered `gate` (the preflight ran before the person's go).
+
+    on_redo: the person pressed "redo last" on the bar; the trial's earlier result is withdrawn."""
     console = console or Console()
     if speaker is not None:
         phrases = [HANDS_OFF]
@@ -337,6 +344,7 @@ def run_chord_batch(
                     on_trial,
                     on_result,
                     overlay,
+                    on_redo,
                 )
             finally:
                 if speaker is not None:
@@ -415,6 +423,7 @@ def _run_trials(
     on_trial: Callable[[int, ChordTrial], None] | None = None,
     on_result: Callable[[int, TrialResult], None] | None = None,
     overlay: ButtonBar | None = None,
+    on_redo: Callable[[ChordTrial], None] | None = None,
 ) -> list[TrialResult]:
     # No limit unless the suite or the operator sets `timeout_s`.
     idle_s_for = lambda trial: float("inf") if trial.timeout_s is None else trial.timeout_s  # noqa: E731
@@ -422,15 +431,37 @@ def _run_trials(
     idle_after_input = lambda trial: (  # noqa: E731
         NO_BAR_IDLE_S if trial.timeout_s is None and overlay is None else idle_s_for(trial)
     )
-    for index, trial in enumerate(trials):
+    def rewind(last: int) -> int:
+        """Withdraw the results from trial `last` back to the trial that starts its field; return that index."""
+        start = last
+        while start > 0 and not trials[start].clear_field:  # it needs the text the earlier trial leaves
+            start -= 1
+        for position in range(start, last + 1):
+            number = trials[position].number or position + 1
+            results[:] = [item for item in results if item.number != number]
+            if on_redo is not None:
+                on_redo(trials[position])
+        live.update(_table(results, ""))
+        return start
+
+    index = 0
+    handed_off = False
+    while True:
+        if index >= len(trials):
+            if overlay is None or not trials or not _end_card(overlay, speaker):
+                break
+            index = rewind(len(trials) - 1)
+        trial = trials[index]
         number = trial.number or index + 1
         error = ""
+        redo = False
         element = None
         if _phone_stopped(gate):
             error = STOPPED
         if gate is not None and error == "":
-            if index == 0 and speaker is not None:
+            if not handed_off and speaker is not None:
                 speaker.say(HANDS_OFF)
+            handed_off = True
             try:
                 gate.hold("Preparing the field")
             except Exception as exc:
@@ -452,7 +483,8 @@ def _run_trials(
                 error = str(exc)
         if error == "" and overlay is not None:
             try:
-                overlay.show(trial.shade or trial.prompt)
+                buttons = ("done", "redo", "next", "stop") if index > 0 else TRIAL_BUTTONS
+                overlay.show(trial.shade or trial.prompt, buttons)
             except Exception as exc:
                 error = str(exc)
         baseline = ""
@@ -461,7 +493,8 @@ def _run_trials(
             try:
                 baseline = _read_observed(trial, element, device, controller)
             except Exception as exc:
-                error = f"field lost: {type(exc).__name__}"
+                if overlay is None:
+                    error = f"field lost: {type(exc).__name__}"
         ready = time.perf_counter()
         voice = _Reprompter(speaker, trial)
         if error == "":
@@ -486,6 +519,7 @@ def _run_trials(
         last_seen = observed
         last_change = ready
         matched_at: float | None = None
+        lost_since: float | None = None
         while error == "" and time.perf_counter() < deadline:
             now = time.perf_counter()
             if now - last_stop_check >= STOP_CHECK_S:
@@ -495,9 +529,15 @@ def _run_trials(
                     break
             try:
                 observed = _read_observed(trial, element, device, controller)
-            except Exception as exc:  # the person left the app or the field went away
-                error = f"field lost: {type(exc).__name__}"
-                break
+                lost_since = None
+            except Exception as exc:  # focus moving, the person left the app, or the field went away
+                # Never end a trial under the person's hands: with the bar they decide (2026-11-25).
+                if lost_since is None:
+                    lost_since = now
+                    console.print(f"trial {number}: field unreadable ({type(exc).__name__}), still waiting")
+                if overlay is None and now - lost_since >= FIELD_LOST_GRACE_S:
+                    error = f"field lost: {type(exc).__name__}"
+                    break
             changed = observed != baseline
             if observed != last_seen:
                 last_seen = observed
@@ -517,13 +557,16 @@ def _run_trials(
                 if button == "next":
                     error = SKIPPED
                     break
+                if button == "redo" and index > 0:
+                    redo = True
+                    break
                 if button == "done":
                     complete = time.perf_counter()  # the person says it is finished
                     time.sleep(DONE_SETTLE_S)  # a last key or an autocorrect commit may still land
                     try:
                         observed = _read_observed(trial, element, device, controller)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        error = f"field lost: {type(exc).__name__}"
                     break
             elif changed and trial_matched(observed, trial.expect, trial.sentinel, trial.expect_ci_first):
                 if matched_at is None:
@@ -540,6 +583,10 @@ def _run_trials(
                 overlay.hide()
             except Exception:
                 pass
+        if redo:
+            voice.started()  # stop reading this trial's action
+            index = rewind(index - 1)
+            continue
         if complete is None:
             complete = time.perf_counter()
         compared = strip_sentinel(observed, trial.sentinel)
@@ -568,4 +615,30 @@ def _run_trials(
         live.update(_table(results, ""))
         if error in (STOPPED, NOT_STARTED):
             break
+        index += 1
     return results
+
+
+def _end_card(overlay: ButtonBar, speaker: Speaker | None) -> bool:
+    """After the last trial: True when the person asks to redo it. Done, silence or no bar ends the batch."""
+    if END_CARD_S <= 0:
+        return False
+    try:
+        overlay.show(END_CARD, ("done", "redo"))
+    except Exception:
+        return False
+    if speaker is not None:
+        speaker.say(END_CARD)
+    again = False
+    deadline = time.perf_counter() + END_CARD_S
+    while time.perf_counter() < deadline:
+        button = overlay.pressed()
+        if button in ("done", "redo"):
+            again = button == "redo"
+            break
+        time.sleep(POLL_S)
+    try:
+        overlay.hide()
+    except Exception:
+        pass
+    return again

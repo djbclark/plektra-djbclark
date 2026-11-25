@@ -13,6 +13,8 @@ class ProtocolTest {
     @Test
     fun onlyNamedButtonsInFixedOrder() {
         assertEquals(listOf(BarButton.DONE, BarButton.STOP), parseButtons("stop, DONE"))
+        assertEquals(listOf(BarButton.DONE, BarButton.REDO), parseButtons("redo,done"))
+        assertEquals(listOf(BarButton.DONE, BarButton.NOREC), parseButtons("norec,done"))
         assertEquals(listOf(BarButton.NEXT), parseButtons("next,bogus,;rm"))
         assertEquals(emptyList<BarButton>(), parseButtons(""))
     }

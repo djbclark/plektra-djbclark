@@ -139,6 +139,8 @@ object Bar {
 
     private fun color(button: BarButton) = when (button) {
         BarButton.DONE -> "#2E7D32"
+        BarButton.NOREC -> "#6D4C41"
+        BarButton.REDO -> "#1565C0"
         BarButton.NEXT -> "#455A64"
         BarButton.STOP -> "#C62828"
     }

@@ -7,6 +7,7 @@ import subprocess
 import sys
 import threading
 import time
+from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -327,6 +328,7 @@ class _FakeGate:
 
 
 class _FakeStart:
+    record_declined = False
     def __init__(self, *a, **k): pass
     def wait(self, *a, **k): return "terminal"
 
@@ -355,6 +357,8 @@ def _patch_cli(monkeypatch, tmp_path, build=BUILD, batch=None):
     monkeypatch.setattr(cli, "StartGate", _FakeStart)
     monkeypatch.setattr(cli, "ButtonBar", _FakeBar)
     monkeypatch.setattr(cli, "run_chord_batch", batch)
+    monkeypatch.setattr(cli, "recording", lambda *a, **k: nullcontext(None))  # no scrcpy in tests
+    monkeypatch.setattr(cli.shutil, "which", lambda name: f"/usr/bin/{name}")
 
 
 def _result(trial, passed, error=""):
@@ -369,7 +373,7 @@ def test_run_with_a_partly_passed_ledger_runs_the_phase_setup_and_writes_passes_
     ledger.record(suite_trials[0], "Hello", None)  # trial 1 passed; the rest did not
     captured = {}
 
-    def batch(controller, trials, console, gate, speaker, on_trial, on_result, overlay, gate_entered):
+    def batch(controller, trials, console, gate, speaker, on_trial, on_result, overlay, gate_entered, on_redo):
         captured["trials"], captured["entered"] = trials, gate_entered
         for t in trials:
             on_trial(t.number, t)

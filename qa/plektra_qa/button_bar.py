@@ -38,10 +38,10 @@ from plektra_qa.screen_gate import adb_shell
 
 DEFAULT_PACKAGE = "dev.hitlbar.overlay"
 LOG_TAG = "QAOVERLAY"
-BUTTONS = ("done", "next", "stop")
+BUTTONS = ("done", "next", "stop")  # the default card; "redo" and "norec" are asked for by name
 ACK_TIMEOUT_S = 5.0
 POLL_S = 0.05
-_LINE = re.compile(r"QAOVERLAY[: ]+(?:(?P<state>shown|hidden)|button=(?P<button>done|next|stop))\b")
+_LINE = re.compile(r"QAOVERLAY[: ]+(?:(?P<state>shown|hidden)|button=(?P<button>done|next|stop|redo|norec))\b")
 _SEQ = re.compile(r"\bseq=(?P<seq>\d+)\b")
 _APP_UID = re.compile(r"^u(?P<user>\d+)_a(?P<app>\d+)$")
 _PM_UID = re.compile(r"^package:(?P<package>\S+)\s+uid:(?P<uid>\d+)(?:,\d+)*\s*$")  # one uid per user profile: the first is the main user's
@@ -225,7 +225,7 @@ class ButtonBar:
             pass
 
     def pressed(self) -> str | None:
-        """The oldest unread button (done, next or stop), or None."""
+        """The oldest unread button (done, next, stop, redo or norec), or None."""
         with self._lock:
             return self._buttons.popleft() if self._buttons else None
 

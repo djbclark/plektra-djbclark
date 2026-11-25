@@ -23,6 +23,8 @@ def _patch(monkeypatch, bar_error=None):
         def __exit__(self, *a): return False
 
     class Start:
+        record_declined = False
+
         def __init__(self, serial, **k):
             seen["start_bar"], seen["start_console"] = k.get("bar"), k["console"]
         def wait(self, *a, **k): return "relayed"
@@ -41,6 +43,7 @@ def _patch(monkeypatch, bar_error=None):
     monkeypatch.setattr(mcp_server, "StartGate", Start)
     monkeypatch.setattr(mcp_server, "ScreenGate", lambda *a, **k: nullcontext())
     monkeypatch.setattr(mcp_server, "run_chord_batch", batch)
+    monkeypatch.setattr(mcp_server, "recording", lambda *a, **k: nullcontext(None))  # no scrcpy in tests
     monkeypatch.setattr(mcp_server, "resolve_keymap", lambda **k: SimpleNamespace(keymap=__import__("plektra_qa.keys", fromlist=["x"]).resolve_keymap(env={"PLEKTRA_QA_KEYMAP_SOURCE": "profile"}).keymap))
     monkeypatch.setattr(runlock, "device_serial", lambda target: "REALSERIAL")
     return seen

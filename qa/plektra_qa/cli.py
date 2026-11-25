@@ -102,14 +102,15 @@ def prep() -> None:
 def run(
     suite: Path,
     record: bool = typer.Option(
-        False,
+        True,
         "--record/--no-record",
-        help="Record the screen and the spoken prompts to an mp4 for sharing. Off by default; ask the person first.",
+        help="Record the screen and the spoken prompts to an mp4 (default). The start card says so and the person "
+        "can start without it (No rec on the bar, or norec in the terminal).",
     ),
     panel: bool = typer.Option(
         True,
         "--panel/--no-panel",
-        help="With --record: put the terminal log beside the phone and add it as a switchable subtitle track.",
+        help="When recording: put the terminal log beside the phone and add it as a switchable subtitle track.",
     ),
     record_dir: Path | None = typer.Option(
         None, "--record-dir", help="Where the mp4 goes (default: PLEKTRA_QA_RECORD_DIR or ~/plektra-qa-recordings)."
@@ -143,7 +144,11 @@ def run(
     if record:
         missing = [tool for tool in ("scrcpy", "ffmpeg") if not shutil.which(tool)]
         if missing:
-            typer.echo(f"refused: recording needs {', '.join(missing)} on PATH (macOS: brew install scrcpy ffmpeg)", err=True)
+            typer.echo(
+                f"refused: recording needs {', '.join(missing)} on PATH (macOS: brew install scrcpy ffmpeg), "
+                "or pass --no-record",
+                err=True,
+            )
             raise typer.Exit(code=2)
     serial = runlock.device_serial(target)  # the phone's own serial: LAN, Tailscale and USB share one lock
     try:
@@ -187,7 +192,7 @@ def _run_locked(
     )
     speaker = Speaker()
     console.print(f"voice: {speaker.backend} (PLEKTRA_QA_VOICE=auto|kokoro|say|espeak|off)")
-    got: list[Any] = []
+    got: dict[int, Any] = {}  # latest result per trial: "redo last" replaces it
     recorder = None
 
     def on_trial(number: int, trial: Any) -> None:
@@ -196,12 +201,16 @@ def _run_locked(
         runlock.note_children(serial)
 
     def on_result(number: int, result: Any) -> None:
-        got.append(result)
+        got[number] = result
         if recorder is not None:
             recorder.on_result(number, result)
         trial = by_number.get(number)
         if result.passed and trial is not None:
             ledger.record(trial, result.observed, None)  # at once: a kill later does not lose it
+
+    def on_redo(trial: Any) -> None:
+        got.pop(trial.number, None)
+        ledger.forget(trial)
 
     interrupted = False
     old_handlers = {sig: signal.signal(sig, _raise_interrupt) for sig in (signal.SIGTERM, signal.SIGHUP)}
@@ -216,9 +225,11 @@ def _run_locked(
             # Preflight before the person is asked to start: unlock, heads-up, stop card, the foreground app.
             stack.enter_context(gate)
             gate.yield_to_human("", shade=False)  # ordinary colors for the go
-            StartGate(target, speaker=speaker, console=console, bar=button_bar).wait(
-                f"Plektra QA: {suite.name}", batch_instruction(len(trials))
-            )
+            start = StartGate(target, speaker=speaker, console=console, bar=button_bar)
+            start.wait(f"Plektra QA: {suite.name}", batch_instruction(len(trials)), recording=record)
+            if record and start.record_declined:
+                record = False
+                console.print("not recording: the person started the run without it.", markup=False)
             with recording(target, speaker, record, record_dir, panel=panel) as recorder:
                 if recorder is not None:
                     voice = "with the voice" if speaker.enabled else "video only (voice is off)"
@@ -227,6 +238,7 @@ def _run_locked(
                 run_chord_batch(
                     controller, trials, console, gate, speaker,
                     on_trial=on_trial, on_result=on_result, overlay=button_bar, gate_entered=True,
+                    on_redo=on_redo,
                 )
     except KeyboardInterrupt:
         interrupted = True
@@ -242,7 +254,8 @@ def _run_locked(
             console.print(f"recording: {warning}", markup=False)
         if recorder.output.is_file():
             console.print(f"recording saved: {recorder.output}", markup=False)
-        for trial, began, ended, passed, _result in recorder.spans:
+        latest = {span[0].number: span for span in recorder.spans}  # a redone trial: only the last attempt
+        for trial, began, ended, passed, _result in latest.values():
             if not passed:
                 continue
             dest = ledger.clip_path(trial)
@@ -252,7 +265,7 @@ def _run_locked(
                 ledger.forget(trial)  # recorded run: a pass with no clip does not count
                 console.print(f"trial {trial.number}: clip could not be cut, so it is not counted as passed", markup=False)
     _write_final(ledger, all_trials, suite, record_dir)
-    failed = [item for item in got if not item.passed]
+    failed = [item for item in got.values() if not item.passed]
     for item in failed:
         console.print(
             f"fail {item.number} {item.phase} | {item.prompt} | expect={item.expect!r} "
@@ -279,7 +292,7 @@ def _write_final(ledger: Ledger, trials: list[Any], suite: Path, record_dir: Pat
         console.print(f"video of the passed trials: {dest}", markup=False)
     if no_clip:
         console.print(
-            f"passed, no clip ({len(no_clip)}; --redo --record to film them): "
+            f"passed, no clip ({len(no_clip)}; --redo to film them): "
             + "; ".join(f"{t.number}. {t.prompt}" for t in no_clip), markup=False,
         )
     if missing:

@@ -46,7 +46,15 @@ def batch_instruction(count: int) -> str:
     )
 
 
-def card_text(title: str, instruction: str, *, phone: bool, terminal: bool, bar: bool = False) -> str:
+NO_RECORD_WORDS = {"norec", "no record", "go norec", "go no record"}
+# The bar holds about four short lines, so a recorded run gets its own start text there.
+BAR_RECORD_CARD = "Recorded: screen, voice, keys. Done starts. No rec starts without recording."
+
+
+def card_text(
+    title: str, instruction: str, *, phone: bool, terminal: bool, bar: bool = False, recording: bool = False
+) -> str:
+    """The start card. `recording`: the run will be recorded, so say so and say how to start without."""
     ways = []
     if bar:
         ways.append("press Done on the bar")
@@ -55,7 +63,18 @@ def card_text(title: str, instruction: str, *, phone: bool, terminal: bool, bar:
     if terminal:
         ways.append("type go in the terminal")
     how = " or ".join(ways) or "ask the agent to relay your go"
-    return f"{instruction} To start: {how}."
+    if not recording:
+        return f"{instruction} To start: {how}."
+    without = []
+    if bar:
+        without.append("press No rec on the bar")
+    if terminal:
+        without.append("type norec in the terminal")
+    opt_out = " or ".join(without) or "ask the agent to turn recording off"
+    return (
+        f"{instruction} This run is recorded: screen, voice and every key. To start: {how}. "
+        f"To start without recording: {opt_out}."
+    )
 
 
 class StartGate:
@@ -86,17 +105,29 @@ class StartGate:
         self._terminal = terminal if terminal is not None else _stdin_line
         self._terminal_enabled = terminal is not None or sys.stdin.isatty()
         self.timeout_s = timeout_s
+        self.record_declined = False  # set by wait(): the person started the batch without recording
 
-    def wait(self, title: str, instruction: str, *, confirmed: bool = False) -> str:
+    def wait(self, title: str, instruction: str, *, confirmed: bool = False, recording: bool = False) -> str:
         """Block until the person starts the batch; return how they did.
 
         confirmed: the person already said go to the agent in chat (the agent
         relays it). The card, the terminal text and the voice still run, then
         the batch starts without waiting for a second signal.
+
+        recording: the run is about to be recorded. The card says so, and the
+        person can start it without (the bar's No rec, or norec in the terminal);
+        then record_declined is True.
         """
-        text = card_text(title, instruction, phone=True, terminal=self._terminal_enabled, bar=self.bar is not None)
+        self.record_declined = False
+        text = card_text(
+            title, instruction, phone=True, terminal=self._terminal_enabled, bar=self.bar is not None,
+            recording=recording,
+        )
         self.console.print(f"[bold]{title}[/bold]\n{text}")
-        self._show_card(title, text)
+        self._show_card(
+            title, text, ("done", "norec") if recording else ("done",),
+            bar_text=BAR_RECORD_CARD if recording else None,
+        )
         if self.speaker is not None:
             self.speaker.say(text)
         if confirmed:
@@ -116,13 +147,18 @@ class StartGate:
                     shown = max(shown, now - SETTLE_S + POLL_S)
                 if events and now - shown >= SETTLE_S:
                     return self._done("phone")
-                if self.bar is not None and now - shown >= SETTLE_S and self.bar.pressed() == "done":
-                    return self._done("bar")
+                if self.bar is not None and now - shown >= SETTLE_S:
+                    pressed = self.bar.pressed()
+                    if pressed == "done" or (recording and pressed == "norec"):
+                        self.record_declined = pressed == "norec"
+                        return self._done("bar")
                 if now - shown < SETTLE_S:
                     events.clear()
                 if self._terminal_enabled:
                     line = self._terminal()
-                    if line is not None and line.strip().lower() in {"go", "start", "ok"}:
+                    word = " ".join(line.split()).lower() if line is not None else ""
+                    if word in {"go", "start", "ok"} or (recording and word in NO_RECORD_WORDS):
+                        self.record_declined = word in NO_RECORD_WORDS
                         return self._done("terminal")
                 if now - shown >= self.timeout_s:
                     raise StartGateError("not started: no start signal from the person")
@@ -142,12 +178,14 @@ class StartGate:
             pass
         return how
 
-    def _show_card(self, title: str, text: str) -> None:
+    def _show_card(
+        self, title: str, text: str, buttons: tuple[str, ...] = ("done",), *, bar_text: str | None = None
+    ) -> None:
         if self.bar is None:
             self._post(title, text)
             return
         try:
-            self.bar.show(text, ("done",))
+            self.bar.show(bar_text or text, buttons)
         except Exception as exc:  # no bar: fall back to the shade card rather than start blind
             self.console.print(f"start bar: {exc}", markup=False)
             self._post(title, text)

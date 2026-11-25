@@ -12,16 +12,21 @@ const val MAX_TEXT_CHARS = 200
 
 enum class BarButton(val wire: String, val label: String) {
     DONE("done", "Done"),
+    NOREC("norec", "No rec"),
+    REDO("redo", "Redo\nlast"),
     NEXT("next", "Next"),
     STOP("stop", "Stop"),
 }
 
+/** What a card shows when the host names no buttons. */
+val DEFAULT_BUTTONS = listOf(BarButton.DONE, BarButton.NEXT, BarButton.STOP)
+
 /**
- * The buttons named in the "buttons" extra, always in the order Done, Next, Stop so each sits in
- * the same place on every card. Unknown names are dropped. A missing extra means all three.
+ * The buttons named in the "buttons" extra, always in the enum's order so each sits in the same
+ * place on every card. Unknown names are dropped. A missing extra means Done, Next and Stop.
  */
 fun parseButtons(raw: String?): List<BarButton> {
-    if (raw == null) return BarButton.entries.toList()
+    if (raw == null) return DEFAULT_BUTTONS
     val wanted = raw.split(',').map { it.trim().lowercase() }.toSet()
     return BarButton.entries.filter { it.wire in wanted }
 }

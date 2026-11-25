@@ -5,7 +5,6 @@ import time
 
 import pytest
 
-from plektra_qa import hitl_runner
 from plektra_qa.button_bar import (
     ButtonBar,
     OverlayError,

@@ -156,13 +156,15 @@ def execute_ui_action(action: str, selector_kwargs: dict[str, Any]) -> str:
 
 @mcp.tool()
 def request_human_chord_batch(
-    trials_json: str, record: bool = False, human_said_go: bool = False
+    trials_json: str, record: bool = True, human_said_go: bool = False
 ) -> str:
     """Block while a person chords the batch. Returns the per-trial report.
 
-    record=true also records the screen and the spoken prompts to an mp4 for
-    sharing. Set it only after the person said yes to being recorded in this
-    session; the default is off. Then the result is {"results": [...],
+    The run is recorded by default (screen, spoken prompts and every key, to an
+    mp4). Tell the person before the batch and pass record=false if they say no;
+    the start card also offers starting without recording. With human_said_go=true
+    there is no phone start, so settle recording with them in chat first. A
+    recorded run returns {"results": [...],
     "recording": path or null, "warnings": [...]}.
 
     The batch never starts on its own: the phone shows and speaks the
@@ -198,9 +200,11 @@ def request_human_chord_batch(
             console.print(f"no button bar ({exc}); using the shade card", markup=False)
             bar = None
         try:
-            StartGate(target, speaker=speaker, console=console, bar=bar).wait(
-                "Plektra QA batch", batch_instruction(len(trials)), confirmed=human_said_go
+            start = StartGate(target, speaker=speaker, console=console, bar=bar)
+            start.wait(
+                "Plektra QA batch", batch_instruction(len(trials)), confirmed=human_said_go, recording=record
             )
+            record = record and not start.record_declined
             with recording(target, speaker, record) as recorder:
                 results = run_chord_batch(
                     controller, trials, console, gate=gate, speaker=speaker,
