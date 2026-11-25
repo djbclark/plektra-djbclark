@@ -7,7 +7,7 @@ import time
 from collections.abc import Callable
 from contextlib import nullcontext
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 import yaml
 from pydantic import BaseModel
@@ -24,9 +24,16 @@ POLL_S = 0.025
 STOP_CHECK_S = 1.0
 NO_BAR_IDLE_S = 20.0  # no bar and no timeout: this long without a key after the first input ends the trial
 FIELD_LOST_GRACE_S = 10.0  # no bar: the field may be unreadable this long (focus moving) before the trial fails
-END_CARD_S = 60.0  # how long the last card offers "redo last" before the batch ends by itself
-END_CARD = "All trials done. Redo last repeats the last one. Done finishes."
-TRIAL_BUTTONS = ("done", "next", "stop")
+END_CARD_S = 60.0  # how long the last card offers "redo the previous one" before the batch ends by itself
+END_CARD = "All trials done. ◀ Prev redoes the last one. Done finishes."
+END_SPOKEN = "All trials done. Previous repeats the last one. Done finishes."
+# Wire names on the bar: "retry" (labelled Redo) restarts this trial, "redo" (labelled ◀ Prev) the one before.
+TRIAL_BUTTONS = ("done", "retry", "next", "stop")  # the first trial: there is none before it
+LATER_BUTTONS = ("done", "retry", "redo", "next", "stop")
+RECOVERY_BUTTONS = ("retry", "next", "stop")
+RECOVERY_CARD = "Reset failed: {error}. Fix the screen by hand, then Redo. Next skips this trial."
+LEAVE_TRIES = 3  # Back presses to leave an open note: the first may only close a keyboard or a menu
+LEAVE_WAIT_S = 0.7
 DONE_SETTLE_S = 0.3
 SETTLE_S = 1.5  # a match counts only after the text stays put this long: people fix typos
 STOPPED = "stopped from the phone"
@@ -66,6 +73,9 @@ class ChordTrial(BaseModel):
     expect_ci_first: bool = False
     # Always start from a fresh note: leave an open note first, then click `click_resource_id`.
     fresh: bool = False
+    # The field to focus at the start of a trial that names none (it reads whatever has the focus, so a
+    # key may move the focus elsewhere). `plan_trials` fills it from the phase. Never used for reading.
+    start_resource_id: str | None = None
 
 
 class TrialResult(BaseModel):
@@ -108,6 +118,7 @@ def load_suite(path: Path, keymap: Keymap | None = None) -> list[ChordTrial]:
                 "max_reprompts": phase.get("max_reprompts", max_reprompts),
                 "sentinel": phase.get("sentinel", sentinel),
                 "resource_id": phase.get("resource_id"),
+                "start_resource_id": phase.get("start_resource_id"),
                 "package": phase.get("package"),
                 "activity": phase.get("activity"),
                 "phase": phase_name,
@@ -124,16 +135,51 @@ def load_suite(path: Path, keymap: Keymap | None = None) -> list[ChordTrial]:
     return trials
 
 
-SETUP_FIELDS = ("package", "activity", "click_resource_id", "resource_id")
+SETUP_FIELDS = ("package", "activity", "click_resource_id")  # what opens a phase's screen
+
+
+def _borrowed(trial: ChordTrial, peers: list[ChordTrial]) -> dict[str, Any]:
+    """The setup `trial` lacks and a peer of its phase has (the first peer that has it wins).
+
+    A peer's field becomes `start_resource_id`, never `resource_id`: a trial that names no field reads
+    the focused one, and must keep doing so (a key may move the focus to another field)."""
+    update: dict[str, Any] = {}
+    for name in SETUP_FIELDS:
+        if getattr(trial, name) is None:
+            value = next((getattr(p, name) for p in peers if getattr(p, name) is not None), None)
+            if value is not None:
+                update[name] = value
+    if not (trial.resource_id or trial.text_hint or trial.start_resource_id):
+        field = next((p.resource_id or p.start_resource_id for p in peers
+                      if p.resource_id or p.start_resource_id), None)
+        if field is not None:
+            update["start_resource_id"] = field
+    return update
+
+
+def _setup_of(trials: list[ChordTrial], index: int) -> ChordTrial:
+    """Trial `index` with all it takes to open its screen from nothing: the app, the button and the
+    field in focus at the start, borrowed from its phase (the nearest earlier trial first).
+
+    For opening only. The trial is always read as written."""
+    trial = trials[index]
+    peers: list[ChordTrial] = []
+    if trial.phase:
+        peers = [t for t in reversed(trials[:index]) if t.phase == trial.phase]
+        peers += [t for t in trials[index + 1:] if t.phase == trial.phase]
+    trial = trial.model_copy(update=_borrowed(trial, peers))
+    if not trial.resource_id and not trial.text_hint and trial.start_resource_id:
+        trial = trial.model_copy(update={"resource_id": trial.start_resource_id})
+    return trial
 
 
 def plan_trials(all_trials: list[ChordTrial], is_passed: Callable[[ChordTrial], bool]) -> list[ChordTrial]:
     """The trials to run: a phase is skipped only when every trial in it passed.
 
     Pending trials run. The first pending trial of a phase gets the phase's setup (the app to open, the
-    button to click, the field), copied from the phase's other trials, so a skipped first trial never
-    leaves the next one with no app open. A trial that keeps the field (`clear_field: false`) depends on
-    the trial before it, so that one runs again too."""
+    button to click, the field to start in), copied from the phase's other trials, so a skipped first
+    trial never leaves the next one with no app open. A trial that keeps the field (`clear_field: false`)
+    depends on the trial before it, so that one runs again too."""
     by_phase: dict[str, list[ChordTrial]] = {}
     for trial in all_trials:
         by_phase.setdefault(trial.phase, []).append(trial)
@@ -153,13 +199,7 @@ def plan_trials(all_trials: list[ChordTrial], is_passed: Callable[[ChordTrial], 
             continue
         if trial.phase not in first_seen:
             first_seen.add(trial.phase)
-            update: dict[str, Any] = {}
-            for name in SETUP_FIELDS:
-                if getattr(trial, name) is None:
-                    for other in by_phase[trial.phase]:
-                        if getattr(other, name) is not None:
-                            update[name] = getattr(other, name)
-                            break
+            update = _borrowed(trial, by_phase[trial.phase])
             if update:
                 trial = trial.model_copy(update=update)
         planned.append(trial)
@@ -254,49 +294,195 @@ def _read_observed(
     return controller.visible_text(target)
 
 
-def _leave_open_note(device: Any, trial: ChordTrial) -> None:
-    """A trial that wants a fresh note: if its field is already on screen, go back to the list first."""
+def _leave_open_note(device: Any, trial: ChordTrial) -> bool:
+    """A trial that wants a fresh note: if its field is on screen, go back until it is gone. True if it left."""
     if not (trial.fresh and trial.click_resource_id and trial.resource_id):
-        return
-    if device(resourceId=trial.resource_id).exists():
-        from lamda.client import Keys
+        return False
+    if not device(resourceId=trial.resource_id).exists():
+        return False
+    from lamda.client import Keys
 
+    for _ in range(LEAVE_TRIES):
         device.press_key(Keys.KEY_BACK)
-        time.sleep(0.5)
+        deadline = time.perf_counter() + LEAVE_WAIT_S
+        while time.perf_counter() < deadline:
+            time.sleep(POLL_S)
+            if not device(resourceId=trial.resource_id).exists():
+                return True
+    raise RuntimeError(f"could not leave the open note: {trial.resource_id} is still on screen")
 
 
 def _open_target(controller: ScreenController, trial: ChordTrial) -> Any:
     device = controller.device
     if trial.package and trial.activity:
         controller.teleport_to_activity(trial.package, trial.activity)
-    _leave_open_note(device, trial)
+    if _leave_open_note(device, trial) and trial.package and trial.activity:
+        if not device(resourceId=trial.click_resource_id).exists():
+            controller.teleport_to_activity(trial.package, trial.activity)  # Back went past the list
     if trial.click_resource_id:
+        field_seen = clicked = False
         deadline = time.perf_counter() + 3
-        opened = False
         while time.perf_counter() < deadline:
             if trial.resource_id and device(resourceId=trial.resource_id).exists():
-                opened = True
+                field_seen = True
                 break
             button = device(resourceId=trial.click_resource_id)
             if button.exists():
                 button.click()
-                opened = True
+                clicked = True
                 break
             time.sleep(POLL_S)
-        if trial.resource_id:
+        if trial.resource_id and not field_seen:
             deadline = time.perf_counter() + 3
             while time.perf_counter() < deadline:
                 if device(resourceId=trial.resource_id).exists():
-                    opened = True
+                    field_seen = True
                     break
                 time.sleep(POLL_S)
-        if not opened:
+        if not (clicked or field_seen):
             raise RuntimeError(f"click target not found: {trial.click_resource_id}")
     return controller.focus_and_clear(
         resource_id=trial.resource_id,
         text_hint=trial.text_hint,
         clear=trial.clear_field,
     )
+
+
+def _replays(trials: list[ChordTrial], index: int) -> bool:
+    """A redo of this trial replays the one before it: it keeps that trial's text in the field."""
+    trial = trials[index]
+    return not trial.clear_field and index > 0 and trials[index - 1].phase == trial.phase
+
+
+class _Start(NamedTuple):
+    """What a trial found when it began."""
+
+    resource_id: str | None  # the field that had the focus
+    text: str | None  # its text; recorded only for a trial that keeps it
+    others: dict[str, str]  # every editable field's text, by resource id
+    clipboard: str | None  # None: not recorded (a clipboard trial starts with it empty)
+
+
+class _Screens:
+    """Open each trial's screen and remember how it looked, so that a redo can put it back.
+
+    Redo restores the trial's true starting state, not only its own field: text typed into any other
+    field is removed and the focus returns to the start field. A trial that clears its field, in a
+    phase with a "new note" button, gets a new note (also at a normal start when another field was
+    left dirty). Elsewhere the changed fields are cleared one by one. The host never types, so text
+    a trial keeps from the one before it comes back by replaying that trial."""
+
+    def __init__(self, controller: ScreenController, trials: list[ChordTrial], redoable: bool) -> None:
+        self.controller = controller
+        self.device = controller.device
+        self.trials = trials
+        self.redoable = redoable  # only the bar offers a redo; without it nothing is recorded for one
+        self.starts: dict[int, _Start] = {}
+        self.base: dict[str, dict[str, str]] = {}  # per phase: every field's text on a clean screen
+        self.begun: set[str] = set()  # phases that started in this run
+
+    def prepare(self, index: int, redo: bool = False) -> Any:
+        """Open the screen for trial `index` and return the field that has the focus."""
+        trial = self.trials[index]
+        setup = _setup_of(self.trials, index)
+        key = trial.phase or f"#{index}"
+        saved = self.starts.get(index) if redo else None
+        can_reopen = bool(setup.click_resource_id and setup.resource_id)
+        first_of_phase = bool(trial.phase) and trial.phase not in self.begun
+        target = trial
+        reopened = False
+        if trial.clear_field:
+            if not trial.resource_id and not trial.text_hint and setup.resource_id:
+                target = trial.model_copy(update={"resource_id": setup.resource_id})
+            if can_reopen and (
+                redo or first_of_phase or trial.fresh or self._changed(self.base.get(key), setup.resource_id)
+            ):
+                target = setup.model_copy(update={"fresh": True})
+                reopened = True
+        if redo and not reopened:
+            field = target.resource_id or (saved.resource_id if saved else None)
+            if field and not self.device(resourceId=field).exists():
+                target = setup  # the screen is gone: open it again
+        spare = (saved.resource_id if saved else None) or setup.resource_id
+        element = self._open(target, spare)
+        self.begun.add(trial.phase)
+        focus = target.resource_id
+        if focus is None and (self.redoable or key not in self.base):
+            focus = getattr(element.info(), "resourceName", None) or None
+        if trial.clear_field:
+            if not reopened and self._restore(self.base.get(key), skip=focus, strict=redo):
+                self._focus(element)
+        elif saved is not None:
+            self._restore(saved.others, skip=saved.resource_id, strict=True)
+            if saved.resource_id:
+                if saved.text is not None and not self.controller.restore_field(saved.resource_id, saved.text):
+                    raise RuntimeError(f"the start field needs the text {saved.text!r}")
+                element = self.device(resourceId=saved.resource_id)
+                self._focus(element)
+        # A kept field with no earlier trial to replay: record it, so a redo can check it.
+        snapshot = self.redoable and saved is None and not trial.clear_field and not _replays(self.trials, index)
+        fields = self.controller.editable_fields() if snapshot or key not in self.base else None
+        if fields is not None:
+            self.base.setdefault(key, fields)
+        if self.redoable and saved is None:
+            text = None
+            if snapshot and focus:
+                try:
+                    text = element.get_text() or ""
+                except Exception:
+                    pass
+            self.starts[index] = _Start(focus, text, fields or {}, self._clipboard(trial))
+        self._reset_clipboard(trial, saved)
+        return element
+
+    def _open(self, target: ChordTrial, spare: str | None) -> Any:
+        try:
+            return _open_target(self.controller, target)
+        except RuntimeError as exc:
+            # The trial names no field and nothing has the focus: go to the field it started in.
+            if target.resource_id or target.text_hint or not spare or "none is focused" not in str(exc):
+                raise
+            return _open_target(self.controller, target.model_copy(update={"resource_id": spare}))
+
+    def _changed(self, wanted: dict[str, str] | None, skip: str | None) -> dict[str, str]:
+        """The fields on screen, other than `skip`, that no longer read as in `wanted`."""
+        if not wanted or not any(rid != skip for rid in wanted):
+            return {}
+        now = self.controller.editable_fields()
+        if now is None:
+            return {}
+        return {rid: text for rid, text in wanted.items() if rid != skip and rid in now and now[rid] != text}
+
+    def _restore(self, wanted: dict[str, str] | None, skip: str | None, strict: bool) -> bool:
+        """Clear the other fields that changed. `strict` (a redo): a field that cannot be put back is an
+        error; at a normal start it is left as it is. True if any field had changed."""
+        changed = self._changed(wanted, skip)
+        failed = [rid for rid, text in changed.items() if not self.controller.restore_field(rid, text)]
+        if failed and strict:
+            raise RuntimeError(f"field not restored: {', '.join(rid.rsplit('/', 1)[-1] for rid in failed)}")
+        return bool(changed)
+
+    def _focus(self, element: Any) -> None:
+        if not element.info().focused:
+            element.click()
+
+    def _clipboard(self, trial: ChordTrial) -> str | None:
+        if trial.verify_mode == "clipboard":
+            return None
+        try:
+            return self.device.get_clipboard() or ""
+        except Exception:
+            return None
+
+    def _reset_clipboard(self, trial: ChordTrial, saved: _Start | None) -> None:
+        try:
+            if trial.verify_mode == "clipboard":
+                self.device.set_clipboard("")  # a stale copy must not pass the trial
+            elif saved is not None and saved.clipboard is not None:
+                if (self.device.get_clipboard() or "") != saved.clipboard:
+                    self.device.set_clipboard(saved.clipboard)
+        except Exception:
+            pass
 
 
 def run_chord_batch(
@@ -310,10 +496,12 @@ def run_chord_batch(
     overlay: ButtonBar | None = None,
     gate_entered: bool = False,
     on_redo: Callable[[ChordTrial], None] | None = None,
+    on_discard: Callable[[int, ChordTrial], None] | None = None,
 ) -> list[TrialResult]:
     """gate_entered: the caller already entered `gate` (the preflight ran before the person's go).
 
-    on_redo: the person pressed "redo last" on the bar; the trial's earlier result is withdrawn."""
+    on_redo: a redo goes back over this trial; any earlier result of it is withdrawn.
+    on_discard: the attempt under way was dropped (Redo or ◀ Prev on the bar): it gets no result."""
     console = console or Console()
     if speaker is not None:
         phrases = [HANDS_OFF]
@@ -345,8 +533,15 @@ def run_chord_batch(
                     on_result,
                     overlay,
                     on_redo,
+                    on_discard,
                 )
             finally:
+                if overlay is not None:
+                    # The one HIDE of a batch: between trials the bar stays up (it shows the wait card).
+                    try:
+                        overlay.hide()
+                    except Exception:
+                        pass
                 if speaker is not None:
                     speaker.say(FINISHED)
     return results
@@ -424,6 +619,7 @@ def _run_trials(
     on_result: Callable[[int, TrialResult], None] | None = None,
     overlay: ButtonBar | None = None,
     on_redo: Callable[[ChordTrial], None] | None = None,
+    on_discard: Callable[[int, ChordTrial], None] | None = None,
 ) -> list[TrialResult]:
     # No limit unless the suite or the operator sets `timeout_s`.
     idle_s_for = lambda trial: float("inf") if trial.timeout_s is None else trial.timeout_s  # noqa: E731
@@ -444,17 +640,31 @@ def _run_trials(
         live.update(_table(results, ""))
         return start
 
+    def redo_this(index: int) -> int:
+        """Where "redo this trial" starts again. A field kept from the trial before is rebuilt by
+        replaying that trial (the person types it again)."""
+        return rewind(index - 1) if _replays(trials, index) else index
+
+    def discard(number: int, trial: ChordTrial) -> None:
+        if on_discard is not None:
+            on_discard(number, trial)
+
+    screens = _Screens(controller, trials, redoable=overlay is not None)
     index = 0
+    redo_target: int | None = None  # the trial whose screen must be put back before it runs again
     handed_off = False
     while True:
         if index >= len(trials):
             if overlay is None or not trials or not _end_card(overlay, speaker):
                 break
-            index = rewind(len(trials) - 1)
+            index = redo_target = rewind(len(trials) - 1)
         trial = trials[index]
         number = trial.number or index + 1
+        redoing = redo_target == index
+        redo_target = None
         error = ""
-        redo = False
+        again = ""  # "retry" or "redo": the person dropped this attempt
+        by_press = False  # the bar already shows the wait card when a button ended the trial
         element = None
         if _phone_stopped(gate):
             error = STOPPED
@@ -468,11 +678,23 @@ def _run_trials(
                 error = str(exc)
         if error == "":
             try:
-                element = _open_target(controller, trial)
+                element = screens.prepare(index, redoing)
             except Exception as exc:
-                error = str(exc)
+                error = str(exc) or type(exc).__name__
         if error == "" and _phone_stopped(gate):
             error = STOPPED
+        if redoing and overlay is not None and error not in ("", STOPPED):
+            choice = _recovery_card(overlay, gate, error)
+            if choice == "retry":
+                discard(number, trial)
+                _wait_card(overlay, pressed=True)
+                redo_target = index
+                continue
+            if choice:
+                by_press = True
+                error = SKIPPED if choice == "next" else STOPPED
+                if on_trial is not None:
+                    on_trial(number, trial)
         if error == "" and gate is not None:
             try:
                 if overlay is not None:
@@ -483,8 +705,7 @@ def _run_trials(
                 error = str(exc)
         if error == "" and overlay is not None:
             try:
-                buttons = ("done", "redo", "next", "stop") if index > 0 else TRIAL_BUTTONS
-                overlay.show(trial.shade or trial.prompt, buttons)
+                overlay.show(trial.shade or trial.prompt, LATER_BUTTONS if index > 0 else TRIAL_BUTTONS)
             except Exception as exc:
                 error = str(exc)
         baseline = ""
@@ -504,11 +725,6 @@ def _run_trials(
             if trial.cue_on_device:
                 device.beep()
             voice.start()
-        if error == "" and trial.verify_mode == "clipboard":
-            try:
-                device.set_clipboard("")  # a stale copy must not pass the trial
-            except Exception:
-                pass
         first: float | None = None
         complete: float | None = None
         observed = baseline
@@ -551,14 +767,15 @@ def _run_trials(
                 deadline = first + idle_after_input(trial)
             if overlay is not None:
                 button = overlay.pressed()
+                if button == "retry" or (button == "redo" and index > 0):
+                    again = button
+                    break
+                by_press = button in ("stop", "next", "done")
                 if button == "stop":
                     error = STOPPED
                     break
                 if button == "next":
                     error = SKIPPED
-                    break
-                if button == "redo" and index > 0:
-                    redo = True
                     break
                 if button == "done":
                     complete = time.perf_counter()  # the person says it is finished
@@ -578,14 +795,11 @@ def _run_trials(
                 error = NOT_STARTED
                 break
             time.sleep(POLL_S)
-        if overlay is not None:
-            try:
-                overlay.hide()
-            except Exception:
-                pass
-        if redo:
+        if again:
             voice.started()  # stop reading this trial's action
-            index = rewind(index - 1)
+            discard(number, trial)
+            _wait_card(overlay, pressed=True)
+            index = redo_target = redo_this(index) if again == "retry" else rewind(index - 1)
             continue
         if complete is None:
             complete = time.perf_counter()
@@ -616,11 +830,46 @@ def _run_trials(
         if error in (STOPPED, NOT_STARTED):
             break
         index += 1
+        if overlay is not None:
+            _wait_card(overlay, pressed=by_press)
     return results
 
 
+def _wait_card(overlay: Any, pressed: bool) -> None:
+    """Between trials the bar says to wait and has no buttons. `pressed`: a button ended the card."""
+    wait = getattr(overlay, "wait", None)
+    if callable(wait):
+        try:
+            wait(pressed)
+        except Exception:
+            pass  # the next card reports a bar that is gone
+
+
+def _recovery_card(overlay: ButtonBar, gate: Any | None, error: str) -> str:
+    """A redo could not put the screen back. The person fixes it by hand and presses Redo, or skips.
+
+    Returns the button ("retry", "next" or "stop"), or "" when the card could not be shown."""
+    try:
+        if gate is not None:
+            gate.yield_to_human("Reset failed", shade=False)
+        overlay.show(RECOVERY_CARD.format(error=error[:90].rstrip(". ")), RECOVERY_BUTTONS)
+    except Exception:
+        return ""
+    checked = time.perf_counter()
+    while True:
+        button = overlay.pressed()
+        if button in RECOVERY_BUTTONS:
+            return button
+        if time.perf_counter() - checked >= STOP_CHECK_S:
+            checked = time.perf_counter()
+            if _phone_stopped(gate):
+                return "stop"
+        time.sleep(POLL_S)
+
+
 def _end_card(overlay: ButtonBar, speaker: Speaker | None) -> bool:
-    """After the last trial: True when the person asks to redo it. Done, silence or no bar ends the batch."""
+    """After the last trial: True when the person asks to redo it (◀ Prev). Done, silence or no bar ends
+    the batch."""
     if END_CARD_S <= 0:
         return False
     try:
@@ -628,17 +877,14 @@ def _end_card(overlay: ButtonBar, speaker: Speaker | None) -> bool:
     except Exception:
         return False
     if speaker is not None:
-        speaker.say(END_CARD)
-    again = False
+        speaker.say(END_SPOKEN)
     deadline = time.perf_counter() + END_CARD_S
     while time.perf_counter() < deadline:
         button = overlay.pressed()
-        if button in ("done", "redo"):
-            again = button == "redo"
+        if button == "redo":
+            _wait_card(overlay, pressed=True)
+            return True
+        if button == "done":
             break
         time.sleep(POLL_S)
-    try:
-        overlay.hide()
-    except Exception:
-        pass
-    return again
+    return False

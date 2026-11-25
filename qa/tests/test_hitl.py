@@ -1,5 +1,6 @@
 import base64
 import io
+import shlex
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -141,6 +142,13 @@ class _Shell:
         self.unsnoozed: list[str] = []
 
     def __call__(self, args):
+        if args[:2] == ["sh", "-c"] and args[2].startswith("settings put "):
+            # The gate batches commands into one call: answer each in turn.
+            self.scripts.append(args[2])
+            return "".join(
+                self([word for word in shlex.split(part) if word not in (">/dev/null", "2>&1")])
+                for part in args[2].split("; ")
+            )
         if args[:2] == ["settings", "get"]:
             return self.values[(args[2], args[3])] + "\n"
         if args[:2] == ["settings", "put"]:
@@ -368,8 +376,8 @@ def test_gate_refuses_to_hold_when_inversion_does_not_stick():
     shell.values[("secure", INVERSION_KEY)] = "0"
 
     def frozen(args):
-        if args[:2] == ["settings", "put"] and args[3] == INVERSION_KEY:
-            return ""
+        if args[:2] == ["sh", "-c"] and args[2].startswith(f"settings put secure {INVERSION_KEY} "):
+            return "0\n"  # the put did not stick: the read back says off
         return shell(args)
 
     gate = ScreenGate("SERIAL", shell=frozen, sleep=shell.slept.append)

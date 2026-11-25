@@ -10,13 +10,25 @@ const val EXTRA_TEXT = "text"
 const val EXTRA_BUTTONS = "buttons"
 const val MAX_TEXT_CHARS = 200
 
-enum class BarButton(val wire: String, val label: String) {
-    DONE("done", "Done"),
-    NOREC("norec", "No rec"),
-    REDO("redo", "Redo\nlast"),
-    NEXT("next", "Next"),
-    STOP("stop", "Stop"),
+/**
+ * [wire] is the protocol name, [slot] the button's place in the row (0 is leftmost), [color] its
+ * own color. "retry" (Redo) restarts the trial on screen; "redo" (Prev) goes to the one before.
+ * The variation selector keeps the triangle from being drawn as an emoji.
+ */
+enum class BarButton(val wire: String, val label: String, val slot: Int, val color: String) {
+    DONE("done", "Done", 0, "#2E7D32"),
+    NOREC("norec", "No rec", 1, "#6D4C41"),
+    RETRY("retry", "Redo", 1, "#7B1FA2"),
+    REDO("redo", "\u25C0\uFE0E Prev", 2, "#1565C0"),
+    NEXT("next", "Next", 3, "#455A64"),
+    STOP("stop", "Stop", 4, "#C62828"),
 }
+
+/** Places in the button row. */
+const val BUTTON_SLOTS = 5
+
+/** What replaces a card the moment one of its buttons is tapped (the host sends the same text). */
+const val WAIT_TEXT = "Wait a few seconds..."
 
 /** What a card shows when the host names no buttons. */
 val DEFAULT_BUTTONS = listOf(BarButton.DONE, BarButton.NEXT, BarButton.STOP)
@@ -29,6 +41,19 @@ fun parseButtons(raw: String?): List<BarButton> {
     if (raw == null) return DEFAULT_BUTTONS
     val wanted = raw.split(',').map { it.trim().lowercase() }.toSet()
     return BarButton.entries.filter { it.wire in wanted }
+}
+
+/**
+ * The button row: each button in its own place, so it never moves from card to card; null is an
+ * empty place. Should two buttons want one place, the row is just the buttons.
+ */
+fun layoutSlots(buttons: List<BarButton>): List<BarButton?> {
+    val slots = arrayOfNulls<BarButton>(BUTTON_SLOTS)
+    for (button in buttons) {
+        if (slots[button.slot] != null) return buttons
+        slots[button.slot] = button
+    }
+    return slots.toList()
 }
 
 /** The instruction text, at most [MAX_TEXT_CHARS] chars, never cutting a surrogate pair. */

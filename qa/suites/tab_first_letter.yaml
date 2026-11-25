@@ -1,0 +1,69 @@
+name: tab_first_letter
+# Does the first letter typed after Tab moves the cursor arrive? Seen once (2026-11-25), in Pinnote
+# only: the title read "Eta" after "beta". This repeats the step in a second app, the two-field screen
+# of the button bar app (qa/overlay-app, version 0.2.0 or newer), to tell a keyboard fault from an
+# app's own bug (qa/README.md section 8). That screen handles keyboard configuration changes itself, so a
+# loss there cannot come from the app restarting (titan2-elite-facts.md, sections 7 and 10).
+#
+# Each try starts with both fields empty and the cursor in the lower one. A try reads the field that
+# has the focus, so it checks the letters, not which field they landed in: watch that Tab moved the
+# cursor to the upper field. Leave about two seconds between tries. A passed try is remembered for
+# this keyboard build: --redo runs all ten again.
+start_wait_s: 10
+sentinel: "\n"
+phases:
+  - name: tab_first_letter_probe
+    package: dev.hitlbar.overlay
+    activity: dev.hitlbar.overlay.TwoFieldsActivity
+    start_resource_id: dev.hitlbar.overlay:id/probe_body
+    trials:
+      - prompt: "try 1 of 10: <Tab>, then type beta"
+        shade: "Try 1 of 10: <Tab>, then type beta"
+        speak: "Try 1. <Tab>, then type beta."
+        expect: "beta"
+        expect_ci_first: true
+      - prompt: "try 2 of 10: <Tab>, then type beta"
+        shade: "Try 2 of 10: <Tab>, then type beta"
+        speak: "Try 2. <Tab>, then type beta."
+        expect: "beta"
+        expect_ci_first: true
+      - prompt: "try 3 of 10: <Tab>, then type beta"
+        shade: "Try 3 of 10: <Tab>, then type beta"
+        speak: "Try 3. <Tab>, then type beta."
+        expect: "beta"
+        expect_ci_first: true
+      - prompt: "try 4 of 10: <Tab>, then type beta"
+        shade: "Try 4 of 10: <Tab>, then type beta"
+        speak: "Try 4. <Tab>, then type beta."
+        expect: "beta"
+        expect_ci_first: true
+      - prompt: "try 5 of 10: <Tab>, then type beta"
+        shade: "Try 5 of 10: <Tab>, then type beta"
+        speak: "Try 5. <Tab>, then type beta."
+        expect: "beta"
+        expect_ci_first: true
+      - prompt: "try 6 of 10: <Tab>, then type beta"
+        shade: "Try 6 of 10: <Tab>, then type beta"
+        speak: "Try 6. <Tab>, then type beta."
+        expect: "beta"
+        expect_ci_first: true
+      - prompt: "try 7 of 10: <Tab>, then type beta"
+        shade: "Try 7 of 10: <Tab>, then type beta"
+        speak: "Try 7. <Tab>, then type beta."
+        expect: "beta"
+        expect_ci_first: true
+      - prompt: "try 8 of 10: <Tab>, then type beta"
+        shade: "Try 8 of 10: <Tab>, then type beta"
+        speak: "Try 8. <Tab>, then type beta."
+        expect: "beta"
+        expect_ci_first: true
+      - prompt: "try 9 of 10: <Tab>, then type beta"
+        shade: "Try 9 of 10: <Tab>, then type beta"
+        speak: "Try 9. <Tab>, then type beta."
+        expect: "beta"
+        expect_ci_first: true
+      - prompt: "try 10 of 10: <Tab>, then type beta"
+        shade: "Try 10 of 10: <Tab>, then type beta"
+        speak: "Try 10. <Tab>, then type beta."
+        expect: "beta"
+        expect_ci_first: true

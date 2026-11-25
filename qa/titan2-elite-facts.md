@@ -168,3 +168,18 @@ Only "Swap right Shift and Enter" on: printed ⏎ (scan 28) types SHIFT_RIGHT(60
 5. Auto-rotate (`settings system accelerometer_rotation`) was once found back at its default 1 (written by
    pkg:android, defaultSystemSet:true) with no agent or Plektra code touching it; cause unknown. Later flips were
    the operator's Quick Settings rotation tile, which shows "0°" when locked.
+
+## 10. First letter lost after the printed Recent key (vendor Tab): seen once, in Pinnote only (2026-11-25)
+Not reproduced. Seen in one app only, so it is **not attributed to the keyboard** until it is reproduced in a
+separate app (`qa/suites/tab_first_letter.yaml`). Cause not established.
+1. One recorded QA run, two attempts, Pinnote note editor, cursor in the body: press printed Recent (□; vendor Tab,
+   moves the cursor to the title), then type `beta`. The title read `Eta` after both. Established from the recording:
+   its `getevent` key overlay and the video frames.
+2. `getevent` shows the B key in both attempts, about 1.7 s after the Recent press, with no Backspace or Delete
+   between B and E.
+3. Screen: in attempt 1 a B appeared in the title, then the title went back to its empty hint before E arrived. In
+   attempt 2 no frame shows a B.
+4. In both attempts the keyboard's touch surface reported a contact (about 0.5 s) around the B press.
+5. Possibly related, not checked for this case: section 7 item 5 (the Recent press and the next keyboard key each
+   change the keyboard configuration and relaunch an app that does not handle `keyboard|keyboardHidden` itself).
+   Whether Pinnote handles it, and whether it relaunched here, was not checked.

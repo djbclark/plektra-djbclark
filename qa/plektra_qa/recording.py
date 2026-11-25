@@ -307,6 +307,16 @@ class Recorder:
         self.note("trial", f"trial {index}: {phase}{trial.prompt}", at=self._marks[-1][0])
         self._open_trial = (trial, self._marks[-1][0] - self._t0)
 
+    def on_discard(self, index: int, trial: Any) -> None:
+        """The attempt under way was dropped (Redo or Prev): it is no span and has no result. The
+        trial's next attempt gets its own chapter."""
+        self._open_trial = None
+        self.note("trial", f"trial {index}: redone, this attempt does not count")
+
+    def withdraw(self, number: int) -> None:
+        """A redo went back over trial `number`: forget its finished attempts (no clip is cut from them)."""
+        self.spans = [span for span in self.spans if span[0].number != number]
+
     def on_result(self, index: int, result: Any) -> None:
         now = self._clock()
         if self._open_trial is not None:

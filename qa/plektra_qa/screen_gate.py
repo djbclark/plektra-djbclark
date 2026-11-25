@@ -161,12 +161,13 @@ class ScreenGate:
 
     def hold(self, reason: str) -> None:
         """Inverted screen. The person leaves the phone alone."""
-        if not self._set_inversion(True):
+        # One adb call (it runs between trials, while the person waits): invert, read back, close the
+        # shade, post the card.
+        card = shell_line(["cmd", "notification", "post", "-t", "Hands off", NOTIFY_TAG, "Hands off"])
+        if not self._set_inversion(True, f"cmd statusbar collapse >/dev/null 2>&1; {card} >/dev/null"):
             raise RuntimeError(
-                "display inversion did not turn on; refusing to control the screen"
+                "display inversion did not turn on (or the card was not posted); refusing to control the screen"
             )
-        self._collapse()
-        self._notify("Hands off", "Hands off")
 
     def yield_to_human(self, action: str, *, shade: bool = True) -> None:
         """Ordinary colors. The shade shows the action, then closes before typing.
@@ -380,11 +381,14 @@ class ScreenGate:
         )
         return "\n".join(lines) + "\n"
 
-    def _set_inversion(self, enabled: bool) -> bool:
+    def _set_inversion(self, enabled: bool, then: str = "") -> bool:
+        """Set and read back in one adb call; `then` is more shell for the same call."""
         state = "1" if enabled else "0"
+        script = f"settings put secure {INVERSION_KEY} {state}; settings get secure {INVERSION_KEY}"
+        if then:
+            script += f"; {then}"
         try:
-            self._put("secure", INVERSION_KEY, state)
-            return self._get("secure", INVERSION_KEY).strip() == state
+            return self._shell(["sh", "-c", script]).strip() == state
         except Exception:
             return False
 

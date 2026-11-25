@@ -192,7 +192,7 @@ def _run_locked(
     )
     speaker = Speaker()
     console.print(f"voice: {speaker.backend} (PLEKTRA_QA_VOICE=auto|kokoro|say|espeak|off)")
-    got: dict[int, Any] = {}  # latest result per trial: "redo last" replaces it
+    got: dict[int, Any] = {}  # latest result per trial: a redo replaces it
     recorder = None
 
     def on_trial(number: int, trial: Any) -> None:
@@ -211,6 +211,12 @@ def _run_locked(
     def on_redo(trial: Any) -> None:
         got.pop(trial.number, None)
         ledger.forget(trial)
+        if recorder is not None:
+            recorder.withdraw(trial.number)
+
+    def on_discard(number: int, trial: Any) -> None:
+        if recorder is not None:
+            recorder.on_discard(number, trial)
 
     interrupted = False
     old_handlers = {sig: signal.signal(sig, _raise_interrupt) for sig in (signal.SIGTERM, signal.SIGHUP)}
@@ -238,7 +244,7 @@ def _run_locked(
                 run_chord_batch(
                     controller, trials, console, gate, speaker,
                     on_trial=on_trial, on_result=on_result, overlay=button_bar, gate_entered=True,
-                    on_redo=on_redo,
+                    on_redo=on_redo, on_discard=on_discard,
                 )
     except KeyboardInterrupt:
         interrupted = True
@@ -351,7 +357,7 @@ def import_recording(
         if not found or not 1 <= number <= len(trials):
             console.print(f"trial {number}: no chapter in the recording, skipped", markup=False)
             continue
-        i = found[0]
+        i = found[-1]  # a redone trial has one chapter per attempt: the last one counts
         end = marks[i + 1][1] if i + 1 < len(marks) else length
         trial = trials[number - 1]
         dest = ledger.clip_path(trial)

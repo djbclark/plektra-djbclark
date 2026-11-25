@@ -2,6 +2,7 @@ package dev.hitlbar.overlay
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ProtocolTest {
@@ -17,6 +18,42 @@ class ProtocolTest {
         assertEquals(listOf(BarButton.DONE, BarButton.NOREC), parseButtons("norec,done"))
         assertEquals(listOf(BarButton.NEXT), parseButtons("next,bogus,;rm"))
         assertEquals(emptyList<BarButton>(), parseButtons(""))
+    }
+
+    @Test
+    fun trialCardButtonsParseInRowOrder() {
+        assertEquals(
+            listOf(BarButton.DONE, BarButton.RETRY, BarButton.REDO, BarButton.NEXT, BarButton.STOP),
+            parseButtons("stop,next,redo,retry,done"),
+        )
+    }
+
+    @Test
+    fun aButtonKeepsItsPlaceFromCardToCard() {
+        assertEquals(
+            listOf(BarButton.DONE, null, null, BarButton.NEXT, BarButton.STOP),
+            layoutSlots(parseButtons(null)),
+        )
+        assertEquals(
+            listOf(BarButton.DONE, BarButton.RETRY, null, BarButton.NEXT, BarButton.STOP),
+            layoutSlots(parseButtons("done,retry,next,stop")),
+        )
+        assertEquals(BUTTON_SLOTS, layoutSlots(BarButton.entries - BarButton.NOREC).filterNotNull().size)
+    }
+
+    @Test
+    fun twoButtonsForOnePlaceAreAllStillShown() {
+        val both = listOf(BarButton.NOREC, BarButton.RETRY)
+        assertEquals(both, layoutSlots(both))
+    }
+
+    @Test
+    fun everyButtonHasItsOwnNameLabelAndColor() {
+        val all = BarButton.entries
+        assertEquals(all.size, all.map { it.wire }.toSet().size)
+        assertEquals(all.size, all.map { it.label }.toSet().size)
+        assertEquals(all.size, all.map { it.color }.toSet().size)
+        assertTrue(all.all { it.slot in 0 until BUTTON_SLOTS })
     }
 
     @Test
@@ -41,6 +78,8 @@ class ProtocolTest {
         assertEquals("QAOVERLAY button=done seq=3", buttonLine(BarButton.DONE, 3))
         assertEquals("QAOVERLAY button=next seq=4", buttonLine(BarButton.NEXT, 4))
         assertEquals("QAOVERLAY button=stop seq=5", buttonLine(BarButton.STOP, 5))
+        assertEquals("QAOVERLAY button=retry seq=7", buttonLine(BarButton.RETRY, 7))
+        assertEquals("QAOVERLAY button=redo seq=8", buttonLine(BarButton.REDO, 8))
         assertEquals("QAOVERLAY error=no-permission seq=6", errorLine("no-permission", 6))
     }
 

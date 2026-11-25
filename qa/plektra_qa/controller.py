@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from xml.etree import ElementTree
 
 
 def obj_info(info: Any) -> dict[str, object]:
@@ -71,6 +72,36 @@ class ScreenController:
         if clear:
             self._clear_to_resting(element, resource_id or class_name)
         return element
+
+    def editable_fields(self) -> dict[str, str] | None:
+        """Every text field on screen as resource id -> text; None when the screen cannot be read.
+
+        An empty field reports its hint, as `get_text` does. Fields without an id, or sharing one, are
+        left out: they cannot be addressed."""
+        dump = getattr(self.device, "dump_window_hierarchy", None)
+        if not callable(dump):
+            return None
+        try:
+            root = ElementTree.fromstring(dump().read())
+        except Exception:
+            return None
+        found: dict[str, list[str]] = {}
+        for node in root.iter("node"):
+            resource_id = node.get("resource-id") or ""
+            if resource_id and (node.get("class") or "").endswith("EditText"):
+                found.setdefault(resource_id, []).append(node.get("text") or "")
+        return {resource_id: texts[0] for resource_id, texts in found.items() if len(texts) == 1}
+
+    def restore_field(self, resource_id: str, text: str) -> bool:
+        """Put one field back by clearing it: the host never types. True when it then reads `text`
+        (also the hint an empty field reports); False when only typing could bring `text` back."""
+        element = self.device(resourceId=resource_id)
+        if not element.exists():
+            return False
+        if (element.get_text() or "") == text:
+            return True
+        element.clear_text_field()
+        return not text or (element.get_text() or "") == text
 
     def visible_text(self, element: Any) -> str:
         """Field text, with a recorded empty-field hint treated as empty."""

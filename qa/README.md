@@ -27,6 +27,7 @@ Status: fork-only, not part of upstream Plektra. Proven on a Unihertz Titan 2 El
 | You see or hear | Meaning | You do |
 | --- | --- | --- |
 | Inverted colors, shade card `Hands off` | The computer is using the screen (opening the app, clearing the field). | Don't touch the phone. |
+| The bar says `Wait a few seconds...` and has no buttons | The computer is getting the next step ready. | Wait for the next card. |
 | Ordinary colors. The shade opens for 4 seconds with the action, closes, then the computer beeps and says the action out loud. | Your turn. | Type that action on the phone's keyboard. |
 | `Still waiting.` and the action again | Nothing reached the field for 10 quiet seconds. | Start typing. After 3 reminders the run stops, assuming you have left. |
 | `Testing finished.` | The pass is over and the phone's settings are back to normal. | Read the table on the computer. |
@@ -107,7 +108,7 @@ Keys and touches come from the phone's `getevent`; sync with the picture is with
 
 ### Remembered passes, one run per phone, stopping a run
 
-- **Ledger.** A trial that passed on the installed Plektra build is not run again (`run --redo` runs everything). Each pass is written to `~/.local/state/plektra-qa/ledger/<suite>.json` the moment the trial passes, so a kill, Ctrl-C or crash loses nothing; in a recorded run the clip is attached afterwards, and a recorded pass whose clip cannot be cut does not count. **Redo last** on the bar (below) withdraws a pass again. A phase is skipped only when all its trials passed; otherwise its pending trials run, the first of them with the phase's setup (app, activity, click, field) and, for a trial that keeps the field (`clear_field: false`), the trial before it. Trial numbers (log, table, chapters, `import --passed`) are the numbers in the suite. The ledger key hashes the prompt as written in the YAML, so a different keymap does not re-key it; older entries are still found. The run refuses when the keyboard build cannot be read or the active keyboard is not Plektra. The end of a run lists "still to pass" and, separately, "passed, no clip".
+- **Ledger.** A trial that passed on the installed Plektra build is not run again (`run --redo` runs everything). Each pass is written to `~/.local/state/plektra-qa/ledger/<suite>.json` the moment the trial passes, so a kill, Ctrl-C or crash loses nothing; in a recorded run the clip is attached afterwards, and a recorded pass whose clip cannot be cut does not count. **◀ Prev** on the bar (below) withdraws a pass again, and so does **Redo** where it replays an earlier trial. A phase is skipped only when all its trials passed; otherwise its pending trials run, the first of them with the phase's setup (app, activity, click, and the field to start in; a trial that names no field still reads whichever field has the focus) and, for a trial that keeps the field (`clear_field: false`), the trial before it. Trial numbers (log, table, chapters, `import --passed`) are the numbers in the suite. The ledger key hashes the prompt as written in the YAML, so a different keymap does not re-key it; older entries are still found. The run refuses when the keyboard build cannot be read or the active keyboard is not Plektra. The end of a run lists "still to pass" and, separately, "passed, no clip".
 - **One run per phone.** `~/.local/state/plektra-qa/locks/<phone serial>.lock` is a kernel file lock keyed on `getprop ro.serialno`, so LAN, Tailscale and USB share it. It holds the pid and the child pids (scrcpy, adb, afplay); the next run ends leftovers a killed run left. MCP tools that drive the screen take the same lock.
 - **Stopping.** SIGTERM and SIGHUP act like Ctrl-C: the phone is restored, the recording is finished and passes so far are kept (exit code 130).
 - **Preflight before go.** The unlock check, the stop card and the foreground check run before you are asked to start. Recording starts only after your start, and not at all if you start with **No rec** or `norec`.
@@ -115,20 +116,40 @@ Keys and touches come from the phone's `getevent`; sync with the picture is with
 
 ### Button bar (the default; `--no-bar` uses the shade card)
 
-`just qa-run SUITE` (same as `--bar`) shows a small on-screen bar with **Done**, **Next** and **Stop** instead of pulling down the notification shade, plus **Redo last** on every trial after the first. A matching text does not end a trial; you end it with **Done**, so you can fix a typo first. The batch starts only on the bar's **Done** (or **No rec**, on the start card of a recorded run) or a typed `go` (or `norec`), never on a key or a touch. With `--no-bar`, only a key press (not a touch) or the typed word starts the batch, and a trial with no `timeout_s` ends after 20 s without a key once typing began. **Next** skips the trial (it is recorded as skipped); **Stop** ends the batch.
+`just qa-run SUITE` (same as `--bar`) shows a small on-screen bar instead of pulling down the notification shade: the instruction across the full width, and one thin row of small buttons under it (40 dp tall, each a fifth of the bar wide, each in its own color and always in the same place). A matching text does not end a trial; you end it with **Done**, so you can fix a typo first. The batch starts only on the bar's **Done** (or **No rec**, on the start card of a recorded run) or a typed `go` (or `norec`), never on a key or a touch. With `--no-bar`, only a key press (not a touch) or the typed word starts the batch, and a trial with no `timeout_s` ends after 20 s without a key once typing began.
 
-- **Redo last** goes back to the previous trial: its result is withdrawn (also a pass already in the ledger) and it runs again. Anything typed in the current trial is dropped. If the previous trial keeps the field (`clear_field: false`), the run goes back to the trial that fills the field, and the results from there on are withdrawn too.
-- **End card.** After the last trial the bar says `All trials done. Redo last repeats the last one. Done finishes.` and shows **Done** and **Redo last** for up to 60 s. **Done** or silence finishes the batch. A batch that was stopped, or never started typing, ends without this card.
-- **A field that cannot be read** (for example while the focus moves) does not end a trial while the bar is in use; the terminal says `field unreadable (…), still waiting`. If the field is still unreadable when you press **Done**, the trial fails with `field lost`; **Redo last** on the next card retries it. Without the bar, a trial fails with `field lost` after the field has been unreadable for 10 s (at once if it is already unreadable when the trial starts).
+| Button | Color | Where | What it does |
+| --- | --- | --- | --- |
+| **Done** | green | every trial, start card, end card | Ends the trial: the field is read and scored. |
+| **Redo** | purple | every trial, reset-failed card | Drops this attempt and runs the same trial again from its starting state. |
+| **◀ Prev** | blue | every trial after the first, end card | Goes back to the previous trial and runs it again. |
+| **Next** | gray | every trial, reset-failed card | Skips the trial (recorded as skipped). |
+| **Stop** | red | every trial, reset-failed card | Ends the batch. |
+| **No rec** | brown | start card of a recorded run | Starts without recording. |
 
-The bar is a companion app (`--bar-package`, default `dev.hitlbar.overlay`; it needs the draw-over-apps permission). The host talks to it by `am broadcast -a <package>.SHOW|HIDE` and reads the answers from logcat lines with tag `QAOVERLAY` (`shown`, `hidden`, `button=done|norec|redo|next|stop`). If the bar does not report `shown` within 5 s, the trial fails with a clear error. Any app can write to logcat, so the host trusts only lines from the bar app's own uid (read with `pm list packages -U`; it refuses to start if the app is not installed), only lines from the phone's current time on, and only lines whose `seq` is higher than every one accepted before (the counter may restart at 1 after a hide, when Android restarted the app). The app is in `qa/overlay-app/` (see its README); the host side is in `plektra_qa/button_bar.py`.
+- **Redo** (this trial) records no result for the attempt you drop, then puts the starting state back and runs the trial again. In a recorded run the video keeps the dropped attempt, marked in the log panel as not counting; no clip is cut from it.
+- **◀ Prev** withdraws the previous trial's result (also a pass already in the ledger), drops whatever was typed in the current trial, restores the previous trial's starting state and runs it again.
+- **Starting state.** What a redo puts back:
+  1. The app and screen are opened as at the start. In a phase with a "new note" button (`click_resource_id`) a trial that clears its field gets a **new note**, so nothing typed anywhere in the old one remains. Elsewhere the trial's field is cleared, and so is every other text field on the screen that changed during the run (the title that Tab moved to, say).
+  2. The focus returns to the field the trial started in (also for a trial that names no field).
+  3. The clipboard gets back what it held when the trial began (a `verify_mode: clipboard` trial begins with it empty).
+  4. A trial that keeps the text (`clear_field: false`) after another trial of its phase: **both run again**, because the computer never types. The run goes back to the trial that fills the field, and the results from there on are withdrawn. With no earlier trial to replay, the field must still read as it did at the start; only clearing can put it back.
+- **Reset failed card.** If the starting state cannot be restored, the bar says `Reset failed: …. Fix the screen by hand, then Redo. Next skips this trial.` with **Redo**, **Next** and **Stop**.
+- **A normal trial start** keeps old text out of the way too. In a phase with a "new note" button, a trial that clears its field gets a new note when it is the first of its phase in the run, when another field was left changed, or with `fresh: true`. Elsewhere changed fields are cleared where possible.
+- **Wait card.** A tap on any button turns the card into `Wait a few seconds...` at once, with no buttons, so a button cannot be pressed twice. It stays until the next card, lets touches through to the app behind it, and is also shown when a trial ends without a tap. The bar is hidden only when the batch ends or is interrupted.
+- **End card.** After the last trial the bar says `All trials done. ◀ Prev redoes the last one. Done finishes.` and shows **Done** and **◀ Prev** for up to 60 s. **Done** or silence finishes the batch. A batch that was stopped, or never started typing, ends without this card.
+- **A field that cannot be read** (for example while the focus moves) does not end a trial while the bar is in use; the terminal says `field unreadable (…), still waiting`. If the field is still unreadable when you press **Done**, the trial fails with `field lost`; **◀ Prev** on the next card retries it, or press **Redo** before **Done**. Without the bar, a trial fails with `field lost` after the field has been unreadable for 10 s (at once if it is already unreadable when the trial starts).
 
-**Install** (once per phone, and again after the app changes: an older build leaves out **No rec** and **Redo last**; a developer device only, since the app draws over other apps and takes broadcasts from adb): build the APK on GitHub Actions (workflow `djb-overlay-app.yml` on `ci/base`, run with `scripts/github-build-overlay-app --release plk/main`), download `hitl-button-bar-<sha8>.apk` from the `overlay-app-<UTC time>-<sha8>` release, then:
+The bar is a companion app (`--bar-package`, default `dev.hitlbar.overlay`; it needs the draw-over-apps permission). The host talks to it by `am broadcast -a <package>.SHOW|HIDE` and reads the answers from logcat lines with tag `QAOVERLAY` (`shown`, `hidden`, `button=done|norec|retry|redo|next|stop`; `retry` is **Redo**, `redo` is **◀ Prev**). If the bar does not report `shown` within 5 s, the host hides it and tries once more (Android may have restarted the idle app), then the trial fails with a clear error. Any app can write to logcat, so the host trusts only lines from the bar app's own uid (read with `pm list packages -U --show-versioncode`, which also gives the app's version; it refuses to start if the app is not installed), only lines from the phone's current time on, and only lines whose `seq` is higher than every one accepted before (the counter may restart at 1 after a hide, when Android restarted the app). The app is in `qa/overlay-app/` (see its README); the host side is in `plektra_qa/button_bar.py`.
+
+**Install** (once per phone, and again after the app changes; a developer device only, since the app draws over other apps and takes broadcasts from adb): build the APK on GitHub Actions (workflow `djb-overlay-app.yml` on `ci/base`, run with `scripts/github-build-overlay-app --release plk/main`), download `hitl-button-bar-<sha8>.apk` from the `overlay-app-<UTC time>-<sha8>` release, then:
 
 ```bash
 adb install -r hitl-button-bar-<sha8>.apk
 adb shell appops set dev.hitlbar.overlay SYSTEM_ALERT_WINDOW allow   # or: Settings, Apps, HITL button bar, Display over other apps
 ```
+
+**An older app** (before version 0.2.0) still works with this harness, with less: there is no **Redo** button (the reset-failed card then has only **Next** and **Stop**), **◀ Prev** is labelled **Redo last**, the wait card appears only when the computer sends it, and it blocks touches on the strip it covers. Install the current app.
 
 **Smoke test** (a human with the phone in hand): in one terminal run `adb logcat -s QAOVERLAY:I`, in another:
 
@@ -151,6 +172,8 @@ Errors you may see:
 | `never started after the spoken prompts` | Nothing was typed after the action and every reminder. Later trials do not start. |
 | `stop card did not appear` | The phone never listed the stop card. This is a harness problem, not your swipe. |
 | `click target not found: …` / `input field not found` | The app was not on the expected screen. Check the suite's `package`, `activity` and `resource_id`. |
+| `could not leave the open note: …` | Back did not close the old note before a new one. Close it by hand, then **Redo**. |
+| `field not restored: …` / `the start field needs the text …` | A redo could not put a field back (the computer only clears, it never types). Fix it by hand, then **Redo**, or **Next**. |
 | `Unlock the phone once. The harness will not enter a PIN.` | The lock screen is up. Unlock it and run again. |
 
 The typing time (and WPM) runs from your first key to the match, so a slow start does not lower your WPM.
@@ -183,7 +206,9 @@ phases:
         clear_field: false       # keep the text from the previous trial
 ```
 
-All trial fields: `prompt`, `expect`, `verify_mode` (`text` or `clipboard`), `sentinel`, `timeout_s`, `shade`, `speak`, `start_wait_s`, `max_reprompts`, `package`, `activity`, `resource_id`, `text_hint`, `click_resource_id`, `clear_field`, `cue_on_device` (the phone beeps too).
+All trial fields: `prompt`, `expect`, `expect_ci_first`, `verify_mode` (`text` or `clipboard`), `sentinel`, `timeout_s`, `shade`, `speak`, `start_wait_s`, `max_reprompts`, `package`, `activity`, `resource_id`, `text_hint`, `start_resource_id`, `click_resource_id`, `clear_field`, `fresh`, `cue_on_device` (the phone beeps too).
+
+`resource_id` is the field a trial reads. `start_resource_id` is the field to focus (and clear) when a trial starts that names none: such a trial reads whichever field has the focus, so it still works after a key such as Tab moves it. `suites/tab_first_letter.yaml` is an example: ten tries of Tab, then typing, in the button bar app's two-field screen.
 
 Tips:
 
@@ -263,6 +288,7 @@ Rules for agents:
 5. Name keys with tokens (`<Ctrl+A>`) in trial lists and in questions to the person: `just qa-keys "<Ctrl+A>"` prints the two-version text to paste (section 7).
 6. Recording (section 4) is on by default. Before every batch, tell the person that the screen, the voice and every key will be recorded, and offer to turn it off; if they decline, pass `--no-record` (CLI) or `record=false` (`request_human_chord_batch`). With `human_said_go=true` there is no start on the phone, so settle recording with them in chat first. Their answer covers that run only. Tell them where the file lands.
 7. A human batch never starts on its own. Every new batch posts its instruction on the phone (on the button bar, or on the notification shade without it), prints it in the terminal and speaks it, then waits for the person's start: **Done** on the bar (without the bar, a key press on the phone; a touch never starts it), or `go` typed in the terminal. A recorded batch can also be started without recording: **No rec** on the bar, or `norec` typed in the terminal. A timeout ends the run with `refused: not started`; it never starts the batch. Recording starts only after the start. If the person has just told you go in chat, pass `human_said_go=true`; the card and voice still run first. No run, overlay check or smoke script bypasses this gate (`plektra_qa/start_gate.py`).
+8. Before blaming the keyboard, repeat a failure in a **separate app**, so that an app's own bug is ruled out (djbclark, 2026-11-25: "In cases like this we should always try again in a seperate app to make sure we are not running into an app bug."). Until then, report it as seen in that one app only. `suites/tab_first_letter.yaml` does this for a first letter lost after Tab.
 
 [firerpa-hitl.md](firerpa-hitl.md) is the full specification. It is written as a build prompt for an agent.
 

@@ -20,6 +20,17 @@
         </activity>
 
         <!--
+          Two empty text fields: the second app of qa/suites/tab_first_letter.yaml. Holds no data.
+          Keyboard configuration changes do not restart it.
+        -->
+        <activity
+            android:name=".TwoFieldsActivity"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|uiMode"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
+
+        <!--
           Exported so that `adb shell am broadcast` can reach it, but only senders that hold
           android.permission.DUMP (the adb shell user; no normal app can get it) are delivered.
         -->

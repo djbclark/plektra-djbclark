@@ -5,6 +5,9 @@ Not the recording overlay (overlay.py): that one draws keys and touches into a v
 The bar replaces the notification-shade card between trials (djbclark,
 2026-11-24): a non-focusable overlay with Done, Next and Stop buttons. A trial
 ends when the person presses Done, so a typing mistake never ends it early.
+It stays up for the whole batch. App version 2 replaces a card with "Wait a few
+seconds..." the moment a button is tapped; for an older app, and when no button
+ended the card, the host shows that text itself (a SHOW with no buttons).
 
 Wire protocol (kept free of anything app-specific so it moves to the public
 harness repo unchanged):
@@ -14,14 +17,17 @@ harness repo unchanged):
 - phone to host: logcat lines with tag QAOVERLAY, priority I:
   `QAOVERLAY shown seq=N`   the bar is on screen (acknowledges SHOW),
   `QAOVERLAY hidden seq=N`  the bar is gone (acknowledges HIDE),
-  `QAOVERLAY button=done seq=N` (or next, stop) the person pressed a button.
+  `QAOVERLAY button=done seq=N` (or retry, redo, norec, next, stop) the person pressed a button.
+Wire names and labels: done "Done", norec "No rec", retry "Redo" (this trial), redo "◀ Prev" (the
+trial before), next "Next", stop "Stop". An app that does not know a name leaves that button out.
 
 Trust (any app can write to logcat): only lines written by the overlay app's own uid count
 (`logcat -v uid`, the uid from `pm list packages -U`); logcat starts at the phone's current time;
 and a line counts only if its seq is higher than every seq accepted so far. The one exception is
 the restart rule: the app's counter starts at 1 again when Android restarts its process, which
-can only happen while no bar is up, so right after a HIDE (or at start) a state line (shown or
-hidden) is accepted whatever its seq, and the counter baseline moves to it.
+takes the bar down, so right after a HIDE (or at start) a state line (shown or hidden) is accepted
+whatever its seq, and the counter baseline moves to it. A SHOW that gets no answer is therefore
+tried once more after a HIDE.
 """
 
 from __future__ import annotations
@@ -38,13 +44,17 @@ from plektra_qa.screen_gate import adb_shell
 
 DEFAULT_PACKAGE = "dev.hitlbar.overlay"
 LOG_TAG = "QAOVERLAY"
-BUTTONS = ("done", "next", "stop")  # the default card; "redo" and "norec" are asked for by name
+BUTTONS = ("done", "next", "stop")  # the default card; "retry", "redo" and "norec" are asked for by name
+WAIT_TEXT = "Wait a few seconds..."
+SELF_WAIT_VERSION = 2  # from this versionCode the app shows the wait text itself on a tap
 ACK_TIMEOUT_S = 5.0
 POLL_S = 0.05
-_LINE = re.compile(r"QAOVERLAY[: ]+(?:(?P<state>shown|hidden)|button=(?P<button>done|next|stop|redo|norec))\b")
+_LINE = re.compile(r"QAOVERLAY[: ]+(?:(?P<state>shown|hidden)|button=(?P<button>done|next|stop|retry|redo|norec))\b")
 _SEQ = re.compile(r"\bseq=(?P<seq>\d+)\b")
 _APP_UID = re.compile(r"^u(?P<user>\d+)_a(?P<app>\d+)$")
-_PM_UID = re.compile(r"^package:(?P<package>\S+)\s+uid:(?P<uid>\d+)(?:,\d+)*\s*$")  # one uid per user profile: the first is the main user's
+_PM_UID = re.compile(  # one uid per user profile: the first is the main user's
+    r"^package:(?P<package>\S+)(?:\s+versionCode:(?P<version>\d+))?\s+uid:(?P<uid>\d+)(?:,\d+)*\s*$"
+)
 _THREADTIME_UID = re.compile(r"^\S+\s+\S+\s+(?P<uid>\S+)\s+\d+\s+\d+\s+[VDIWEFA]\s+QAOVERLAY\s*:")
 
 
@@ -62,13 +72,24 @@ def uid_from_column(column: str) -> int | None:
     return None
 
 
-def parse_pm_uid(output: str, package: str) -> int | None:
-    """The uid of exactly `package` from `pm list packages -U <package>` (it filters by substring)."""
+def _pm_line(output: str, package: str) -> re.Match[str] | None:
     for line in output.splitlines():
         found = _PM_UID.match(line.strip())
         if found and found["package"] == package:
-            return int(found["uid"])
+            return found
     return None
+
+
+def parse_pm_uid(output: str, package: str) -> int | None:
+    """The uid of exactly `package` from `pm list packages -U <package>` (it filters by substring)."""
+    found = _pm_line(output, package)
+    return int(found["uid"]) if found else None
+
+
+def parse_pm_version(output: str, package: str) -> int | None:
+    """The versionCode of exactly `package` (`--show-versioncode`); None if the listing has none."""
+    found = _pm_line(output, package)
+    return int(found["version"]) if found and found["version"] else None
 
 
 def parse_entry(line: str) -> tuple[int | None, int | None, str, str] | None:
@@ -124,6 +145,7 @@ class ButtonBar:
         self._buttons: deque[str] = deque()
         self._states: deque[str] = deque()
         self._uid: int | None = None
+        self.app_version: int | None = None  # the overlay app's versionCode, read at start
         self._high = 0  # highest seq accepted so far
         self._fresh = True  # no bar line seen since start or the last HIDE: a restarted counter is fine
         self._stop = threading.Event()
@@ -144,12 +166,13 @@ class ButtonBar:
         (the app is not installed) the bar refuses to start rather than trust every line.
         """
         try:
-            listing = self._shell(["pm", "list", "packages", "-U", self.package])
+            listing = self._shell(["pm", "list", "packages", "-U", "--show-versioncode", self.package])
         except RuntimeError as exc:
             raise OverlayError(f"cannot look up the uid of {self.package}: {exc}") from exc
         self._uid = parse_pm_uid(listing, self.package)
         if self._uid is None:
             raise OverlayError(f"{self.package} is not installed on the phone (no uid), so its lines cannot be trusted")
+        self.app_version = parse_pm_version(listing, self.package)
         try:
             # Logcat's own time format, in the phone's clock; a failed lookup falls back to the last line.
             now = self._shell(["date", "+%m-%d %H:%M:%S.000"]).strip()
@@ -187,6 +210,8 @@ class ButtonBar:
             if kind == "state":
                 self._fresh = value == "hidden"
                 self._states.append(value)
+                if value == "shown":
+                    self._buttons.clear()  # a late press on the card this one replaces
             else:
                 self._buttons.append(value)
 
@@ -201,6 +226,21 @@ class ButtonBar:
 
     def show(self, text: str, buttons: Sequence[str] = BUTTONS) -> None:
         """Put the bar up and wait until the phone says it is showing."""
+        try:
+            self._show_once(text, buttons)
+        except OverlayError:
+            # Android may have restarted the idle app: its counter began again, which only counts after a HIDE.
+            self.hide()
+            self._show_once(text, buttons)
+
+    def wait(self, pressed: bool = False) -> None:
+        """Between cards: the wait text, no buttons. `pressed`: a button ended the card, so a new
+        enough app shows it already and nothing is sent."""
+        if pressed and (self.app_version or 0) >= SELF_WAIT_VERSION:
+            return
+        self.show(WAIT_TEXT, ())
+
+    def _show_once(self, text: str, buttons: Sequence[str]) -> None:
         with self._lock:
             self._states.clear()
             self._buttons.clear()  # presses from before this card are not answers
@@ -225,7 +265,7 @@ class ButtonBar:
             pass
 
     def pressed(self) -> str | None:
-        """The oldest unread button (done, next, stop, redo or norec), or None."""
+        """The oldest unread button (done, next, stop, retry, redo or norec), or None."""
         with self._lock:
             return self._buttons.popleft() if self._buttons else None
 

@@ -29,10 +29,10 @@ class MainActivity : Activity() {
         }
         column.addView(TextView(this).apply {
             text = "HITL button bar is a test tool for developer devices. When a test harness " +
-                "asks it to, it draws a small bar with Done, Next and Stop buttons at the top " +
-                "of the screen, above other apps, and reports button presses to the log. It " +
-                "needs the permission to draw over other apps, has no network access and keeps " +
-                "no data."
+                "asks it to, it draws a small bar at the top of the screen, above other apps, with " +
+                "an instruction and small buttons (Done, Redo, Prev, Next, Stop), and reports " +
+                "button presses to the log. It needs the permission to draw over other apps, has " +
+                "no network access and keeps no data."
             textSize = 16f
         })
         status = TextView(this).apply { textSize = 16f; setPadding(0, pad, 0, pad) }

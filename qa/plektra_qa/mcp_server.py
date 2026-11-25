@@ -210,6 +210,8 @@ def request_human_chord_batch(
                     controller, trials, console, gate=gate, speaker=speaker,
                     on_trial=recorder.on_trial if recorder is not None else None,
                     on_result=recorder.on_result if recorder is not None else None,
+                    on_redo=(lambda trial: recorder.withdraw(trial.number)) if recorder is not None else None,
+                    on_discard=recorder.on_discard if recorder is not None else None,
                     overlay=bar,
                 )
         finally:

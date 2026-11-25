@@ -171,7 +171,7 @@ class StartGate:
     def _done(self, how: str = "relayed") -> str:
         try:
             if self.bar is not None:
-                self.bar.hide()
+                self.bar.wait(pressed=how == "bar")  # the bar stays up until the first trial's card
             else:
                 self._shell(["cmd", "statusbar", "collapse"])
         except Exception:
