@@ -391,6 +391,8 @@ adb -s "$ADB_TARGET" shell settings put global heads_up_notifications_enabled 1
 2. The voice says the wrong thing for a symbol: add a `speak` line to that trial.
 3. Spoken phrases are cached in `~/.cache/plektra-qa/voice/`. Delete the folder to render them again.
 
+To inspect the visible resource IDs, run `just qa-ui --all` from `qa/` on the authorized test phone. With the phone holder's go-ahead, `just qa-ui --click RESOURCE_ID` taps a control by its full package-qualified ID. Use the IDs reported by the installed build. [Upstream PR #230](https://github.com/pkb-rocks/plektra/pull/230) proposes shared, locale-independent selectors for the keyboard toolbar's emoji button and the full emoji picker's search controls.
+
 ## 10. Develop the harness
 
 ```bash
