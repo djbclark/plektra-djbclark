@@ -1,0 +1,175 @@
+name: HITL button bar overlay app (ci/run/overlay-app-*)
+
+# Fork-only (ci/base overlay): pushed by scripts/github-build-overlay-app. The overlay commit is the
+# target ref's tree plus this workflow; every other .github/workflows/* is removed. Builds the
+# standalone Gradle project in qa/overlay-app (no wrapper: Gradle comes from setup-gradle), runs
+# its unit tests, signs the debug APK with the fork's debug key (secret DJB_DEBUG_KEYSTORE_B64,
+# re-signed with apksigner like djb-release.yml, so a later build installs over an earlier one),
+# uploads it as an artifact and, for --release runs, attaches it to a GitHub release
+# overlay-app-<UTC yyyymmdd.HHMM>-<sha8>.
+#
+# Hardening (security review of 009f1440):
+# - the build job has contents: read, no persisted git credentials, and no signing key while Gradle
+#   (and every plugin and dependency it resolves) runs; the key exists only inside the signing step
+#   and is deleted at its end;
+# - the release is a separate job (contents: write) that only downloads the signed artifact;
+# - third-party actions are pinned by full commit sha;
+# - run-meta.env is read with grep, never sourced.
+
+on:
+  push:
+    branches: ['ci/run/overlay-app-**']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    outputs:
+      target_ref: ${{ steps.meta.outputs.target_ref }}
+      target_sha: ${{ steps.meta.outputs.target_sha }}
+      release: ${{ steps.meta.outputs.release }}
+      sha8: ${{ steps.meta.outputs.sha8 }}
+      apk: ${{ steps.apk.outputs.apk }}
+    env:
+      DJB_SIGNER_SHA256: 5ca8d5fcce4bad08206eb7e112b5c9d63b35b0a8874e3d25af48e8e332a9596a
+      PROJECT: qa/overlay-app
+    steps:
+      - name: Checkout overlay commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Read run metadata
+        id: meta
+        run: |
+          set -euo pipefail
+          meta=.github/ci/run-meta.env
+          target_ref=$(grep '^TARGET_REF=' "$meta" | cut -d= -f2-)
+          target_sha=$(grep '^TARGET_SHA=' "$meta" | cut -d= -f2-)
+          release=$(grep '^RELEASE=' "$meta" | cut -d= -f2-)
+          printf '%s' "$target_sha" | grep -Eq '^[0-9a-f]{40}$'
+          case "$release" in 0|1) ;; *) echo "bad RELEASE" >&2; exit 1 ;; esac
+          {
+            echo "target_ref=$target_ref"
+            echo "target_sha=$target_sha"
+            echo "release=$release"
+            echo "sha8=${target_sha:0:8}"
+          } >> "$GITHUB_OUTPUT"
+          echo "target $target_sha release=$release"
+          test -f "$PROJECT/settings.gradle.kts"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK (build-tools for AGP and apksigner)
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+        with:
+          packages: 'platform-tools build-tools;35.0.0 platforms;android-36'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@48b5f213c81028ace310571dc5ec0fbbca0b2947 # v4
+        with:
+          gradle-version: "8.13"
+
+      # No signing key exists on this runner yet: nothing Gradle runs can read it.
+      - name: Unit tests and assemble debug
+        run: |
+          set -euo pipefail
+          gradle -p "$PROJECT" --no-daemon --stacktrace \
+            --init-script "$GITHUB_WORKSPACE/.github/ci/central-mirror.gradle" \
+            testDebugUnitTest assembleDebug
+
+      - name: Sign with the fork debug key and verify
+        id: apk
+        env:
+          DJB_DEBUG_KEYSTORE_B64: ${{ secrets.DJB_DEBUG_KEYSTORE_B64 }}
+          SHA8: ${{ steps.meta.outputs.sha8 }}
+        run: |
+          set -euo pipefail
+          keydir=$(mktemp -d)
+          trap 'rm -rf "$keydir"' EXIT
+          ks="$keydir/debug.keystore"
+          printf '%s' "$DJB_DEBUG_KEYSTORE_B64" | base64 -d > "$ks"
+          test -s "$ks"
+          fp=$(keytool -list -v -keystore "$ks" -storepass android \
+            | awk '/SHA256:/{gsub(/:/,"",$2); print tolower($2); exit}')
+          echo "installed_keystore_fp=$fp"
+          test "$fp" = "$DJB_SIGNER_SHA256"
+          build_tools=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)
+          src="$PROJECT/app/build/outputs/apk/debug/app-debug.apk"
+          apk="hitl-button-bar-$SHA8.apk"
+          "$build_tools/apksigner" sign \
+            --ks "$ks" --ks-pass pass:android \
+            --ks-key-alias androiddebugkey --key-pass pass:android \
+            --in "$src" --out "$apk"
+          rm -f "$ks"
+          "$build_tools/apksigner" verify --print-certs "$apk" | tee /tmp/signer.txt
+          grep -q "certificate SHA-256 digest: $DJB_SIGNER_SHA256" /tmp/signer.txt
+          sha256sum "$apk" | tee "$apk.sha256"
+          # What the manifest ended up with: package, permissions, no network.
+          "$build_tools/aapt2" dump badging "$apk" | grep -E "^(package|uses-permission|application-label)" | tee /tmp/badging.txt
+          ! grep -q "android.permission.INTERNET" /tmp/badging.txt
+          echo "apk=$apk" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the APK as an artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: hitl-button-bar-${{ steps.meta.outputs.sha8 }}
+          path: |
+            ${{ steps.apk.outputs.apk }}
+            ${{ steps.apk.outputs.apk }}.sha256
+          if-no-files-found: error
+
+  release:
+    # Only the signed artifact comes in here; no checkout, no key, no build tools.
+    needs: build
+    if: ${{ needs.build.outputs.release == '1' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      TARGET_SHA: ${{ needs.build.outputs.target_sha }}
+      TARGET_REF: ${{ needs.build.outputs.target_ref }}
+      SHA8: ${{ needs.build.outputs.sha8 }}
+      APK: ${{ needs.build.outputs.apk }}
+      DJB_SIGNER_SHA256: 5ca8d5fcce4bad08206eb7e112b5c9d63b35b0a8874e3d25af48e8e332a9596a
+    steps:
+      - name: Download the signed APK
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: hitl-button-bar-${{ needs.build.outputs.sha8 }}
+
+      - name: Attach to a GitHub release
+        run: |
+          set -euo pipefail
+          sha256sum -c "$APK.sha256"
+          tag="overlay-app-$(date -u +%Y%m%d.%H%M)-$SHA8"
+          target="$TARGET_SHA"
+          gh api "repos/$GH_REPO/commits/$TARGET_SHA" --silent 2>/dev/null || target="$GITHUB_SHA"
+          digest=$(cut -d' ' -f1 "$APK.sha256")
+          printf '%s\n' \
+            "HITL button bar overlay app (dev.hitlbar.overlay) from $TARGET_REF at $TARGET_SHA." \
+            "" \
+            "Build: $GITHUB_SERVER_URL/$GH_REPO/actions/runs/$GITHUB_RUN_ID" \
+            "APK SHA-256: \`$digest\`" \
+            "Signer certificate SHA-256: \`$DJB_SIGNER_SHA256\`" \
+            "" \
+            "A test tool for developer devices. Install: adb install -r $APK, then allow it to draw over other apps (see qa/overlay-app/README.md)." \
+            > notes.md
+          gh release create "$tag" "$APK" "$APK.sha256" --target "$target" --latest=false --title "HITL button bar $SHA8" --notes-file notes.md
+          echo "released $tag"
+          # Keep the 10 newest overlay-app releases.
+          gh release list --limit 100 --json tagName,createdAt \
+            --jq '[.[] | select(.tagName | startswith("overlay-app-"))] | sort_by(.createdAt) | reverse | .[10:][].tagName' \
+            | while read -r old; do gh release delete "$old" --cleanup-tag --yes; done
