@@ -41,6 +41,7 @@ The harness keeps the screen on during a pass. When the pass ends (normally, aft
 3. FIRERPA 10.12 running on the phone as the `shell` user, started with a client certificate (`lamda.pem`). No root, no APK.
 4. Optional: a voice. [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) through [kokoro-cli](https://pypi.org/project/kokoro-cli/) sounds best and runs offline. Without it the harness uses macOS `say`, or `spd-say` / `espeak-ng` on Linux, or stays silent.
 5. A note-taking app with a plain text field. The sample suite uses Pinnote (`branislav667.pinnote`).
+6. `scrcpy` and `ffmpeg` on the computer, because runs are recorded by default (macOS: `brew install scrcpy ffmpeg`). To run without them, turn recording off (section 4).
 
 ## 3. One-time setup
 
@@ -86,34 +87,43 @@ cd qa && just qa-run suites/smoke_chords.yaml
 
 The computer shows the keymap in use (`keymap: live ...` or `keymap: profile ...`, section 7), a live table and the voice in use (`voice: kokoro`). Follow the signals in section 1. Ctrl-C on the computer stops the pass and restores the phone.
 
-### Record a run to share (optional, off by default)
+### Record a run to share (on by default)
 
 ```bash
-cd qa && just qa-run suites/smoke_chords.yaml --record
+cd qa && just qa-run suites/smoke_chords.yaml              # recorded
+cd qa && just qa-run suites/smoke_chords.yaml --no-record  # not recorded
 ```
 
-`--record` saves one mp4 in `~/plektra-qa-recordings/` (`--record-dir` or `PLEKTRA_QA_RECORD_DIR` change it). It needs `scrcpy`, `ffmpeg` and the phone on adb (`ADB_TARGET`). What is in it:
+Every run is recorded unless you turn it off: `--record` is the default and `--no-record` turns it off (over MCP, `record=true` is the default; pass `record=false`). The start card says that the run is recorded and offers to start without recording: press **No rec** on the bar, or type `norec` in the terminal. **Done** or `go` starts the recorded run. On the bar the card reads `Recorded: screen, voice, keys. Done starts. No rec starts without recording.`
+
+A recorded run saves one mp4 in `~/plektra-qa-recordings/` (`--record-dir` or `PLEKTRA_QA_RECORD_DIR` change it). It needs `scrcpy`, `ffmpeg` and the phone on adb (`ADB_TARGET`); `run` refuses to start without `scrcpy` and `ffmpeg` unless you pass `--no-record`. What is in it:
 
 - The phone's screen (a view-only copy; scrcpy runs with `--no-control`) and the computer's spoken prompts, laid on the audio track at the times they were spoken (the voice is not captured from the speakers).
 - A band above the screen: a running timecode on the left; on the right the keys held at that moment (`L-Shift + A`, kernel names such as `ENTER`, d-pad keys included) and the touches (`TOUCH (x, y)`, then `TAP`, `LONG PRESS` or `SWIPE up (x1, y1) to (x2, y2)`; the keyboard's own trackpad is marked `PAD`). Android's "show touches" dots are on while recording and put back afterwards.
 - A log panel to the right of the phone: what the terminal shows, in time with the picture (trial prompts, spoken lines, pass or fail, and the keys and touches as they happen). The same lines are also an mp4 subtitle track named "Terminal log" that a player can switch off. `--no-panel` leaves both out (CLI only).
 - Chapters, one per trial (the next batch of key presses): inside the mp4, and as `plektra-qa-*.chapters.txt` to paste into a YouTube description (YouTube needs 0:00 first and chapters of at least 10 s, so shorter ones are merged there).
 
-Keys and touches come from the phone's `getevent`; sync with the picture is within about a tenth of a second. The recording shows the whole screen, the status bar and every key the person presses, so it is shared only with their say-so. Do not use it for anything private.
+Keys and touches come from the phone's `getevent`; sync with the picture is within about a tenth of a second. The recording shows the whole screen, the status bar and every key the person presses, so it is shared only with their say-so. Do not use it for anything private: turn recording off for that.
 
 ### Remembered passes, one run per phone, stopping a run
 
-- **Ledger.** A trial that passed on the installed Plektra build is not run again (`run --redo` runs everything). Each pass is written to `~/.local/state/plektra-qa/ledger/<suite>.json` the moment the trial passes, so a kill, Ctrl-C or crash loses nothing; with `--record` the clip is attached afterwards, and a recorded pass whose clip cannot be cut does not count. A phase is skipped only when all its trials passed; otherwise its pending trials run, the first of them with the phase's setup (app, activity, click, field) and, for a trial that keeps the field (`clear_field: false`), the trial before it. Trial numbers (log, table, chapters, `import --passed`) are the numbers in the suite. The ledger key hashes the prompt as written in the YAML, so a different keymap does not re-key it; older entries are still found. The run refuses when the keyboard build cannot be read or the active keyboard is not Plektra. The end of a run lists "still to pass" and, separately, "passed, no clip".
+- **Ledger.** A trial that passed on the installed Plektra build is not run again (`run --redo` runs everything). Each pass is written to `~/.local/state/plektra-qa/ledger/<suite>.json` the moment the trial passes, so a kill, Ctrl-C or crash loses nothing; in a recorded run the clip is attached afterwards, and a recorded pass whose clip cannot be cut does not count. **Redo last** on the bar (below) withdraws a pass again. A phase is skipped only when all its trials passed; otherwise its pending trials run, the first of them with the phase's setup (app, activity, click, field) and, for a trial that keeps the field (`clear_field: false`), the trial before it. Trial numbers (log, table, chapters, `import --passed`) are the numbers in the suite. The ledger key hashes the prompt as written in the YAML, so a different keymap does not re-key it; older entries are still found. The run refuses when the keyboard build cannot be read or the active keyboard is not Plektra. The end of a run lists "still to pass" and, separately, "passed, no clip".
 - **One run per phone.** `~/.local/state/plektra-qa/locks/<phone serial>.lock` is a kernel file lock keyed on `getprop ro.serialno`, so LAN, Tailscale and USB share it. It holds the pid and the child pids (scrcpy, adb, afplay); the next run ends leftovers a killed run left. MCP tools that drive the screen take the same lock.
 - **Stopping.** SIGTERM and SIGHUP act like Ctrl-C: the phone is restored, the recording is finished and passes so far are kept (exit code 130).
-- **Preflight before go.** The unlock check, the stop card and the foreground check run before you are asked to start. Recording starts only after your go.
+- **Preflight before go.** The unlock check, the stop card and the foreground check run before you are asked to start. Recording starts only after your start, and not at all if you start with **No rec** or `norec`.
 - **Optional per-trial keys** in the suite: `expect_ci_first: true` ignores the case of the first letter (for trials that do not test autocapitalization); `fresh: true` always opens a new note first (the one autocap trial).
 
 ### Button bar (the default; `--no-bar` uses the shade card)
 
-`just qa-run SUITE` (same as `--bar`) shows a small on-screen bar with **Done**, **Next** and **Stop** instead of pulling down the notification shade. A trial ends only when you press **Done**, so you can fix a typo first. The batch starts only on the bar's **Done** or a typed `go`, never on a key or a touch. With `--no-bar`, only a key press (not a touch) starts the batch, and a trial with no `timeout_s` ends after 20 s without a key once typing began. **Next** skips the trial (it is recorded as skipped); **Stop** ends the batch. The bar is a companion app (`--bar-package`, default `dev.hitlbar.overlay`; it needs the draw-over-apps permission). The host talks to it by `am broadcast -a <package>.SHOW|HIDE` and reads the answers from logcat lines with tag `QAOVERLAY` (`shown`, `hidden`, `button=done|next|stop`). If the bar does not report `shown` within 5 s, the trial fails with a clear error. Any app can write to logcat, so the host trusts only lines from the bar app's own uid (read with `pm list packages -U`; it refuses to start if the app is not installed), only lines from the phone's current time on, and only lines whose `seq` is higher than every one accepted before (the counter may restart at 1 after a hide, when Android restarted the app). The app is in `qa/overlay-app/` (see its README); the host side is in `plektra_qa/button_bar.py`.
+`just qa-run SUITE` (same as `--bar`) shows a small on-screen bar with **Done**, **Next** and **Stop** instead of pulling down the notification shade, plus **Redo last** on every trial after the first. A matching text does not end a trial; you end it with **Done**, so you can fix a typo first. The batch starts only on the bar's **Done** (or **No rec**, on the start card of a recorded run) or a typed `go` (or `norec`), never on a key or a touch. With `--no-bar`, only a key press (not a touch) or the typed word starts the batch, and a trial with no `timeout_s` ends after 20 s without a key once typing began. **Next** skips the trial (it is recorded as skipped); **Stop** ends the batch.
 
-**Install** (once per phone; a developer device only, since the app draws over other apps and takes broadcasts from adb): build the APK on GitHub Actions (workflow `djb-overlay-app.yml` on `ci/base`, run with `scripts/github-build-overlay-app --release plk/main`), download `hitl-button-bar-<sha8>.apk` from the `overlay-app-<UTC time>-<sha8>` release, then:
+- **Redo last** goes back to the previous trial: its result is withdrawn (also a pass already in the ledger) and it runs again. Anything typed in the current trial is dropped. If the previous trial keeps the field (`clear_field: false`), the run goes back to the trial that fills the field, and the results from there on are withdrawn too.
+- **End card.** After the last trial the bar says `All trials done. Redo last repeats the last one. Done finishes.` and shows **Done** and **Redo last** for up to 60 s. **Done** or silence finishes the batch. A batch that was stopped, or never started typing, ends without this card.
+- **A field that cannot be read** (for example while the focus moves) does not end a trial while the bar is in use; the terminal says `field unreadable (…), still waiting`. If the field is still unreadable when you press **Done**, the trial fails with `field lost`; **Redo last** on the next card retries it. Without the bar, a trial fails with `field lost` after the field has been unreadable for 10 s (at once if it is already unreadable when the trial starts).
+
+The bar is a companion app (`--bar-package`, default `dev.hitlbar.overlay`; it needs the draw-over-apps permission). The host talks to it by `am broadcast -a <package>.SHOW|HIDE` and reads the answers from logcat lines with tag `QAOVERLAY` (`shown`, `hidden`, `button=done|norec|redo|next|stop`). If the bar does not report `shown` within 5 s, the trial fails with a clear error. Any app can write to logcat, so the host trusts only lines from the bar app's own uid (read with `pm list packages -U`; it refuses to start if the app is not installed), only lines from the phone's current time on, and only lines whose `seq` is higher than every one accepted before (the counter may restart at 1 after a hide, when Android restarted the app). The app is in `qa/overlay-app/` (see its README); the host side is in `plektra_qa/button_bar.py`.
+
+**Install** (once per phone, and again after the app changes: an older build leaves out **No rec** and **Redo last**; a developer device only, since the app draws over other apps and takes broadcasts from adb): build the APK on GitHub Actions (workflow `djb-overlay-app.yml` on `ci/base`, run with `scripts/github-build-overlay-app --release plk/main`), download `hitl-button-bar-<sha8>.apk` from the `overlay-app-<UTC time>-<sha8>` release, then:
 
 ```bash
 adb install -r hitl-button-bar-<sha8>.apk
@@ -242,7 +252,7 @@ The keymap is read once at the start. Change a key setting during a run and the 
 | `teleport_and_prep_input` | Open an activity and focus and clear a field (behind the screen gate). |
 | `inspect_ui_fast` | The screen's UI tree, optionally with a JPEG screenshot. |
 | `execute_ui_action` | One click or key press on a selector (behind the screen gate). |
-| `request_human_chord_batch` | Run trials (a JSON list of trial objects) with a person typing, and return the report. It blocks until the person is done. `record=true` also records the run (section 4); only after the person said yes. |
+| `request_human_chord_batch` | Run trials (a JSON list of trial objects) with a person typing, and return the report. It blocks until the person is done. The run is recorded by default (`record=true`, section 4); tell the person first and pass `record=false` if they decline. |
 
 Rules for agents:
 
@@ -251,8 +261,8 @@ Rules for agents:
 3. Never change the active input method, and never `am force-stop` or `am start -S` the Plektra package. Android would switch keyboards.
 4. Do not click dialogs the harness has not seen before, press Back, or change Do Not Disturb.
 5. Name keys with tokens (`<Ctrl+A>`) in trial lists and in questions to the person: `just qa-keys "<Ctrl+A>"` prints the two-version text to paste (section 7).
-6. Recording (section 4) is off unless the person asks for it. Ask at the start of every guided run ("record the screen and voice to share with the group?") and pass `--record` (CLI) or `record=true` (`request_human_chord_batch`) only on a yes. The answer covers that run only. Tell them where the file lands.
-7. A human batch never starts on its own. Every new batch posts its instruction on the phone's notification shade, prints it in the terminal and speaks it, then waits for the person's start: a key press or tap on the phone, or `go` typed in the terminal. A timeout ends the run with `refused: not started`; it never starts the batch. Recording starts only after the start. If the person has just told you go in chat, pass `human_said_go=true`; the card and voice still run first. No run, overlay check or smoke script bypasses this gate (`plektra_qa/start_gate.py`).
+6. Recording (section 4) is on by default. Before every batch, tell the person that the screen, the voice and every key will be recorded, and offer to turn it off; if they decline, pass `--no-record` (CLI) or `record=false` (`request_human_chord_batch`). With `human_said_go=true` there is no start on the phone, so settle recording with them in chat first. Their answer covers that run only. Tell them where the file lands.
+7. A human batch never starts on its own. Every new batch posts its instruction on the phone (on the button bar, or on the notification shade without it), prints it in the terminal and speaks it, then waits for the person's start: **Done** on the bar (without the bar, a key press on the phone; a touch never starts it), or `go` typed in the terminal. A recorded batch can also be started without recording: **No rec** on the bar, or `norec` typed in the terminal. A timeout ends the run with `refused: not started`; it never starts the batch. Recording starts only after the start. If the person has just told you go in chat, pass `human_said_go=true`; the card and voice still run first. No run, overlay check or smoke script bypasses this gate (`plektra_qa/start_gate.py`).
 
 [firerpa-hitl.md](firerpa-hitl.md) is the full specification. It is written as a build prompt for an agent.
 
@@ -282,10 +292,10 @@ The tests use fakes and need no phone.
 | File | Role |
 | --- | --- |
 | `plektra_qa/hitl_runner.py` | Suite loading, the trial loop, scoring, reminders. |
-| `plektra_qa/start_gate.py` | The start gate: shade card, terminal text and voice, then wait for the person's key press, tap or typed `go`. |
+| `plektra_qa/start_gate.py` | The start gate: shade card, terminal text and voice, then wait for the person's start: **Done** or **No rec** on the bar (a key press without the bar), or `go` or `norec` typed. |
 | `plektra_qa/screen_gate.py` | Inverted colors, the shade, stay-awake, the stop card and the phone-side watcher. adb only. |
 | `plektra_qa/speech.py` | The voice backends and the phrase cache. |
-| `plektra_qa/recording.py` | Optional screen and voice recording (scrcpy, ffmpeg), the voice track and the chapters. |
+| `plektra_qa/recording.py` | Screen and voice recording, on by default (scrcpy, ffmpeg), the voice track and the chapters. |
 | `plektra_qa/inputlog.py` | Reads the phone's `getevent` and turns it into held keys and tap, long press and swipe text. |
 | `plektra_qa/overlay.py` | The band above the video (Pillow) and the chapter files. |
 | `plektra_qa/keys.py` | Key tokens, the keymap (live or profile), the renderer and the lint. |

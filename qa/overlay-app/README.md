@@ -2,7 +2,7 @@
 
 [Deutsch](README.de.md)
 
-A tiny Android overlay app for human-in-the-loop test harnesses. It draws a compact bar at the top of the screen (below the status bar) with an instruction text and the buttons **Done**, **Next** and **Stop**. It never takes focus, so the keyboard and the app under test keep the input focus, and it does not cover the typing area. It has no project-specific code.
+A tiny Android overlay app for human-in-the-loop test harnesses. It draws a compact bar at the top of the screen (below the status bar) with an instruction text and up to five buttons: **Done**, **No rec**, **Redo last**, **Next** and **Stop**. It never takes focus, so the keyboard and the app under test keep the input focus, and it does not cover the typing area. It has no project-specific code.
 
 **This is a test tool for developer devices.** It draws over other apps and accepts broadcasts from adb. Install it only on a device you test with.
 
@@ -18,6 +18,8 @@ adb install -r hitl-button-bar-<sha8>.apk
 adb shell appops set dev.hitlbar.overlay SYSTEM_ALERT_WINDOW allow   # or: open the app and use its button
 ```
 
+A build from before **No rec** and **Redo last** drops those two names, so install a current one.
+
 ## Protocol
 
 Host to app (adb shell user only: the receiver requires the `DUMP` permission, which no normal app holds):
@@ -27,7 +29,15 @@ adb shell am broadcast -a dev.hitlbar.overlay.SHOW -p dev.hitlbar.overlay --es t
 adb shell am broadcast -a dev.hitlbar.overlay.HIDE -p dev.hitlbar.overlay
 ```
 
-`buttons` names the buttons to show (shown in the fixed order Done, Next, Stop; a missing extra shows all three). `text` is cut at 200 characters.
+`buttons` names the buttons to show, as a comma-separated list of the wire names below. They are shown in the fixed order Done, No rec, Redo last, Next, Stop; a missing extra shows Done, Next, Stop. Unknown names are dropped. `text` is cut at 200 characters.
+
+| Button | Wire name |
+| --- | --- |
+| **Done** | `done` |
+| **No rec** | `norec` |
+| **Redo last** | `redo` |
+| **Next** | `next` |
+| **Stop** | `stop` |
 
 App to host: `Log.i` lines with tag `QAOVERLAY` (read with `adb logcat -s QAOVERLAY:I`):
 
@@ -35,11 +45,11 @@ App to host: `Log.i` lines with tag `QAOVERLAY` (read with `adb logcat -s QAOVER
 | --- | --- |
 | `QAOVERLAY shown seq=N` | The bar is laid out on screen (answers SHOW). |
 | `QAOVERLAY hidden seq=N` | The bar is gone (answers HIDE, also when none was showing). |
-| `QAOVERLAY button=done seq=N` | The person pressed Done (also `next`, `stop`). |
+| `QAOVERLAY button=done seq=N` | The person pressed Done (also `norec`, `redo`, `next`, `stop`). |
 | `QAOVERLAY error=no-permission seq=N` | SHOW arrived without the draw-over-apps permission. |
 | `QAOVERLAY error=window-failed seq=N` | The system refused the window. |
 
-`seq` counts up per line while the process lives (it starts at 1 again if Android restarts the process, which the host accepts only right after a HIDE). The host reads only lines written by this app's uid (`logcat -v uid`) and ignores any seq that is not higher than the last one. The three buttons ignore touches while another window covers them (`filterTouchesWhenObscured`). The instruction text is never logged.
+`seq` counts up per line while the process lives (it starts at 1 again if Android restarts the process, which the host accepts only right after a HIDE). The host reads only lines written by this app's uid (`logcat -v uid`) and ignores any seq that is not higher than the last one. The buttons ignore touches while another window covers them (`filterTouchesWhenObscured`). The instruction text is never logged.
 
 ## Design
 

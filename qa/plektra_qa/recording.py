@@ -1,8 +1,10 @@
-"""Optional screen and voice recording of a guided run, for sharing with the group.
+"""Screen and voice recording of a guided run, for sharing with the group.
 
-Off unless asked for: `plektra-qa run SUITE --record`, or `record=true` on the MCP
-tool. An agent asks the person first (README section 8): the screen can show
-notifications and other private content.
+On by default: `plektra-qa run SUITE`, and the MCP tool with `record=true`. It is
+turned off with `--no-record` or `record=false`, or by the person on the start
+card (No rec on the bar, norec in the terminal). An agent tells the person before
+the batch and offers to turn it off (README section 8): the video shows the whole
+screen, which can include notifications and other private content, and every key.
 
 How it works, with no audio loopback or extra permission:
 

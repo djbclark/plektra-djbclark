@@ -18,7 +18,8 @@ qa-prep:
     cd "{{ justfile_directory() }}" && uv run --python 3.14 plektra-qa prep
 
 # Run one YAML suite. The human chords; this process only watches the field.
-# Add --record to also save the screen and the spoken prompts as an mp4 (off by default; ask the person first).
+# The run is recorded by default (screen, spoken prompts and every key, as an mp4): tell the person first.
+# Add --no-record to turn it off; the start card also offers that (No rec on the bar, norec in the terminal).
 qa-run suite *flags:
     cd "{{ justfile_directory() }}" && uv run --python 3.14 plektra-qa run "{{ suite }}" {{ flags }}
 
