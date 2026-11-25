@@ -6,6 +6,23 @@ Run repeatable, guided keyboard checks on an Android developer phone. The host o
 
 The harness is maintained in the fork. The reference setup is a non-rooted Titan 2 Elite running Android 16 and FIRERPA 10.12.
 
+**Set up with an AI agent** · [Setup guide](SETUP.md)
+
+> Follow [qa/SETUP.md](SETUP.md) to install and verify the guided QA harness for this Plektra checkout.
+
+[Plektra’s upstream input flows](../docs/testing/input-flows.md) inject repeatable input through Android's event pipeline. Use this guided harness when the check calls for a person to press the real keys, perform gestures, or assess what they see and hear.
+
+## See it in action
+
+[![Test bench with the translucent QA bar moved over the focused field, and the corresponding keystroke in the terminal panel](media/movable-bar.png)](media/harness-demo.mp4)
+
+**[Watch the 2:03 Titan 2 Elite demo (MP4)](media/harness-demo.mp4)**. The seven trials use synthetic text. The recording includes host narration, chapters, key and touch annotations, and the synchronized terminal log.
+
+| Software-keyboard trial | Movable QA bubble |
+| --- | --- |
+| ![Software keyboard open beneath the guided typing prompt](media/software-keyboard.png) | ![QA bubble near the top of the test bench after being dragged](media/qa-bubble.png) |
+| Switch to on-screen typing and check the text in the focused field. | Minimize the bar, move the bubble, and tap it to reopen the controls. |
+
 ## Quick start: harness demo
 
 After [one-time setup](#3-one-time-setup) and [installing the overlay APK](overlay-app/README.md#install), run from the repository root:

@@ -8,6 +8,8 @@ Der Computer tippt nie für dich. Plektras Aufgabe ist es, physische Tastendrüc
 
 Stand: nur im Fork, nicht Teil von Upstream-Plektra. Erprobt auf einem Unihertz Titan 2 Elite (Android 16, ohne Root). Jedes Android-Telefon, auf dem FIRERPA 10.12 über adb läuft, sollte funktionieren.
 
+[Einrichtung mit einem KI-Agenten (Englisch)](SETUP.md) · [Demo-Video (2:03, MP4)](media/harness-demo.mp4) · [Screenshots](README.md#see-it-in-action)
+
 ## Schnellstart: Harness-Demo
 
 Nach der [Einrichtung](#3-einmalige-einrichtung) und Installation der Overlay-App (Version 0.4.1 oder neuer):
