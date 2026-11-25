@@ -137,7 +137,7 @@ def test_the_start_card_offers_no_recording_on_the_bar():
     bar.pressed = lambda: pressed() if now() >= 2 else None
     assert gate.wait("Batch", "Pick up the phone.", recording=True) == "bar"
     assert gate.record_declined
-    assert bar.cards == [(BAR_RECORD_CARD, ("done", "norec"))] and len(BAR_RECORD_CARD) <= 90
+    assert bar.cards == [(BAR_RECORD_CARD, ("done", "norec", "stop"))] and len(BAR_RECORD_CARD) <= 90
 
 
 def test_norec_typed_in_the_terminal_starts_without_recording_and_go_records():

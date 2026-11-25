@@ -6,6 +6,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ProtocolTest {
+    @Test fun bubbleDismissNeverConfirmsTheStartCard() {
+        assertEquals(null, dismissButton(listOf(BarButton.DONE)))
+        assertEquals(null, dismissButton(listOf(BarButton.DONE, BarButton.NOREC)))
+        assertEquals(BarButton.STOP, dismissButton(listOf(BarButton.DONE, BarButton.NOREC, BarButton.STOP)))
+        assertEquals(BarButton.DONE, dismissButton(listOf(BarButton.DONE, BarButton.REDO)))
+    }
+
     @Test
     fun missingButtonsExtraShowsAll() {
         assertEquals(listOf(BarButton.DONE, BarButton.NEXT, BarButton.STOP), parseButtons(null))

@@ -222,8 +222,7 @@ configuration change itself.
 
 1. T5 requested the full software keyboard. It opened on the symbols layer. The operator switched it
    to letters before typing `plum`, which passed. Before T6, the harness restored the hardware mode
-   and the operator typed `"Hello"` on the physical keyboard. The mode change alone leaves the active
-   software keyboard layer intact.
+   and the operator typed `"Hello"` on the physical keyboard.
 2. T7 produced `ok. Plum`, T8 produced `plum. Jam` after double Space and T9 produced `abCd`
    after one-shot Shift. The intended behavior occurred after the initial lowercase letter in all three.
    The first-letter autocapitalization discrepancy is in the bench body and still needs a comparison in Pinnote.

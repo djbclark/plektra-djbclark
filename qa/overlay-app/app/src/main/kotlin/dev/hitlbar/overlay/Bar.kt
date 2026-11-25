@@ -201,7 +201,6 @@ object Bar {
         val size = dp(app, 64)
         val position = area.clamp(OverlayPosition(area.left + (area.width - size) / 2,
             area.bottom - size - dp(app, 12)), size, size)
-        val (x, y) = position
         val target = TextView(app).apply {
             text = "×"
             textSize = 29f
@@ -212,12 +211,14 @@ object Bar {
         }
         val layout = layoutParams(size, passThrough = true).apply {
             height = size
-            this.x = x
-            this.y = y
+            x = position.x
+            y = position.y
         }
         try {
             wm.addView(target, layout)
-            dropTarget = DropTarget(target, OverlayArea(x, y, x + size, y + size))
+            dropTarget = DropTarget(target, OverlayArea(
+                position.x, position.y, position.x + size, position.y + size,
+            ))
         } catch (_: RuntimeException) {
             // Dragging still works when the target window cannot be shown.
         }
@@ -306,11 +307,7 @@ object Bar {
             }
         }
         row.addView(bubble, LinearLayout.LayoutParams(dp(app, 48), dp(app, 48)))
-        val terminate = when {
-            BarButton.STOP in item.buttons -> BarButton.STOP
-            BarButton.DONE in item.buttons -> BarButton.DONE
-            else -> null
-        }
+        val terminate = dismissButton(item.buttons)
         val close = {
             if (terminate != null) {
                 answer(app, item, terminate, dismiss = true)
