@@ -381,7 +381,7 @@ def _app(version, *, restarted_at=None):
     """A bar and its fake phone, whose app counts its own log lines. Returns (bar, broadcasts, pipe, app)."""
     pipe, sent, app = _Pipe(), [], {"seq": 0}
 
-    def say(text):
+    def say(text, rate=1.0):
         app["seq"] += 1
         pipe.push(_line(f"{text} seq={app['seq']}"))
 

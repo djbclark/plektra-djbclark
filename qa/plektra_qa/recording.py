@@ -56,6 +56,7 @@ from plektra_qa.overlay import (
     write_chapter_files,
     write_panel,
 )
+from plektra_qa.speech import rate_args
 
 SAMPLE_RATE = 24000
 BYTES_PER_SAMPLE = 2  # s16le mono
@@ -83,6 +84,7 @@ class SpeechLine:
     path: Path | None = None
     tool: str = ""
     cut: float | None = None
+    rate: float = 1.0
 
 
 def build_track(
@@ -265,7 +267,7 @@ class Recorder:
             self._lines.append(
                 SpeechLine(
                     start=info["time"], text=info["text"], kind=info["kind"],
-                    path=info.get("path"), tool=info.get("tool", ""),
+                    path=info.get("path"), tool=info.get("tool", ""), rate=info.get("rate", 1.0),
                 )
             )
         elif event == "cut" and self._lines and self._lines[-1].cut is None:
@@ -277,14 +279,16 @@ class Recorder:
         source = line.path
         if line.kind == "say" and self._which("say"):
             source = work / f"say-{id(line)}.aiff"
-            self._run(["say", "-o", str(source), line.text], check=True, capture_output=True, timeout=60)
+            cmd = ["say", *rate_args("say", line.rate), "-o", str(source), line.text]
+            self._run(cmd, check=True, capture_output=True, timeout=60)
         elif line.kind == "espeak":
             tool = next((t for t in ("espeak-ng", "espeak") if self._which(t)), None)
             if tool is None:
                 self.warnings.append(f"no audio file for {line.text!r} (spd-say cannot write one)")
                 return b""
             source = work / f"espeak-{id(line)}.wav"
-            self._run([tool, "-w", str(source), line.text], check=True, capture_output=True, timeout=60)
+            cmd = [tool, *rate_args(tool, line.rate), "-w", str(source), line.text]
+            self._run(cmd, check=True, capture_output=True, timeout=60)
         if source is None or not Path(source).is_file():
             self.warnings.append(f"audio for {line.text!r} was not found")
             return b""

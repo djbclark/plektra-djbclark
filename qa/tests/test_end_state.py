@@ -57,7 +57,7 @@ class Voice:
     def prepare(self, texts):
         self.prepared = list(texts)
 
-    def say(self, text):
+    def say(self, text, rate=1.0):
         self.phone.events.append(("say", text))
 
     def speaking(self):

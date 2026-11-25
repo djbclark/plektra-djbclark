@@ -50,6 +50,19 @@ def _player(which: Which) -> list[str] | None:
     return None
 
 
+# The words a minute that macOS `say` and espeak use at about their normal speed.
+BASE_WPM = 175
+
+
+def rate_args(tool: str, rate: float) -> list[str]:
+    """The flags that make a system voice speak at `rate` times its normal speed."""
+    if rate == 1.0:
+        return []
+    if tool == "spd-say":  # percent faster or slower, -100 to 100
+        return ["-r", str(max(-100, min(100, round((rate - 1) * 100))))]
+    return ["-r" if tool == "say" else "-s", str(round(BASE_WPM * rate))]
+
+
 def pick_backend(choice: str | None = None, which: Which = shutil.which) -> str:
     choice = (choice or os.environ.get("PLEKTRA_QA_VOICE", "auto")).strip().lower()
     if choice in ("", "auto"):
@@ -83,6 +96,7 @@ class Speaker:
         self._cache = cache or cache_dir()
         self._voice = os.environ.get("PLEKTRA_QA_VOICE_NAME", "").strip()
         self._proc: subprocess.Popen[bytes] | None = None
+        self._tool = ""  # the program of the line being said
         self._player = _player(which) if self.backend == "kokoro" else None
         self._lock = threading.Lock()
         self._warm: threading.Thread | None = None
@@ -95,12 +109,13 @@ class Speaker:
     def enabled(self) -> bool:
         return self.backend != "off"
 
-    def _wav(self, text: str) -> Path:
-        key = hashlib.sha256(f"{self._voice}\0{text}".encode()).hexdigest()[:20]
+    def _wav(self, text: str, rate: float = 1.0) -> Path:
+        speed = "" if rate == 1.0 else f"\0{rate:g}"
+        key = hashlib.sha256(f"{self._voice}\0{text}{speed}".encode()).hexdigest()[:20]
         return self._cache / f"{key}.wav"
 
-    def _render(self, text: str) -> Path | None:
-        wav = self._wav(text)
+    def _render(self, text: str, rate: float = 1.0) -> Path | None:
+        wav = self._wav(text, rate)
         if wav.is_file() and wav.stat().st_size > 0:
             return wav
         self._cache.mkdir(parents=True, exist_ok=True)
@@ -108,6 +123,8 @@ class Speaker:
         cmd = ["kokoro", "speak", text, "-o", str(tmp), "--format", "wav", "--service", "auto"]
         if self._voice:
             cmd += ["--voice", self._voice]
+        if rate != 1.0:
+            cmd += ["--speed", f"{rate:g}"]
         try:
             self._run(cmd, check=True, capture_output=True, timeout=60)
             os.replace(tmp, wav)
@@ -129,29 +146,31 @@ class Speaker:
         self._warm = threading.Thread(target=work, name="voice-prepare", daemon=True)
         self._warm.start()
 
-    def _command(self, text: str) -> list[str] | None:
+    def _command(self, text: str, rate: float = 1.0) -> list[str] | None:
+        say = ["say", *rate_args("say", rate), text]
         if self.backend == "say":
-            return ["say", text]
+            return say
         if self.backend == "espeak":
             for name in ("spd-say", "espeak-ng", "espeak"):
                 if self._which(name):
-                    return [name, "-w", text] if name == "spd-say" else [name, text]
+                    wait = ["-w"] if name == "spd-say" else []
+                    return [name, *rate_args(name, rate), *wait, text]
             return None
         if self.backend == "kokoro" and self._player:
-            wav = self._wav(text)
+            wav = self._wav(text, rate)
             if not (wav.is_file() and wav.stat().st_size > 0) and self._which("say"):
                 # Never block on a Kokoro render (up to 60 s) in the middle of a trial: render it in the
                 # background for next time and speak it with the system voice now.
-                threading.Thread(target=self._render, args=(text,), name="voice-render", daemon=True).start()
-                return ["say", text]
-            wav_ready = self._render(text)
+                threading.Thread(target=self._render, args=(text, rate), name="voice-render", daemon=True).start()
+                return say
+            wav_ready = self._render(text, rate)
             if wav_ready is not None:
                 return [*self._player, str(wav_ready)]
             if self._which("say"):
-                return ["say", text]
+                return say
         return None
 
-    def _announce(self, text: str, cmd: list[str]) -> None:
+    def _announce(self, text: str, cmd: list[str], rate: float = 1.0) -> None:
         if self.listener is None:
             return
         if cmd[0] == "say":
@@ -160,14 +179,16 @@ class Speaker:
             info = {"kind": "wav", "path": Path(cmd[-1])}
         else:
             info = {"kind": "espeak", "tool": cmd[0]}
+        if rate != 1.0 and info["kind"] != "wav":  # a rendered file already has the speed
+            info["rate"] = rate
         self.listener("say", time=time.monotonic(), text=text, **info)
 
-    def say(self, text: str) -> None:
+    def say(self, text: str, rate: float = 1.0) -> None:
         if not self.enabled or not text:
             return
         with self._lock:
             self.stop()
-            cmd = self._command(text)
+            cmd = self._command(text, rate)
             if cmd is None:
                 return
             try:
@@ -178,7 +199,8 @@ class Speaker:
                 print(f"voice: {exc}", file=sys.stderr)
                 self._proc = None
                 return
-            self._announce(text, cmd)
+            self._tool = cmd[0]
+            self._announce(text, cmd, rate)
 
     def wait_idle(self, timeout_s: float) -> None:
         """Block until the line being said has finished, or the timeout."""
@@ -199,6 +221,11 @@ class Speaker:
                 proc.wait(timeout=1)
             except subprocess.TimeoutExpired:
                 proc.kill()
+            if self._tool == "spd-say":  # the daemon speaks on after its client is gone
+                try:
+                    self._run(["spd-say", "-C"], check=False, capture_output=True, timeout=2)
+                except (OSError, subprocess.SubprocessError) as exc:
+                    print(f"voice: {exc}", file=sys.stderr)
 
     def close(self) -> None:
         self.stop()

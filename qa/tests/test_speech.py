@@ -30,7 +30,7 @@ class _FakeSpeaker:
     def prepare(self, texts) -> None:
         self.prepared = list(texts)
 
-    def say(self, text: str) -> None:
+    def say(self, text: str, rate: float = 1.0) -> None:
         self.said.append(text)
 
     def speaking(self) -> bool:
@@ -206,3 +206,37 @@ def test_espeak_uses_the_first_linux_voice_found():
 
     Speaker("espeak", which=_which("espeak-ng"), popen=popen).say("Type 42")
     assert plays == [["espeak-ng", "Type 42"]]
+
+
+def test_a_faster_line_is_asked_of_each_system_voice():
+    plays: list[list[str]] = []
+
+    def popen(cmd, **_kwargs):
+        plays.append(cmd)
+        return SimpleNamespace(poll=lambda: 0)
+
+    for backend, tool in (("say", "say"), ("espeak", "espeak-ng"), ("espeak", "spd-say")):
+        Speaker(backend, which=_which(tool), popen=popen).say("Hi", rate=1.5)
+    assert plays == [
+        ["say", "-r", "262", "Hi"], ["espeak-ng", "-s", "262", "Hi"], ["spd-say", "-r", "50", "-w", "Hi"],
+    ]
+
+
+def test_kokoro_renders_a_faster_line_apart_from_the_normal_one(tmp_path):
+    runs: list[list[str]] = []
+    plays: list[list[str]] = []
+
+    def run(cmd, **_kwargs):
+        runs.append(cmd)
+        Path(cmd[cmd.index("-o") + 1]).write_bytes(b"RIFF")
+        return SimpleNamespace(returncode=0)
+
+    def popen(cmd, **_kwargs):
+        plays.append(cmd)
+        return SimpleNamespace(poll=lambda: 0)
+
+    speaker = Speaker("kokoro", which=_which("kokoro", "afplay"), popen=popen, run=run, cache=tmp_path)
+    speaker.say("Hi")
+    speaker.say("Hi", rate=1.5)
+    assert "--speed" not in runs[0] and runs[1][-2:] == ["--speed", "1.5"]
+    assert plays[0][1] != plays[1][1]

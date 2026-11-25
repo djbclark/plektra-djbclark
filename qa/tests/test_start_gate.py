@@ -5,7 +5,15 @@ import pytest
 from rich.console import Console
 
 from plektra_qa.inputlog import Event
-from plektra_qa.start_gate import START_TAG, StartGate, StartGateError, card_text, is_start_event
+from plektra_qa.start_gate import (
+    SETTLE_S,
+    SPEECH_RATE,
+    START_TAG,
+    StartGate,
+    StartGateError,
+    card_text,
+    is_start_event,
+)
 
 
 def ev(type_, code, value):
@@ -37,7 +45,7 @@ class Voice:
     def __init__(self):
         self.said = []
 
-    def say(self, text):
+    def say(self, text, rate=1.0):
         self.said.append(text)
 
 
@@ -92,3 +100,43 @@ def test_card_names_the_ways_to_start():
     assert "press any key" in both and "tap the screen" not in both and "type go" in both
     assert "press Done on the bar" in card_text("t", "Do it.", phone=True, terminal=False, bar=True)
     assert "type go" not in card_text("t", "Do it.", phone=True, terminal=False)
+
+
+class Talking(Voice):
+    """A voice that never finishes a line by itself."""
+
+    def __init__(self):
+        super().__init__()
+        self.rates, self.stops = [], 0
+
+    def say(self, text, rate=1.0):
+        super().say(text, rate)
+        self.rates.append(rate)
+
+    def speaking(self):
+        return not self.stops
+
+    def stop(self):
+        self.stops += 1
+
+
+def _talking_gate(clock, voice, **kwargs):
+    return StartGate(
+        "serial", speaker=voice, console=Console(file=io.StringIO()), shell=lambda args: "", clock=clock,
+        sleep=clock.sleep, terminal=lambda: None, timeout_s=30.0, **kwargs,
+    )
+
+
+def test_done_on_the_bar_cuts_the_fast_instruction_and_starts_at_once():
+    clock, voice = Clock(), Talking()
+    bar = SimpleNamespace(show=lambda *a: None, wait=lambda **k: None, pressed=lambda: "done")
+    assert _talking_gate(clock, voice, bar=bar).wait("Batch", "Pick up the phone.") == "bar"
+    assert SPEECH_RATE == 1.5 and voice.rates == [SPEECH_RATE] and voice.stops == 1
+    assert clock.now < SETTLE_S + 1
+
+
+def test_a_relayed_go_lets_the_instruction_play():
+    clock, voice = Clock(), Talking()
+    bar = SimpleNamespace(show=lambda *a: None, wait=lambda **k: None, pressed=lambda: None)
+    _talking_gate(clock, voice, bar=bar).wait("Batch", "Pick up the phone.", confirmed=True)
+    assert voice.stops == 0

@@ -253,3 +253,16 @@ def test_youtube_chapters_merge_anything_under_ten_seconds():
     assert all(b - a >= 10 for (a, _), (b, _) in zip(merged, merged[1:]))
     meta = ffmetadata(items, 50.0)
     assert meta.startswith(";FFMETADATA1") and meta.count("[CHAPTER]") == 5 and "title=d" in meta
+
+
+def test_the_voice_track_is_rendered_at_the_speed_it_was_spoken(tmp_path):
+    runs: list[list[str]] = []
+
+    def run(cmd, **_kwargs):
+        runs.append(cmd)
+        return SimpleNamespace(stdout=b"")
+
+    recorder = Recorder("serial", tmp_path, run=run, which=lambda name: name, capture_input=False)
+    recorder.on_speech("say", time=1.0, text="Hi", kind="say", rate=1.5)
+    recorder._pcm(recorder._lines[0], tmp_path)
+    assert runs[0][:3] == ["say", "-r", "262"]

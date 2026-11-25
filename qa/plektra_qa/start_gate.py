@@ -26,6 +26,7 @@ from plektra_qa.screen_gate import START_TAG, adb_shell
 
 START_TIMEOUT_S = 900.0
 SETTLE_S = 1.0  # presses this soon after the card went up are not a start
+SPEECH_RATE = 1.5  # the opening instruction is long: it is read faster than the trial prompts
 POLL_S = 0.1
 NO_TRACKING_ID = "ffffffff"
 
@@ -147,7 +148,7 @@ class StartGate:
             bar_text = f"{bar_text or BAR_PLAIN_CARD} {repeat_line(repeat_reason)}"
         self._show_card(title, text, ("done", "norec") if recording else ("done",), bar_text=bar_text)
         if self.speaker is not None:
-            self.speaker.say(text)
+            self.speaker.say(text, rate=SPEECH_RATE)
         if confirmed:
             self._done()
             return "relayed"
@@ -155,7 +156,7 @@ class StartGate:
         stop = threading.Event()
         # With the bar only its Done (or a typed go) starts the batch: no key or touch can.
         proc = self._start_phone_watch(events, stop) if self.bar is None else None
-        shown = self._clock()
+        card_up = shown = self._clock()
         try:
             while True:
                 now = self._clock()
@@ -165,7 +166,8 @@ class StartGate:
                     shown = max(shown, now - SETTLE_S + POLL_S)
                 if events and now - shown >= SETTLE_S:
                     return self._done("phone")
-                if self.bar is not None and now - shown >= SETTLE_S:
+                # A bar button is pressed on purpose: it counts while the instruction is still being read.
+                if self.bar is not None and now - card_up >= SETTLE_S:
                     pressed = self.bar.pressed()
                     if pressed == "done" or (recording and pressed == "norec"):
                         self.record_declined = pressed == "norec"
@@ -187,6 +189,10 @@ class StartGate:
                 proc.terminate()
 
     def _done(self, how: str = "relayed") -> str:
+        if how != "relayed":  # the person started: stop reading to them
+            stop = getattr(self.speaker, "stop", None)
+            if callable(stop):
+                stop()
         try:
             if self.bar is not None:
                 self.bar.wait(pressed=how == "bar")  # the bar stays up until the first trial's card

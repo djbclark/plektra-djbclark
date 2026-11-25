@@ -913,6 +913,8 @@ def _run_trials(
                 deadline = first + idle_after_input(trial)
             if overlay is not None:
                 button = overlay.pressed()
+                if button in ("done", "next", "stop"):
+                    voice.started()  # the person has acted: nobody waits for the prompt to finish
                 if button == "retry" or (button == "redo" and index > 0):
                     again = button
                     break
@@ -1056,6 +1058,8 @@ def _end_card(overlay: ButtonBar, speaker: Speaker | None) -> bool:
     deadline = time.perf_counter() + END_CARD_S
     while time.perf_counter() < deadline:
         button = overlay.pressed()
+        if button in ("done", "redo") and speaker is not None:
+            speaker.stop()
         if button == "redo":
             _wait_card(overlay, pressed=True)
             return True

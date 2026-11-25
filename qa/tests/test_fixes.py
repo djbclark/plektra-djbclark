@@ -207,7 +207,7 @@ def test_keys_pressed_while_the_instruction_is_spoken_do_not_start():
     clock = _Clock()
 
     class Voice:
-        def say(self, text): pass
+        def say(self, text, rate=1.0): pass
         def speaking(self): return clock.now < 6
 
     gate = _gate(clock, [KEY], speaker=Voice(), timeout_s=5.0)

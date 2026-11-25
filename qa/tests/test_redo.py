@@ -149,3 +149,36 @@ def test_norec_typed_in_the_terminal_starts_without_recording_and_go_records():
     gate = _gate(bar=gate.bar, line="go\n")
     gate.wait("Batch", "Pick up the phone.", recording=True)
     assert not gate.record_declined
+
+
+class _Talking:
+    """A voice that never finishes a line by itself."""
+
+    enabled = True
+
+    def __init__(self):
+        self.line, self.cut = None, []
+
+    def prepare(self, texts):
+        return None
+
+    def say(self, text, rate=1.0):
+        self.line = text
+
+    def speaking(self):
+        return self.line is not None
+
+    def stop(self):
+        if self.line is not None:
+            self.cut.append(self.line)
+        self.line = None
+
+
+def test_done_cuts_the_trial_prompt_and_the_end_card_speech(monkeypatch):
+    monkeypatch.setattr(hitl_runner, "END_CARD_S", 1.0)
+    voice = _Talking()
+    run_chord_batch(
+        ScreenController(lambda **_k: _Field("x")), _kept(), Console(file=io.StringIO()),
+        overlay=_Bar(["done", "done"]), speaker=voice,
+    )
+    assert len(voice.cut) >= 2 and hitl_runner.END_SPOKEN in voice.cut
