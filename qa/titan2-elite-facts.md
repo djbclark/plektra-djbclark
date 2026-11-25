@@ -233,3 +233,18 @@ configuration change itself.
    `x`, leaving `red x`. This repeated the replacement observed in the earlier Ctrl+N trial.
 5. T14 and T15 could not score screen trackpad motion. Their respective final texts were `a` and `fh`.
    The initial `xcd` and the `g` were absent from the corresponding bench key streams.
+
+## 13. Guided overlay gestures (2026-11-25)
+
+1. The signed overlay update installed over 0.3.0 and reported 0.4.0. On the cancellation retry,
+   minimizing the start card and tapping the adjacent × logged `button=stop`. The start gate exited
+   as cancelled and the recording directory stayed empty. The earlier attempt logged `button=done`
+   and made a brief recording before host Ctrl-C.
+2. During the scored run, the recording showed the bar being dragged, carrying its position into the
+   next prompt, and minimizing into a bubble. The bubble moved and reopened the bar. The operator
+   confirmed dragging the bubble onto the bottom × worked. The phone logged Stop and showed the
+   end card. The bench reported Body focus through the first trial and received no keys for its text.
+3. The operator could read through the panel and reported opaque colored buttons. They preferred
+   one QA circle and dismissal by dragging to the bottom ×. Two overlapping voices were heard near
+   handback. The second voice's source is open. The host now finishes its spoken line before posting
+   the end card, and its overlay log reader survives a terminal Ctrl-C through end-card cleanup.
