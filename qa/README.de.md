@@ -22,6 +22,8 @@ Die [Demo](suites/harness_demo.yaml) verwendet nur den eingebauten Prüfstand un
 
 Starte am Handy mit **Done** für eine Aufnahme oder **No rec** ohne Aufnahme. In T2 probierst du **Redo** einmal aus. Tippe auf der Schlusskarte erneut auf **Done**. Das Terminal zeigt den Pfad zur vollständigen MP4-Datei und zum Zusammenschnitt der bestandenen Versuche. Prüfe in der vollständigen Datei Bild, Ton, Kapitel, Tasten- und Berührungsspur sowie mögliche private Inhalte. Die [englische Anleitung](README.md#check-the-video) enthält einen `ffprobe`-Befehl zur Prüfung.
 
+Die Sprachausgabe läuft auf dem Host-Computer. Schalte andere Ansagen für den Durchlauf stumm, wenn sie sich mit der Demo überschneiden. In Paseo Herald gilt **Mute here** für das aktuelle Gerät.
+
 ## Inhalt
 
 1. [Wie ein Durchlauf aussieht und klingt](#1-wie-ein-durchlauf-aussieht-und-klingt)

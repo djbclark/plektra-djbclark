@@ -20,6 +20,8 @@ Use overlay **0.4.1 or newer** for the full demo. The [demo suite](suites/harnes
 
 Hold the phone and wait for the start card. Tap **Done** to start recording the screen, spoken prompts, keys, and touches. **No rec** starts without recording. Follow the numbered instructions, including one deliberate **Redo** in T2. On the last card, tap **Done** again to finish and listen for the handback announcement.
 
+Spoken prompts play on the host computer. If another desktop narrator competes with them, mute its announcements for the run. In Paseo Herald, **Mute here** applies to the current device.
+
 The terminal prints the paths to the full `plektra-qa-*.mp4` and a separate `harness_demo-final.mp4` assembled from passing clips. Review the **full MP4** to see the redo and the transitions. Repeat with `just qa-demo --record-dir /path/to/demo-output` to keep this run's recording and bench logs in a known location.
 
 ### Check the video
