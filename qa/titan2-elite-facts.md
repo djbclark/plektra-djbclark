@@ -192,4 +192,22 @@ configuration change itself.
    moved to the **⋮** button of the bottom bar, not to the title, and the typed letters appeared in neither field.
    Logcat showed no configuration change and no relaunch during the tries. So the Tab-to-title behaviour in item 1
    probably comes from the relaunch (not proven), and this run says nothing about the first letter.
-7. Not checked: vendor Tab, then a keyboard key that types nothing (Shift), a pause, then typing.
+7. In the interrupted batch 10 screen recording, tries 1 and 3 of vendor Tab, left Shift, pause, then typing
+   each showed `Beta` in the title while the body still showed its placeholder. The software keyboard was
+   visible in both attempts. The harness read the body, so it could not score the title. The screen recording
+   did not show a try 2 prompt. These two attempts kept the first letter with the extra Shift press; they
+   do not establish whether that press or the pause was responsible.
+
+## 11. Interrupted batch 10 (2026-11-25)
+1. Trial 10 sent three Android Right Alt events (key code 58, scan code 56) in the positions where the
+   prompt called for Shift. The bench captured `x *!9d`. This does not exercise the Caps Lock sequence.
+2. Trial 13 advertised the printed right ⇧ for Enter. The bench received Left Shift (key code 59, scan code
+   54) before and after IME handling and showed `aB`, without a newline. The subsequent live keymap read
+   still rendered that keycap as Enter. The observed mismatch needs a fresh paired key and remap check.
+3. Trial 15 recorded Ctrl+S followed by Ctrl+B. Ctrl+B toggles the full software keyboard on this build;
+   later trial prompts were visible with it open.
+4. Trials 22 and 23 ended with the original text. The final A and H keys, respectively, were absent from
+   the bench event stream, so the trials could not score swipe motion. The source's permission toast comes
+   from the Android “Display over other apps” check. The later read-only check found that permission
+   allowed and the configured trackpad trigger set to Left Shift. This does not establish the permission
+   state during the interrupted run.
