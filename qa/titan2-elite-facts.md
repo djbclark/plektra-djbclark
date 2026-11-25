@@ -254,3 +254,15 @@ configuration change itself.
    captured physical `p l u m` and displayed `Plum` in Body. Dropping the bubble on the bottom ×
    logged Stop. The host announced that the phone could be used normally and the device readback
    showed display inversion off.
+
+## 14. Emoji toolbar and picker selectors (2026-11-25)
+
+On the Titan 2 Elite (Android 16, firmware `Titan 2 Elite_V02.00.06`), a side-by-side Stable Debug build of [upstream PR #230](https://github.com/pkb-rocks/plektra/pull/230) at `03c2715f` was selected temporarily over the synthetic HITL typing bench (overlay 0.4.1). The CI APK identified as version 26.09 (26090000), package `rocks.pkb.plektra`. The installed APK's SHA-256 matched the staged [CI artifact](https://github.com/djbclark/plektra-djbclark/actions/runs/45722694177).
+
+| Control | FIRERPA 10.12 hierarchy and resource-ID lookup | Upstream input-flow probe |
+| --- | --- | --- |
+| `plektra_toolbar_emoji` | Found the button by its ID and tapped it to open the picker. | Found `bar:emoji`. |
+| `plektra_emoji_search_toggle` | Found the toggle by its ID and tapped it to show search. | Found `picker:search`. |
+| `plektra_emoji_search_field` | Found a focused `EditText` by its ID after opening search. The field was absent from the dump before the toggle. | The probe exposes the search toggle as the action for entering search. |
+
+The upstream runner's plain `adb shell uiautomator dump` of the bench window returned none of the three IME IDs. The FIRERPA hierarchy exposed all three as their surfaces opened. Immediately after the first install, `ime enable` returned “Unknown input method.” The service appeared in `ime list -a -s` before the successful retry. The original keyboard and screen settings were restored, the test IME was disabled, and the end card released the phone. The check ran without recording.
