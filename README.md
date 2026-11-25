@@ -231,6 +231,8 @@ python3 scripts/debug_device.py --device <serial> --env .env restore <backup-dir
 
 Restore requires the same package on the same device with a debuggable APK installed. Only supplied keys and optional speech settings are changed by the key import; omitted settings remain unchanged.
 
+The fork includes a [guided phone QA harness](qa/README.md) with a synthetic test bench, spoken prompts, and chaptered screen recordings. Start with its [short harness demo](qa/README.md#quick-start-harness-demo).
+
 Distributed forks must use their own name, application ID, update endpoints and branding, and must not present themselves as official Plektra releases.
 
 ## Project links

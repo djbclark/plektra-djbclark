@@ -1,12 +1,35 @@
 English · [Deutsch](README.de.md)
 
-# Plektra QA harness: a person types, the computer watches
+# Plektra QA harness
 
-This folder tests Plektra on a real phone with a real hardware keyboard. A person types on the phone's keyboard. The computer prepares each text field, tells the person what to type, reads what arrived, and scores it (pass or fail, a character diff, words per minute).
+Run repeatable, guided keyboard checks on an Android developer phone. The host opens a test field, displays and reads each instruction, and compares the text that arrives. Typing trials use input supplied by the person holding the phone. The host prepares fields through [FIRERPA](https://github.com/firerpa/lamda) and can switch between hardware and software keyboard modes.
 
-The computer never types for you. Plektra's job is turning physical key presses into text, so only real key presses test it. The computer drives the screen through [FIRERPA](https://github.com/firerpa/lamda) (lamda) over adb and never touches the input method.
+The harness is maintained in the fork. The reference setup is a non-rooted Titan 2 Elite running Android 16 and FIRERPA 10.12.
 
-Status: fork-only, not part of upstream Plektra. Proven on a Unihertz Titan 2 Elite (Android 16, not rooted). Any Android phone that runs FIRERPA 10.12 over adb should work.
+## Quick start: harness demo
+
+After [one-time setup](#3-one-time-setup) and [installing the overlay APK](overlay-app/README.md#install), run from the repository root:
+
+```bash
+cd qa
+just qa-connect
+just qa-demo
+```
+
+Use overlay **0.4.1 or newer** for the full demo. The [demo suite](suites/harness_demo.yaml) uses only the built-in test bench and synthetic text. It shows the movable bar and bubble, redo from a known field state, keyboard-mode switching, field focus, key and touch capture, and the end card. Allow a few minutes for the seven trials. Use an ordinary pace and aim for a **2–6 minute** full recording.
+
+Hold the phone and wait for the start card. Tap **Done** to start recording the screen, spoken prompts, keys, and touches. **No rec** starts without recording. Follow the numbered instructions, including one deliberate **Redo** in T2. On the last card, tap **Done** again to finish and listen for the handback announcement.
+
+The terminal prints the paths to the full `plektra-qa-*.mp4` and a separate `harness_demo-final.mp4` assembled from passing clips. Review the **full MP4** to see the redo and the transitions. Repeat with `just qa-demo --record-dir /path/to/demo-output` to keep this run's recording and bench logs in a known location.
+
+### Check the video
+
+```bash
+ffprobe -v error -show_entries format=duration:stream=codec_type:chapter=start_time,end_time:chapter_tags=title \
+  -of json /path/to/plektra-qa-demo.mp4
+```
+
+Confirm the full recording is about 120–360 seconds and has video, audio with the voice enabled, chapters, and a Terminal log subtitle stream with the default panel enabled. Play the file and check that the key and touch band, spoken instructions, redraws, and chapter changes line up. Review the frame and event log for private information before sharing the MP4.
 
 ## Contents
 
@@ -29,8 +52,8 @@ Status: fork-only, not part of upstream Plektra. Proven on a Unihertz Titan 2 El
 | --- | --- | --- |
 | Inverted colors, shade card `Hands off` | The computer is using the screen (opening the app, clearing the field). | Don't touch the phone. |
 | The bar says `Wait a few seconds...` and has no buttons | The computer is getting the next step ready. | Wait for the next card. |
-| Ordinary colors. The shade opens for 4 seconds with the action, closes, then the computer beeps and says the action out loud. | Your turn. | Type that action on the phone's keyboard. |
-| `Still waiting.` and the action again | Nothing reached the field for 10 quiet seconds. | Start typing. After 3 reminders the run stops, assuming you have left. |
+| Ordinary colors. The action appears on the bar, is posted to the shade, and is spoken. With `--no-bar`, the shade opens briefly and closes. | Your turn. | Type that action on the phone's keyboard. |
+| `Still waiting.` and the action again | Nothing reached the field during the configured quiet interval. | Start typing. A suite can cap the number of reminders. |
 | `Done. No more batches: the phone may be used normally.` (end-of-batch card, section 4) | The batch is over, any recording has stopped and the phone's settings are back to normal. | Use the phone as usual. Read the table on the computer. |
 | `Wait. Another batch is coming: please leave the phone for now.` (end-of-batch card, section 4) | This batch is over and another one will follow. | Leave the phone alone until its start card appears. |
 | The shade card `Swipe away to stop testing` | Always there during a pass. | Swipe it away only to stop testing. The phone then restores its own settings, even if the computer has lost contact. |
@@ -43,7 +66,7 @@ The harness keeps the screen on during a pass. When the pass ends (normally, aft
 2. An Android phone with a hardware keyboard, developer options and USB debugging on, and Plektra installed and chosen as the keyboard.
 3. FIRERPA 10.12 running on the phone as the `shell` user, started with a client certificate (`lamda.pem`). No root, no APK.
 4. Optional: a voice. [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) through [kokoro-cli](https://pypi.org/project/kokoro-cli/) sounds best and runs offline. Without it the harness uses macOS `say`, or `spd-say` / `espeak-ng` on Linux, or stays silent.
-5. A note-taking app with a plain text field. The sample suite uses Pinnote (`branislav667.pinnote`).
+5. The [overlay app](overlay-app/README.md) for the demo and built-in test bench. The separate smoke suite also uses Pinnote (`branislav667.pinnote`).
 6. `scrcpy` and `ffmpeg` on the computer, because runs are recorded by default (macOS: `brew install scrcpy ffmpeg`). To run without them, turn recording off (section 4).
 
 ## 3. One-time setup
@@ -194,7 +217,7 @@ Errors you may see:
 
 | Error | Meaning |
 | --- | --- |
-| `stopped from the phone` | The stop card was seen and then swiped away. Later trials do not start. |
+| `stopped from the phone` | You pressed Stop, swiped away the stop card, or dropped the QA bubble on the bottom ×. Later trials do not start. |
 | `never started after the spoken prompts` | Nothing was typed after the action and every reminder. Later trials do not start. |
 | `stop card did not appear` | The phone never listed the stop card. This is a harness problem, not your swipe. |
 | `click target not found: …` / `input field not found` | The app was not on the expected screen. Check the suite's `package`, `activity` and `resource_id`. |

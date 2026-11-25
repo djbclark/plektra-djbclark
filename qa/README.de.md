@@ -8,6 +8,20 @@ Der Computer tippt nie für dich. Plektras Aufgabe ist es, physische Tastendrüc
 
 Stand: nur im Fork, nicht Teil von Upstream-Plektra. Erprobt auf einem Unihertz Titan 2 Elite (Android 16, ohne Root). Jedes Android-Telefon, auf dem FIRERPA 10.12 über adb läuft, sollte funktionieren.
 
+## Schnellstart: Harness-Demo
+
+Nach der [Einrichtung](#3-einmalige-einrichtung) und Installation der Overlay-App (Version 0.4.1 oder neuer):
+
+```bash
+cd qa
+just qa-connect
+just qa-demo
+```
+
+Die [Demo](suites/harness_demo.yaml) verwendet nur den eingebauten Prüfstand und Beispieldaten. Sie zeigt die verschiebbare Leiste, die Blase, **Redo**, den Wechsel der Tastaturansicht, den Eingabefokus und den Abschluss. Die vollständige Aufnahme soll etwa zwei bis sechs Minuten dauern.
+
+Starte am Handy mit **Done** für eine Aufnahme oder **No rec** ohne Aufnahme. In T2 probierst du **Redo** einmal aus. Tippe auf der Schlusskarte erneut auf **Done**. Das Terminal zeigt den Pfad zur vollständigen MP4-Datei und zum Zusammenschnitt der bestandenen Versuche. Prüfe in der vollständigen Datei Bild, Ton, Kapitel, Tasten- und Berührungsspur sowie mögliche private Inhalte. Die [englische Anleitung](README.md#check-the-video) enthält einen `ffprobe`-Befehl zur Prüfung.
+
 ## Inhalt
 
 1. [Wie ein Durchlauf aussieht und klingt](#1-wie-ein-durchlauf-aussieht-und-klingt)
