@@ -171,17 +171,21 @@ Only "Swap right Shift and Enter" on: printed ⏎ (scan 28) types SHIFT_RIGHT(60
    pkg:android, defaultSystemSet:true) with no agent or Plektra code touching it; cause unknown. Later flips were
    the operator's Quick Settings rotation tile, which shows "0°" when locked.
 
-## 10. First letter lost after the printed Recent key (vendor Tab): seen once, in Pinnote only (2026-11-25)
-Not reproduced. Seen in one app only, so it is **not attributed to the keyboard** until it is reproduced in a
-separate app (`qa/suites/tab_first_letter.yaml`). Cause not established.
-1. One recorded QA run, two attempts, Pinnote note editor, cursor in the body: press printed Recent (□; vendor Tab,
-   moves the cursor to the title), then type `beta`. The title read `Eta` after both. Established from the recording:
-   its `getevent` key overlay and the video frames.
-2. `getevent` shows the B key in both attempts, about 1.7 s after the Recent press, with no Backspace or Delete
-   between B and E.
-3. Screen: in attempt 1 a B appeared in the title, then the title went back to its empty hint before E arrived. In
-   attempt 2 no frame shows a B.
-4. In both attempts the keyboard's touch surface reported a contact (about 0.5 s) around the B press.
-5. Possibly related, not checked for this case: section 7 item 5 (the Recent press and the next keyboard key each
-   change the keyboard configuration and relaunch an app that does not handle `keyboard|keyboardHidden` itself).
-   Whether Pinnote handles it, and whether it relaunched here, was not checked.
+## 10. First letter lost after the printed Recent key (vendor Tab) in Pinnote: with both keyboards (2026-11-25)
+The app relaunch is the likely cause; it is **not specific to Plektra**. Not seen in an app that handles the keyboard
+configuration change itself.
+1. First seen in one recorded run, two attempts, Pinnote note editor, cursor in the body: press printed Recent (□; vendor
+   Tab, moves the cursor to the title), then type `beta`. The title read `Eta` after both. `getevent` showed the B key
+   about 1.7 s after the Recent press, with no Backspace or Delete between B and E. In attempt 1 a B appeared in the
+   title, then the title went back to its empty hint before E arrived; in attempt 2 no frame shows a B. In both attempts the keyboard's touch surface
+   reported a contact around the B press.
+2. Test bench (button-bar app, handles `keyboard|keyboardHidden` itself), Plektra, `qa/suites/tab_first_letter.yaml`:
+   10 of 10 tries kept the first letter.
+3. Pinnote with Plektra, `qa/suites/smoke_chords.yaml` trial 6: 1 of 1 failed (`Eta`).
+4. Pinnote with the stock Kika keyboard (`com.iqqijni.bbkeyboard`), same steps, a new note per try: 3 of 3 failed
+   (`Ta`, `Eta`, `Eta`).
+5. Pinnote's `NoteEditActivity` declares no `configChanges` (`aapt2 dump xmltree`). In every Kika try, and in the
+   Plektra trial 6 log, `configuration_changed 48` and `wm_relaunch_resume_activity … NoteEditActivity,30` appeared
+   twice per try, 1-1.7 s apart (consistent with section 7 item 5: one at the Recent press, one at the first letter;
+   key times were not lined up with the log).
+6. Not checked: the same steps in Pinnote with a Tab sent by a key of the keyboard device (no configuration flip).
