@@ -141,8 +141,10 @@ class StartGate:
         )
         self.console.print(f"[bold]{escape(title)}[/bold]\n{escape(text)}")
         bar_text = BAR_RECORD_CARD if recording else None
-        if repeat_reason:  # the bar holds 200 characters: the reason and how to start
-            bar_text = f"{repeat_line(repeat_reason)} {bar_text or BAR_PLAIN_CARD}"
+        if repeat_reason:
+            # The bar holds 200 characters in four lines. How to start (and that it records) comes first: a
+            # cut card may lose the end of the reason, which the terminal and the voice also give.
+            bar_text = f"{bar_text or BAR_PLAIN_CARD} {repeat_line(repeat_reason)}"
         self._show_card(title, text, ("done", "norec") if recording else ("done",), bar_text=bar_text)
         if self.speaker is not None:
             self.speaker.say(text)

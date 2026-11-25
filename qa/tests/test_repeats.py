@@ -181,7 +181,9 @@ def test_the_start_card_shows_the_reason_on_screen_and_terminal(recording):
                      terminal=lambda: None)
     gate.wait("Batch", "Pick up the phone.", confirmed=True, recording=recording, repeat_reason=reason)
     card = bar.shown[0][0]
-    assert card.startswith(f"Repeats on purpose: {reason}.") and "Done starts" in card
+    # how to start comes first, so a card the bar cuts never loses that or the recording notice
+    assert card.startswith(BAR_RECORD_CARD if recording else "Done starts.")
+    assert card.endswith(f"Repeats on purpose: {reason}.")
     assert len(card) <= 200  # the bar app cuts there
     assert (BAR_RECORD_CARD in card) is recording
     assert reason in out.getvalue()
