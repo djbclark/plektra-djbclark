@@ -462,14 +462,17 @@ class Recorder:
                 cmd += ["-map", f"{audio}:a", "-c:a", "aac", "-af", "apad"]
             if srt_index > 0:
                 cmd += ["-map", f"{srt_index}:s", "-c:s", "mov_text", "-metadata:s:s:0", "title=Terminal log"]
+            pending = self.output.with_suffix(".partial.mp4")
             cmd += [
                 "-map_metadata", str(meta_index), "-map_chapters", str(meta_index),
                 "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
-                "-t", f"{length:.2f}", "-movflags", "+faststart", str(self.output),
+                "-t", f"{length:.2f}", "-movflags", "+faststart", str(pending),
             ]
             try:
                 self._encode(cmd, band_frames(length, width, keys, touches, self._t0))
+                pending.replace(self.output)
             except (OSError, subprocess.SubprocessError) as exc:
+                pending.unlink(missing_ok=True)
                 self.warnings.append(f"ffmpeg could not write {self.output.name}; the raw video is kept at {self._raw}: {exc}")
                 return None
             self.chapters_file = write_chapter_files(items, length, self.output)

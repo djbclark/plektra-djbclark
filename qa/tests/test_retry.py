@@ -239,7 +239,7 @@ def test_redo_of_a_trial_that_keeps_the_field_replays_the_trial_that_fills_it(sm
         (copy, "done"),
     )
     results, seen = _run(notes, bar, smoke[4:7])
-    assert [c[0] for c in bar.cards] == [*(smoke[i].shade for i in (4, 5, 6, 5, 6)), END_DONE_TEXT]
+    assert [c[0] for c in bar.cards] == [*(f"T{smoke[i].number}. {smoke[i].shade}" for i in (4, 5, 6, 5, 6)), END_DONE_TEXT]
     assert [r.number for r in results] == [5, 6, 7] and all(r.passed for r in results)
     assert seen == {"discard": [7], "redo": [6]}
     assert bar.seen[3][:2] == CLEAN and bar.seen[4] == (TITLE, {BODY: "", TITLE: "Beta"}, "")
