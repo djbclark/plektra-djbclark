@@ -265,4 +265,4 @@ def test_the_voice_track_is_rendered_at_the_speed_it_was_spoken(tmp_path):
     recorder = Recorder("serial", tmp_path, run=run, which=lambda name: name, capture_input=False)
     recorder.on_speech("say", time=1.0, text="Hi", kind="say", rate=1.5)
     recorder._pcm(recorder._lines[0], tmp_path)
-    assert runs[0][:3] == ["say", "-r", "262"]
+    assert runs[0][:3] == ["say", "-r", "282"]

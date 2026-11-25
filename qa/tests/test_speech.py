@@ -218,7 +218,7 @@ def test_a_faster_line_is_asked_of_each_system_voice():
     for backend, tool in (("say", "say"), ("espeak", "espeak-ng"), ("espeak", "spd-say")):
         Speaker(backend, which=_which(tool), popen=popen).say("Hi", rate=1.5)
     assert plays == [
-        ["say", "-r", "262", "Hi"], ["espeak-ng", "-s", "262", "Hi"], ["spd-say", "-r", "50", "-w", "Hi"],
+        ["say", "-r", "282", "Hi"], ["espeak-ng", "-s", "262", "Hi"], ["spd-say", "-r", "50", "-w", "Hi"],
     ]
 
 

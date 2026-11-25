@@ -50,8 +50,9 @@ def _player(which: Which) -> list[str] | None:
     return None
 
 
-# The words a minute that macOS `say` and espeak use at about their normal speed.
-BASE_WPM = 175
+# The words a minute each program uses at its normal speed. espeak documents 175. For macOS `say`, which also
+# reads 175 at normal speed but moves in steps, -r 282 measured 1.5 times normal (2026-11-25); 262 gave 1.43.
+BASE_WPM = {"say": 188, "espeak": 175}
 
 
 def rate_args(tool: str, rate: float) -> list[str]:
@@ -60,7 +61,9 @@ def rate_args(tool: str, rate: float) -> list[str]:
         return []
     if tool == "spd-say":  # percent faster or slower, -100 to 100
         return ["-r", str(max(-100, min(100, round((rate - 1) * 100))))]
-    return ["-r" if tool == "say" else "-s", str(round(BASE_WPM * rate))]
+    if tool == "say":
+        return ["-r", str(round(BASE_WPM["say"] * rate))]
+    return ["-s", str(round(BASE_WPM["espeak"] * rate))]
 
 
 def pick_backend(choice: str | None = None, which: Which = shutil.which) -> str:
