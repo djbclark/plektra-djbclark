@@ -38,6 +38,8 @@ The second A/B batch (Plektra arm) was dropped after Kika failed 3 of 3: Plektra
 - [ruling] "at end of queue, we want to make as much as reasonable be algorithmic instead of AI based, as that will likely be faster and use less tokens." (djbclark, 2026-11-25)
 - [decision] skip the Plektra arm of the A/B; rejected: running three more tries; because Plektra losses were already recorded.
 
+- [ruling] "We talk at 1.5x for the opening monologue, and also hitting done should end it immediatly so human does not have to wait for speach to end" (djbclark, 2026-11-25)
+
 ## Relations
 - continues [[HANDOFF_standalone-f12a_qa-test-bench_2026-11-25_c47a]]
 - decided_in [[HANDOFF_standalone-f12a_qa-first-letter-cause_2026-11-25_ec59]]
@@ -52,6 +54,7 @@ The second A/B batch (Plektra arm) was dropped after Kika failed 3 of 3: Plektra
 At most 3 repeats. End each batch with the phone state. Prefer scripts over AI turns (queued last). Runs record by default and a batch waits for djbclark's start. Claude Code outside Paseo: local handoff only; djbclark runs /new and /baton.
 
 ## Where We're Going
+0. FIRST (djbclark, 2026-11-25, newest ask, not started): speak the opening monologue (the start-card instruction) at 1.5x, and make Done on the bar cut the speech and act immediately, so the person never waits for speech to end. Look in qa/plektra_qa/start_gate.py and speech.py (voice backends kokoro, say, espeak: set the rate in each). Add tests, update qa/README.md and README.de.md, commit in the writer worktree, push plk/main, fast-forward the run copy. Delegate to a Sonnet sub-agent. Check whether Done during later spoken prompts also waits for speech, and fix that the same way.
 1. Report the finding and ask djbclark whether to run the control (3 tries in Pinnote with a keyboard-device Tab, for example right ⇧ under Plektra's swap, tapping only that key; expected: no loss). It would also confirm a user workaround.
 2. File it where it belongs, after a duplicate search: Pinnote (find its repo; missing configChanges / lost input on relaunch), and add the fact to upstream device-facts PR pkb-rocks/plektra#205 (respect the upstream holds memory). Consider whether Plektra can or should mitigate it.
 3. Move smoke_chords phase two to an app that handles keyboard configuration changes (the bench), so trial 6 tests the keyboard.
