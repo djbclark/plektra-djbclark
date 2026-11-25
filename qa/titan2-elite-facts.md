@@ -192,4 +192,65 @@ configuration change itself.
    moved to the **⋮** button of the bottom bar, not to the title, and the typed letters appeared in neither field.
    Logcat showed no configuration change and no relaunch during the tries. So the Tab-to-title behaviour in item 1
    probably comes from the relaunch (not proven), and this run says nothing about the first letter.
-7. Not checked: vendor Tab, then a keyboard key that types nothing (Shift), a pause, then typing.
+7. In the interrupted batch 10 screen recording, tries 1 and 3 of vendor Tab, left Shift, pause, then typing
+   each showed `Beta` in the title while the body still showed its placeholder. The software keyboard was
+   visible in both attempts. The harness read the body, so it could not score the title. The screen recording
+   did not show a try 2 prompt. These two attempts kept the first letter with the extra Shift press; they
+   do not establish whether that press or the pause was responsible.
+
+
+8. Follow-up on Android 16 firmware V02.00.06, Plektra 26.09 and test bench 0.3.0: all three
+   guided Pinnote trials kept the first letter after vendor Tab, a left Shift press and a two-second wait.
+   The revised harness scored the field that had focus after Tab. This verifies that sequence on this
+   setup. The original sequence without the Shift press remains a separate case.
+
+## 11. Interrupted batch 10 (2026-11-25)
+1. Trial 10 sent three Android Right Alt events (key code 58, scan code 56) in the positions where the
+   prompt called for Shift. The bench captured `x *!9d`. This does not exercise the Caps Lock sequence.
+2. Trial 13 advertised the printed right ⇧ for Enter. The bench received Left Shift (key code 59, scan code
+   54) before and after IME handling and showed `aB`, without a newline. The subsequent live keymap read
+   still rendered that keycap as Enter. The observed mismatch needs a fresh paired key and remap check.
+3. Trial 15 recorded Ctrl+S followed by Ctrl+B. Ctrl+B toggles the full software keyboard on this build;
+   later trial prompts were visible with it open.
+4. Trials 22 and 23 ended with the original text. The final A and H keys, respectively, were absent from
+   the bench event stream, so the trials could not score swipe motion. The source's permission toast comes
+   from the Android “Display over other apps” check. The later read-only check found that permission
+   allowed and the configured trackpad trigger set to Left Shift. This does not establish the permission
+   state during the interrupted run.
+
+## 12. Guided follow-up batch (2026-11-25)
+
+1. T5 requested the full software keyboard. It opened on the symbols layer. The operator switched it
+   to letters before typing `plum`, which passed. Before T6, the harness restored the hardware mode
+   and the operator typed `"Hello"` on the physical keyboard.
+2. T7 produced `ok. Plum`, T8 produced `plum. Jam` after double Space and T9 produced `abCd`
+   after one-shot Shift. The intended behavior occurred after the initial lowercase letter in all three.
+   The first-letter autocapitalization discrepancy is in the bench body and still needs a comparison in Pinnote.
+3. T11 used printed right ⇧ as Enter. The bench received Enter and showed `a\nB`. The newline worked.
+   The trial's overall failure was the initial lowercase `a`.
+4. T12 used Ctrl+S once to move left before inserting `x` and produced `axc`. T13 started with
+   `red plum`, used Ctrl+N, then typed `x`. The bench recorded `commitText` replacing `plum` with
+   `x`, leaving `red x`. This repeated the replacement observed in the earlier Ctrl+N trial.
+5. T14 and T15 could not score screen trackpad motion. Their respective final texts were `a` and `fh`.
+   The initial `xcd` and the `g` were absent from the corresponding bench key streams.
+
+## 13. Guided overlay gestures (2026-11-25)
+
+1. The signed overlay update installed over 0.3.0 and reported 0.4.0. On the cancellation retry,
+   minimizing the start card and tapping the adjacent × logged `button=stop`. The start gate exited
+   as cancelled and the recording directory stayed empty. The earlier attempt logged `button=done`
+   and made a brief recording before host Ctrl-C.
+2. During the scored run, the recording showed the bar being dragged, carrying its position into the
+   next prompt, and minimizing into a bubble. The bubble moved and reopened the bar. The operator
+   confirmed dragging the bubble onto the bottom × worked. The phone logged Stop and showed the
+   end card. The bench reported Body focus through the first trial and received no keys for its text.
+3. The operator could read through the panel and reported opaque colored buttons. They preferred
+   one QA circle and dismissal by dragging to the bottom ×. Two overlapping voices were heard near
+   handback. The second voice's source is open. The host now finishes its spoken line before posting
+   the end card, and its overlay log reader survives a terminal Ctrl-C through end-card cleanup.
+
+4. Overlay 0.4.1 installed over 0.4.0. The operator confirmed the translucent colored buttons,
+   single draggable QA circle, and one audible end announcement. After moving the bar, the bench
+   captured physical `p l u m` and displayed `Plum` in Body. Dropping the bubble on the bottom ×
+   logged Stop. The host announced that the phone could be used normally and the device readback
+   showed display inversion off.
