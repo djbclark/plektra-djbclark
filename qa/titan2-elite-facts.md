@@ -198,6 +198,12 @@ configuration change itself.
    did not show a try 2 prompt. These two attempts kept the first letter with the extra Shift press; they
    do not establish whether that press or the pause was responsible.
 
+
+8. Follow-up on Android 16 firmware V02.00.06, Plektra 26.09 and test bench 0.3.0: all three
+   guided Pinnote trials kept the first letter after vendor Tab, a left Shift press and a two-second wait.
+   The revised harness scored the field that had focus after Tab. This verifies that sequence on this
+   setup. The original sequence without the Shift press remains a separate case.
+
 ## 11. Interrupted batch 10 (2026-11-25)
 1. Trial 10 sent three Android Right Alt events (key code 58, scan code 56) in the positions where the
    prompt called for Shift. The bench captured `x *!9d`. This does not exercise the Caps Lock sequence.
@@ -211,3 +217,20 @@ configuration change itself.
    from the Android “Display over other apps” check. The later read-only check found that permission
    allowed and the configured trackpad trigger set to Left Shift. This does not establish the permission
    state during the interrupted run.
+
+## 12. Guided follow-up batch (2026-11-25)
+
+1. T5 requested the full software keyboard. It opened on the symbols layer. The operator switched it
+   to letters before typing `plum`, which passed. Before T6, the harness restored the hardware mode
+   and the operator typed `"Hello"` on the physical keyboard. The mode change alone leaves the active
+   software keyboard layer intact.
+2. T7 produced `ok. Plum`, T8 produced `plum. Jam` after double Space and T9 produced `abCd`
+   after one-shot Shift. The intended behavior occurred after the initial lowercase letter in all three.
+   The first-letter autocapitalization discrepancy is in the bench body and still needs a comparison in Pinnote.
+3. T11 used printed right ⇧ as Enter. The bench received Enter and showed `a\nB`. The newline worked.
+   The trial's overall failure was the initial lowercase `a`.
+4. T12 used Ctrl+S once to move left before inserting `x` and produced `axc`. T13 started with
+   `red plum`, used Ctrl+N, then typed `x`. The bench recorded `commitText` replacing `plum` with
+   `x`, leaving `red x`. This repeated the replacement observed in the earlier Ctrl+N trial.
+5. T14 and T15 could not score screen trackpad motion. Their respective final texts were `a` and `fh`.
+   The initial `xcd` and the `g` were absent from the corresponding bench key streams.
