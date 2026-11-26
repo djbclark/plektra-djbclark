@@ -1,12 +1,54 @@
 English · [Deutsch](README.de.md)
 
-# Plektra QA harness: a person types, the computer watches
+# Plektra QA harness
 
-This folder tests Plektra on a real phone with a real hardware keyboard. A person types on the phone's keyboard. The computer prepares each text field, tells the person what to type, reads what arrived, and scores it (pass or fail, a character diff, words per minute).
+Run repeatable, guided keyboard checks on an Android developer phone. The host opens a test field, displays and reads each instruction, and compares the text that arrives. Typing trials use input supplied by the person holding the phone. The host prepares fields through [FIRERPA](https://github.com/firerpa/lamda) and can switch between hardware and software keyboard modes.
 
-The computer never types for you. Plektra's job is turning physical key presses into text, so only real key presses test it. The computer drives the screen through [FIRERPA](https://github.com/firerpa/lamda) (lamda) over adb and never touches the input method.
+The harness is maintained in the fork. The reference setup is a non-rooted Titan 2 Elite running Android 16 and FIRERPA 10.12.
 
-Status: fork-only, not part of upstream Plektra. Proven on a Unihertz Titan 2 Elite (Android 16, not rooted). Any Android phone that runs FIRERPA 10.12 over adb should work.
+**Set up with an AI agent** · [Setup guide](SETUP.md)
+
+> Follow [qa/SETUP.md](SETUP.md) to install and verify the guided QA harness for this Plektra checkout.
+
+[Plektra’s upstream input flows](../docs/testing/input-flows.md) inject repeatable input through Android's event pipeline. Use this guided harness when the check calls for a person to press the real keys, perform gestures, or assess what they see and hear.
+
+## See it in action
+
+[![Test bench with the translucent QA bar moved over the focused field, and the corresponding keystroke in the terminal panel](media/movable-bar.png)](media/harness-demo.mp4)
+
+**[Watch the 2:03 Titan 2 Elite demo (MP4)](media/harness-demo.mp4)**. The seven trials use synthetic text. The recording includes host narration, chapters, key and touch annotations, and the synchronized terminal log.
+
+| Software-keyboard trial | Movable QA bubble |
+| --- | --- |
+| ![Software keyboard open beneath the guided typing prompt](media/software-keyboard.png) | ![QA bubble near the top of the test bench after being dragged](media/qa-bubble.png) |
+| Switch to on-screen typing and check the text in the focused field. | Minimize the bar, move the bubble, and tap it to reopen the controls. |
+
+## Quick start: harness demo
+
+After [one-time setup](#3-one-time-setup) and [installing the overlay APK](overlay-app/README.md#install), run from the repository root:
+
+```bash
+cd qa
+just qa-connect
+just qa-demo
+```
+
+Use overlay **0.4.1 or newer** for the full demo. The [demo suite](suites/harness_demo.yaml) uses only the built-in test bench and synthetic text. It shows the movable bar and bubble, redo from a known field state, keyboard-mode switching, field focus, key and touch capture, and the end card. Allow a few minutes for the seven trials. Use an ordinary pace and aim for a **2–6 minute** full recording.
+
+Hold the phone and wait for the start card. Tap **Done** to start recording the screen, spoken prompts, keys, and touches. **No rec** starts without recording. Follow the numbered instructions, including one deliberate **Redo** in T2. On the last card, tap **Done** again to finish and listen for the handback announcement.
+
+Spoken prompts play on the host computer. If another desktop narrator competes with them, mute its announcements for the run. In Paseo Herald, **Mute here** applies to the current device.
+
+The terminal prints the paths to the full `plektra-qa-*.mp4` and a separate `harness_demo-final.mp4` assembled from passing clips. Review the **full MP4** to see the redo and the transitions. Repeat with `just qa-demo --record-dir /path/to/demo-output` to keep this run's recording and bench logs in a known location.
+
+### Check the video
+
+```bash
+ffprobe -v error -show_entries format=duration:stream=codec_type:chapter=start_time,end_time:chapter_tags=title \
+  -of json /path/to/plektra-qa-demo.mp4
+```
+
+Confirm the full recording is about 120–360 seconds and has video, audio with the voice enabled, chapters, and a Terminal log subtitle stream with the default panel enabled. Play the file and check that the key and touch band, spoken instructions, redraws, and chapter changes line up. Review the frame and event log for private information before sharing the MP4.
 
 ## Contents
 
@@ -29,8 +71,8 @@ Status: fork-only, not part of upstream Plektra. Proven on a Unihertz Titan 2 El
 | --- | --- | --- |
 | Inverted colors, shade card `Hands off` | The computer is using the screen (opening the app, clearing the field). | Don't touch the phone. |
 | The bar says `Wait a few seconds...` and has no buttons | The computer is getting the next step ready. | Wait for the next card. |
-| Ordinary colors. The shade opens for 4 seconds with the action, closes, then the computer beeps and says the action out loud. | Your turn. | Type that action on the phone's keyboard. |
-| `Still waiting.` and the action again | Nothing reached the field for 10 quiet seconds. | Start typing. After 3 reminders the run stops, assuming you have left. |
+| Ordinary colors. The action appears on the bar, is posted to the shade, and is spoken. With `--no-bar`, the shade opens briefly and closes. | Your turn. | Type that action on the phone's keyboard. |
+| `Still waiting.` and the action again | Nothing reached the field during the configured quiet interval. | Start typing. A suite can cap the number of reminders. |
 | `Done. No more batches: the phone may be used normally.` (end-of-batch card, section 4) | The batch is over, any recording has stopped and the phone's settings are back to normal. | Use the phone as usual. Read the table on the computer. |
 | `Wait. Another batch is coming: please leave the phone for now.` (end-of-batch card, section 4) | This batch is over and another one will follow. | Leave the phone alone until its start card appears. |
 | The shade card `Swipe away to stop testing` | Always there during a pass. | Swipe it away only to stop testing. The phone then restores its own settings, even if the computer has lost contact. |
@@ -40,10 +82,10 @@ The harness keeps the screen on during a pass. When the pass ends (normally, aft
 ## 2. What you need
 
 1. A Mac or a Linux computer with [`uv`](https://docs.astral.sh/uv/), [`just`](https://just.systems/) and `adb` (Android platform-tools). `uv` downloads Python 3.14 on its own.
-2. An Android phone with a hardware keyboard, developer options and USB debugging on, and Plektra installed and chosen as the keyboard.
+2. An Android phone with developer options and USB debugging on, a physical keyboard, and a debuggable Plektra build selected as the keyboard. Debuggable builds let the host read the active key map and keyboard mode.
 3. FIRERPA 10.12 running on the phone as the `shell` user, started with a client certificate (`lamda.pem`). No root, no APK.
 4. Optional: a voice. [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) through [kokoro-cli](https://pypi.org/project/kokoro-cli/) sounds best and runs offline. Without it the harness uses macOS `say`, or `spd-say` / `espeak-ng` on Linux, or stays silent.
-5. A note-taking app with a plain text field. The sample suite uses Pinnote (`branislav667.pinnote`).
+5. The [overlay app](overlay-app/README.md) for the demo and built-in test bench. The separate smoke suite also uses Pinnote (`branislav667.pinnote`).
 6. `scrcpy` and `ffmpeg` on the computer, because runs are recorded by default (macOS: `brew install scrcpy ffmpeg`). To run without them, turn recording off (section 4).
 
 ## 3. One-time setup
@@ -55,7 +97,7 @@ The harness keeps the screen on during a pass. When the pass ends (normally, aft
    uv tool install --python 3.13 kokoro-cli && kokoro setup && kokoro doctor
    ```
 
-3. Create `qa/.env`. The file is gitignored; never commit it. Use your own values:
+3. Copy `qa/.env.example` to `qa/.env`, run `chmod 600 qa/.env`, and enter your own values. The file is gitignored.
 
    ```dotenv
    FIRERPA_HOST=192.0.2.10          # the phone's address, or 127.0.0.1 with adb forward
@@ -63,6 +105,7 @@ The harness keeps the screen on during a pass. When the pass ends (normally, aft
    FIRERPA_CERT=/absolute/path/to/lamda.pem
    FIRERPA_VERSION=10.12
    ADB_TARGET=SERIAL_OR_IP:5555     # a device that `adb devices` lists right now
+   # PLEKTRA_QA_PACKAGE=rocks.pkb.plektra.djb  # active debuggable app ID if it differs from this default
    # PLEKTRA_QA_VOICE=auto          # auto, kokoro, say, espeak or off
    # PLEKTRA_QA_VOICE_NAME=af_heart # a Kokoro voice; `kokoro voices` lists them
    # PLEKTRA_QA_KEYMAP=/path/to/profile.yaml  # key profile, default keymaps/titan2-elite-baseline.yaml (section 7)
@@ -140,7 +183,9 @@ cd qa && just qa-release                                      # it will not run 
 
 ### Button bar (the default; `--no-bar` uses the shade card)
 
-`just qa-run SUITE` (same as `--bar`) shows a small on-screen bar instead of pulling down the notification shade: the instruction across the full width, and one thin row of small buttons under it (40 dp tall, each a fifth of the bar wide, each in its own color and always in the same place). A matching text does not end a trial; you end it with **Done**, so you can fix a typo first. The batch starts only on the bar's **Done** (or **No rec**, on the start card of a recorded run) or a typed `go` (or `norec`), never on a key or a touch. With `--no-bar`, only a key press (not a touch) or the typed word starts the batch, and a trial with no `timeout_s` ends after 20 s without a key once typing began.
+`just qa-run SUITE` (same as `--bar`) shows a small on-screen bar instead of pulling down the notification shade: a translucent instruction panel with one row of translucent buttons under it (40 dp tall, each a fifth of the bar wide, each in its own color and always in the same place). A matching text does not end a trial; you end it with **Done**, so you can fix a typo first. The batch starts only on the bar's **Done** (or **No rec**, on the start card of a recorded run) or a typed `go` (or `norec`), never on a key or a touch. With `--no-bar`, only a key press (not a touch) or the typed word starts the batch, and a trial with no `timeout_s` ends after 20 s without a key once typing began.
+
+Drag the instruction to reposition the bar. Tap **−** to minimize it to a bubble. Drag the bubble to move it, or tap **QA** to expand it. Drag the bubble to the **×** at the bottom of the screen to dismiss it. Dismissing an active trial stops the batch. The bar stays put as instructions change.
 
 | Button | Color | Where | What it does |
 | --- | --- | --- | --- |
@@ -192,7 +237,7 @@ Errors you may see:
 
 | Error | Meaning |
 | --- | --- |
-| `stopped from the phone` | The stop card was seen and then swiped away. Later trials do not start. |
+| `stopped from the phone` | You pressed Stop, swiped away the stop card, or dropped the QA bubble on the bottom ×. Later trials do not start. |
 | `never started after the spoken prompts` | Nothing was typed after the action and every reminder. Later trials do not start. |
 | `stop card did not appear` | The phone never listed the stop card. This is a harness problem, not your swipe. |
 | `click target not found: …` / `input field not found` | The app was not on the expected screen. Check the suite's `package`, `activity` and `resource_id`. |
@@ -230,9 +275,11 @@ phases:
         clear_field: false       # keep the text from the previous trial
 ```
 
-All trial fields: `prompt`, `expect`, `expect_ci_first`, `verify_mode` (`text` or `clipboard`), `sentinel`, `timeout_s`, `shade`, `speak`, `start_wait_s`, `max_reprompts`, `package`, `activity`, `resource_id`, `text_hint`, `start_resource_id`, `click_resource_id`, `clear_field`, `fresh`, `cue_on_device` (the phone beeps too), and for the test bench `probe_field` and `prefill` (section 12).
+All trial fields: `prompt`, `expect`, `expect_ci_first`, `verify_mode` (`text` or `clipboard`), `sentinel`, `timeout_s`, `shade`, `speak`, `start_wait_s`, `max_reprompts`, `package`, `activity`, `resource_id`, `text_hint`, `start_resource_id`, `click_resource_id`, `clear_field`, `fresh`, `cue_on_device` (the phone beeps too), `software_keyboard` (`hidden` by default, or `shown`), and for the test bench `probe_field` and `prefill` (section 12).
 
 `resource_id` is the field a trial reads. `start_resource_id` is the field to focus (and clear) when a trial starts that names none: such a trial reads whichever field has the focus, so it still works after a key such as Tab moves it. `suites/tab_first_letter.yaml` is an example: three tries of Tab, then typing, on the test bench (section 12).
+
+The bar, notification shade, voice, and terminal use the original suite numbers (`T1`, `T2`, …), including on retries or runs that skip earlier passes. The harness checks Plektra's software keyboard mode and Android's IME window after each trial and before a trial that needs the full keyboard shown. Use `software_keyboard: shown` when the trial requires the on-screen keys.
 
 **At most three times the same action.** A person is not asked to do the same thing over and over (djbclark, 2026-11-25: "10 times is too many times to have a human do the same thing unless we really think that is neccisary. Limit to 3 max on a regular basis."). A suite that asks for the same action more than 3 times is refused before anything touches the phone. The same action is the same instruction on the phone (`shade`, else `prompt`), or the same spoken instruction (`speak`, else that one) with the same `expect`. Numbering such as `try 2 of 10` does not make it a new action, and neither does putting it in another phase.
 
@@ -248,6 +295,7 @@ Tips:
 2. Find resource ids with the MCP tool `inspect_ui_fast`, or `adb shell uiautomator dump` with FIRERPA stopped (section 11, item 6).
 3. Open an app's exported launcher activity, then click into the editor with `click_resource_id`. Activities that are not exported cannot be started directly.
 4. Avoid search boxes as targets: Enter submits them.
+5. Say “space” when you want a space. Use a clear word such as “plum” for sample text. If a trial calls for an arrow, give the keyboard chord as well. For Plektra’s default Ctrl layer, use `<Ctrl+E>` for Up, `<Ctrl+S>` for Left, `<Ctrl+D>` for Down, and `<Ctrl+F>` for Right.
 
 ## 7. Naming keys
 
@@ -342,6 +390,8 @@ adb -s "$ADB_TARGET" shell settings put global heads_up_notifications_enabled 1
 1. No sound: run `kokoro doctor`, or set `PLEKTRA_QA_VOICE=say` (Mac) or `espeak` (Linux).
 2. The voice says the wrong thing for a symbol: add a `speak` line to that trial.
 3. Spoken phrases are cached in `~/.cache/plektra-qa/voice/`. Delete the folder to render them again.
+
+To inspect the visible resource IDs, run `just qa-ui --all` from `qa/` on the authorized test phone. With the phone holder's go-ahead, `just qa-ui --click RESOURCE_ID` taps a control by its full package-qualified ID. Use the IDs reported by the installed build. [Upstream PR #230](https://github.com/pkb-rocks/plektra/pull/230) proposes shared, locale-independent selectors for the keyboard toolbar's emoji button and the full emoji picker's search controls.
 
 ## 10. Develop the harness
 

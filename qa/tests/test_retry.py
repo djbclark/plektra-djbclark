@@ -3,6 +3,8 @@
 
 import io
 import json
+import os
+import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -10,7 +12,7 @@ import pytest
 from rich.console import Console
 from typer.testing import CliRunner
 
-from plektra_qa import cli, hitl_runner
+from plektra_qa import cli, hitl_runner, screen_gate
 from plektra_qa.button_bar import WAIT_TEXT, ButtonBar, parse_line, parse_pm_uid, parse_pm_version
 from plektra_qa.controller import ScreenController
 from plektra_qa.end_state import END_DONE_TEXT
@@ -239,7 +241,7 @@ def test_redo_of_a_trial_that_keeps_the_field_replays_the_trial_that_fills_it(sm
         (copy, "done"),
     )
     results, seen = _run(notes, bar, smoke[4:7])
-    assert [c[0] for c in bar.cards] == [*(smoke[i].shade for i in (4, 5, 6, 5, 6)), END_DONE_TEXT]
+    assert [c[0] for c in bar.cards] == [*(f"T{smoke[i].number}. {smoke[i].shade}" for i in (4, 5, 6, 5, 6)), END_DONE_TEXT]
     assert [r.number for r in results] == [5, 6, 7] and all(r.passed for r in results)
     assert seen == {"discard": [7], "redo": [6]}
     assert bar.seen[3][:2] == CLEAN and bar.seen[4] == (TITLE, {BODY: "", TITLE: "Beta"}, "")
@@ -472,6 +474,122 @@ def test_the_start_card_becomes_the_wait_card(line, pressed):
     assert calls == [pressed]
 
 
+def test_keyboard_guard_reads_override_and_window_and_restores_the_next_surface(monkeypatch):
+    monkeypatch.setenv("PLEKTRA_QA_PACKAGE", "example.ime")
+    actions = []
+    snapshots = iter([
+        '<string name="software_keyboard_mode">force_hardware</string>\n'
+        '<string name="software_keyboard_mode_runtime_override">force_virtual</string>\n'
+        'mCurId=example.ime/.Service\nmInputShown=true\n',
+        '<string name="software_keyboard_mode_runtime_override">force_hardware</string>\n'
+        'mCurId=example.ime/.Service\nmInputShown=true\n',
+    ])
+
+    def shell(args):
+        actions.append(args)
+        return "" if args[-1].endswith("\nchange_qa_keyboard") else next(snapshots)
+
+    gate = ScreenGate("SERIAL", shell=shell)
+    initial = gate.keyboard_state()
+    assert initial.override == "force_virtual" and initial.view_shown
+    restored = gate.restore_keyboard("hidden", initial)
+    assert restored.mode == "force_hardware" and restored.view_shown  # compact control bar
+    assert gate.restore_keyboard("hidden", restored) is restored
+    assert len(actions) == 3 and "SoftwareKeyboardModeActionActivity" in actions[1][-1]
+
+
+@pytest.mark.parametrize(("original", "phone_stop", "lock_contention"), [
+    ("absent", False, False),
+    ("absent", True, False),
+    ("force_hardware", True, False),
+    ("force_virtual", False, False),
+    ("absent", True, True),
+])
+def test_keyboard_mode_journal_restores_exact_override(tmp_path, monkeypatch, original, phone_stop, lock_contention):
+    for name in (
+        "KEYBOARD_JOURNAL", "KEYBOARD_LOCK", "AWAKE_PID", "AWAKE_SCRIPT",
+        "AWAKE_RELEASE", "AWAKE_STOPPED", "AWAKE_NOTES",
+    ):
+        monkeypatch.setattr(screen_gate, name, str(tmp_path / name))
+    monkeypatch.setenv("PLEKTRA_QA_PACKAGE", "example.ime")
+    commands = tmp_path / "bin"
+    commands.mkdir()
+    override = tmp_path / "override"
+    override.write_text(original)
+    Path(screen_gate.AWAKE_PID).touch()
+
+    def command(name, body):
+        executable = commands / name
+        executable.write_text("#!/bin/sh\n" + body)
+        executable.chmod(0o755)
+
+    command("run-as", """
+value=$(cat "$QA_OVERRIDE")
+[ "$value" = absent ] || printf '<string name="software_keyboard_mode_runtime_override">%s</string>\n' "$value"
+""")
+    command("am", """
+case "$1" in
+    broadcast)
+        printf absent > "$QA_OVERRIDE"
+        echo 'Broadcast completed: result=0, data="Temporary software-keyboard mode cleared"'
+        ;;
+    start)
+        case "$(cat "$QA_OVERRIDE")" in
+            force_virtual) printf force_hardware > "$QA_OVERRIDE" ;;
+            *) printf force_virtual > "$QA_OVERRIDE" ;;
+        esac
+        echo 'Status: ok'
+        ;;
+esac
+""")
+    command("cmd", """
+if [ "$2" = list ] && [ ! -f "$QA_STOP_SEEN" ]; then
+    touch "$QA_STOP_SEEN"
+    echo '0|com.android.shell|1|plektra-qa-stop|2000'
+fi
+""")
+    for name in ("settings", "sleep", "svc"):
+        command(name, "exit 0\n")
+    contention = tmp_path / "lock-attempts"
+    command("mkdir", """
+if [ -f "$QA_CONTENDED" ]; then
+    attempts=$(cat "$QA_CONTENDED")
+    echo "$((attempts + 1))" > "$QA_CONTENDED"
+    [ "$attempts" -ge 101 ] || exit 1
+fi
+exec /bin/mkdir "$@"
+""")
+    env = dict(os.environ, PATH=f"{commands}:{os.environ['PATH']}",
+               QA_OVERRIDE=str(override), QA_STOP_SEEN=str(tmp_path / "seen"),
+               QA_CONTENDED=str(contention))
+    gate = ScreenGate("s")
+    gate._saved_timeout = "120000"
+    gate._saved_stay = "0"
+
+    def run(script, check=True):
+        return subprocess.run(["sh", "-c", script], env=env, capture_output=True, text=True,
+                              timeout=10, check=check)
+
+    run(gate._keyboard_script("change_qa_keyboard"))
+    assert override.read_text() != original
+    journal = Path(screen_gate.KEYBOARD_JOURNAL)
+    assert journal.read_text().split()[-2:] == ["example.ime", original]
+
+    if phone_stop:
+        if lock_contention:
+            contention.write_text("0")
+        run(gate._watcher_text())
+        if lock_contention:
+            assert int(contention.read_text()) > 100
+        assert Path(screen_gate.AWAKE_STOPPED).is_file()
+        assert run(gate._keyboard_script("change_qa_keyboard"), check=False).returncode
+    else:
+        run(gate._keyboard_script("restore_qa_keyboard"))
+    assert override.read_text() == original
+    assert not journal.exists()
+    assert not Path(screen_gate.KEYBOARD_LOCK).exists()
+
+
 def test_hands_off_and_yield_are_one_adb_call_each():
     calls = []
 
@@ -481,8 +599,9 @@ def test_hands_off_and_yield_are_one_adb_call_each():
 
     gate = ScreenGate("SERIAL", shell=shell)
     gate.hold("Preparing the field")
-    gate.yield_to_human("x", shade=False)
+    gate.yield_to_human("T1. Type hello", shade=False)
     assert len(calls) == 2 and "notification post" in calls[0][2] and "statusbar collapse" in calls[0][2]
+    assert "notification post" in calls[1][2] and "T1. Type hello" in calls[1][2]
 
 
 # --- recording and import ----------------------------------------------------------------------------

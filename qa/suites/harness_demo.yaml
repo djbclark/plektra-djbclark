@@ -1,0 +1,35 @@
+name: harness_demo
+start_wait_s: 20
+max_reprompts: 2
+phases:
+  - name: harness_demo
+    package: dev.hitlbar.overlay
+    activity: dev.hitlbar.overlay.BenchActivity
+    start_resource_id: dev.hitlbar.overlay:id/probe_body
+    probe_field: body
+    trials:
+      - prompt: Drag the QA bar over a bench label. Read the label through the bar. Type calm river without tapping the field, then tap Done.
+        expect: calm river
+        expect_ci_first: true
+      - prompt: Complete calm rive with the letter R. On the first try, tap Redo and watch the starting text reappear. Finish it again and tap Done.
+        prefill: {body: calm rive}
+        expect: calm river
+        expect_ci_first: true
+      - prompt: Type blue sky with the on-screen keyboard. If it opens on symbols, switch to letters. Tap Done.
+        software_keyboard: shown
+        expect: blue sky
+        expect_ci_first: true
+      - prompt: Check that the on-screen keys have closed. Tap minus, move the QA bubble, then tap it to reopen the bar. Type gentle wind and tap Done.
+        expect: gentle wind
+        expect_ci_first: true
+      - prompt: Look for the cursor in the Title box. Type field focus there without tapping it, then tap Done.
+        resource_id: dev.hitlbar.overlay:id/probe_title
+        probe_field: title
+        expect: field focus
+        expect_ci_first: true
+      - prompt: Type sun, then the letter X. <Backspace>, then type a space and rise. Tap Done.
+        expect: sun rise
+        expect_ci_first: true
+      - prompt: Type demo complete and tap Done. Wait for the end card, then tap Done again to finish.
+        expect: demo complete
+        expect_ci_first: true

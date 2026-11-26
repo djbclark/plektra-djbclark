@@ -8,7 +8,7 @@ import time
 from collections.abc import Callable
 from contextlib import nullcontext
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Any, Literal, NamedTuple
 
 import yaml
 from pydantic import BaseModel, field_validator
@@ -71,6 +71,7 @@ class ChordTrial(BaseModel):
     # key that changes the field, not from the prompt.
     start_wait_s: float = 10
     max_reprompts: int | None = None  # None: keep reprompting, never give up
+    software_keyboard: Literal["hidden", "shown"] = "hidden"
     phase: str = ""
     number: int = 0  # position in the whole suite (1-based): chapters, logs, the table and `import` use it
     raw_prompt: str = ""  # the prompt as written in the YAML, before key tokens were rendered (ledger identity)
@@ -236,6 +237,7 @@ def read_suite(path: Path, keymap: Keymap | None = None) -> Suite:
                 "activity": phase.get("activity"),
                 "probe_field": phase.get("probe_field"),
                 "prefill": phase.get("prefill"),
+                "software_keyboard": phase.get("software_keyboard", data.get("software_keyboard", "hidden")),
                 "phase": phase_name,
             }
             for key, value in raw.items():
@@ -385,7 +387,7 @@ def _table(results: list[TrialResult], current: str) -> Table:
     for result in results:
         mark = "pass" if result.passed else "fail"
         table.add_row(
-            str(result.number or ""),
+            f"T{result.number}" if result.number else "",
             result.phase,
             result.prompt,
             mark,
@@ -655,8 +657,9 @@ def run_chord_batch(
         notice.bar = overlay
     if speaker is not None:
         phrases = [HANDS_OFF]
-        for trial in trials:
-            phrases += [spoken_action(trial), REPROMPT + spoken_action(trial)]
+        for index, trial in enumerate(trials, start=1):
+            action = f"T{trial.number or index}. {spoken_action(trial)}"
+            phrases += [action, REPROMPT + action]
         speaker.prepare([*phrases, *notice.phrases()])
     device = controller.device
     results: list[TrialResult] = []
@@ -706,9 +709,9 @@ def spoken_action(trial: ChordTrial) -> str:
 class _Reprompter:
     """Say the action, then say it again after a human-length quiet spell."""
 
-    def __init__(self, speaker: Speaker | None, trial: ChordTrial) -> None:
+    def __init__(self, speaker: Speaker | None, trial: ChordTrial, number: int) -> None:
         self.speaker = speaker if speaker is not None and speaker.enabled else None
-        self.text = spoken_action(trial)
+        self.text = f"T{number}. {spoken_action(trial)}"
         self.wait_s = trial.start_wait_s
         self.left = trial.max_reprompts if trial.max_reprompts is not None else 10**9
         self.quiet_since: float | None = None
@@ -794,6 +797,9 @@ def _run_trials(
     index = 0
     redo_target: int | None = None  # the trial whose screen must be put back before it runs again
     handed_off = False
+    keyboard_before = None
+    keyboard_state = getattr(gate, "keyboard_state", None)
+    restore_keyboard = getattr(gate, "restore_keyboard", None)
     while True:
         if index >= len(trials):
             if overlay is None or not trials or not _end_card(overlay, speaker):
@@ -801,6 +807,8 @@ def _run_trials(
             index = redo_target = rewind(len(trials) - 1)
         trial = trials[index]
         number = trial.number or index + 1
+        action = f"T{number}. {trial.shade or trial.prompt}"
+        keyboard_ready = None
         redoing = redo_target == index
         redo_target = None
         error = ""
@@ -829,6 +837,19 @@ def _run_trials(
                 error = str(exc) or type(exc).__name__
         if error == "" and _phone_stopped(gate):
             error = STOPPED
+        if error == "" and callable(restore_keyboard):
+            try:
+                state = keyboard_before if keyboard_before is not None else keyboard_state()
+                # Inspect the new field as well when focus changed: it can show or hide Android's IME window.
+                if keyboard_before is not None and trial.software_keyboard == "shown":
+                    state = keyboard_state()
+                keyboard_ready = restore_keyboard(trial.software_keyboard, state)
+                if keyboard_ready != state:
+                    console.print(
+                        f"T{number} keyboard restored: {state} → {keyboard_ready}", markup=False
+                    )
+            except Exception as exc:
+                error = f"could not prepare the software keyboard: {exc}"
         if redoing and overlay is not None and error not in ("", STOPPED):
             choice = _recovery_card(overlay, gate, error)
             if choice == "retry":
@@ -844,14 +865,14 @@ def _run_trials(
         if error == "" and gate is not None:
             try:
                 if overlay is not None:
-                    gate.yield_to_human(trial.shade or trial.prompt, shade=False)
+                    gate.yield_to_human(action, shade=False)
                 else:
-                    gate.yield_to_human(trial.shade or trial.prompt)
+                    gate.yield_to_human(action)
             except Exception as exc:
                 error = str(exc)
         if error == "" and overlay is not None:
             try:
-                overlay.show(trial.shade or trial.prompt, LATER_BUTTONS if index > 0 else TRIAL_BUTTONS)
+                overlay.show(action, LATER_BUTTONS if index > 0 else TRIAL_BUTTONS)
             except Exception as exc:
                 error = str(exc)
         baseline = ""
@@ -863,7 +884,7 @@ def _run_trials(
                 if overlay is None:
                     error = f"field lost: {type(exc).__name__}"
         ready = time.perf_counter()
-        voice = _Reprompter(speaker, trial)
+        voice = _Reprompter(speaker, trial, number)
         if error == "":
             if on_trial is not None:
                 on_trial(number, trial)
@@ -876,7 +897,7 @@ def _run_trials(
         observed = baseline
         # With a voice the human gets reprompts instead of a fixed start window.
         deadline = float("inf") if voice.active else ready + idle_s_for(trial)
-        live.update(_table(results, "" if error else trial.prompt))
+        live.update(_table(results, "" if error else f"T{number}. {trial.prompt}"))
         last_stop_check = ready
         last_seen = observed
         last_change = ready
@@ -943,6 +964,16 @@ def _run_trials(
                 error = NOT_STARTED
                 break
             time.sleep(POLL_S)
+        if callable(keyboard_state):
+            try:
+                keyboard_before = keyboard_state()
+                if keyboard_ready is not None and keyboard_before != keyboard_ready:
+                    console.print(
+                        f"T{number} keyboard changed: {keyboard_ready} → {keyboard_before}", markup=False
+                    )
+            except Exception as exc:
+                keyboard_before = None
+                console.print(f"T{number} keyboard state unavailable: {exc}", markup=False)
         if again:
             voice.started()  # stop reading this trial's action
             if benched:
@@ -985,7 +1016,7 @@ def _run_trials(
             on_result(number, result)
         previous_complete = complete
         live.update(_table(results, ""))
-        if error in (STOPPED, NOT_STARTED):
+        if error in (STOPPED, NOT_STARTED) or error.startswith("could not prepare the software keyboard:"):
             break
         index += 1
         if overlay is not None:

@@ -82,7 +82,7 @@ def _trials(*prompts, **second):
 def test_redo_last_reruns_the_previous_trial_and_withdraws_its_result():
     bar = _Bar(["done", "redo", "done", "done"])
     results, redone = _run(bar, _trials("one", "two", clear_field=True), _Field("x"))
-    assert [c[0] for c in bar.cards] == ["one", "two", "one", "two", END_DONE_TEXT]
+    assert [c[0] for c in bar.cards] == ["T1. one", "T2. two", "T1. one", "T2. two", END_DONE_TEXT]
     assert "redo" not in bar.cards[0][1] and "redo" in bar.cards[1][1]
     assert redone == ["one"] and [r.number for r in results] == [1, 2]
 
@@ -90,7 +90,7 @@ def test_redo_last_reruns_the_previous_trial_and_withdraws_its_result():
 def test_redo_of_a_trial_that_keeps_the_field_starts_from_the_trial_that_fills_it():
     bar = _Bar(["done", "done", "redo", "done", "done", "done"])
     results, redone = _run(bar, _trials("one", "two", "three"), _Field("x"))
-    assert [c[0] for c in bar.cards] == ["one", "two", "three", "one", "two", "three", END_DONE_TEXT]
+    assert [c[0] for c in bar.cards] == ["T1. one", "T2. two", "T3. three", "T1. one", "T2. two", "T3. three", END_DONE_TEXT]
     assert redone == ["one", "two"] and len(results) == 3
 
 
@@ -99,9 +99,9 @@ def test_the_end_card_offers_redo_of_the_last_trial(monkeypatch):
     bar = _Bar(["done", "redo", "done", "done"])
     field = _Field("")
     shown = bar.show
-    bar.show = lambda text, buttons=(): (shown(text, buttons), setattr(field, "text", "x" if text == "one" else ""))
+    bar.show = lambda text, buttons=(): (shown(text, buttons), setattr(field, "text", "x" if text == "T1. one" else ""))
     results, redone = _run(bar, _kept(), field)
-    assert [c[0] for c in bar.cards] == ["one", hitl_runner.END_CARD, "one", hitl_runner.END_CARD, END_DONE_TEXT]
+    assert [c[0] for c in bar.cards] == ["T1. one", hitl_runner.END_CARD, "T1. one", hitl_runner.END_CARD, END_DONE_TEXT]
     assert redone == ["one"] and len(results) == 1 and results[0].passed
 
 
@@ -137,7 +137,7 @@ def test_the_start_card_offers_no_recording_on_the_bar():
     bar.pressed = lambda: pressed() if now() >= 2 else None
     assert gate.wait("Batch", "Pick up the phone.", recording=True) == "bar"
     assert gate.record_declined
-    assert bar.cards == [(BAR_RECORD_CARD, ("done", "norec"))] and len(BAR_RECORD_CARD) <= 90
+    assert bar.cards == [(BAR_RECORD_CARD, ("done", "norec", "stop"))] and len(BAR_RECORD_CARD) <= 90
 
 
 def test_norec_typed_in_the_terminal_starts_without_recording_and_go_records():

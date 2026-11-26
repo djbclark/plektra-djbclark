@@ -135,6 +135,16 @@ def test_done_on_the_bar_cuts_the_fast_instruction_and_starts_at_once():
     assert clock.now < SETTLE_S + 1
 
 
+def test_stop_on_a_recorded_start_card_cancels_without_starting():
+    clock, voice = Clock(), Talking()
+    shown = []
+    bar = SimpleNamespace(show=lambda *args: shown.append(args), pressed=lambda: "stop")
+    with pytest.raises(StartGateError, match="cancelled on the phone"):
+        _talking_gate(clock, voice, bar=bar).wait("Batch", "Pick up the phone.", recording=True)
+    assert shown[0][1] == ("done", "norec", "stop")
+    assert voice.stops == 1
+
+
 def test_a_relayed_go_lets_the_instruction_play():
     clock, voice = Clock(), Talking()
     bar = SimpleNamespace(show=lambda *a: None, wait=lambda **k: None, pressed=lambda: None)

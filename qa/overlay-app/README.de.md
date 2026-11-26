@@ -2,7 +2,7 @@
 
 [English](README.md)
 
-Eine winzige Android-Overlay-App für Testläufe mit Mensch im Ablauf. Sie zeichnet eine schmale Leiste am oberen Bildschirmrand (unter der Statusleiste): einen Anweisungstext über die ganze Breite und darunter eine schmale Reihe kleiner Schaltflächen, **Done**, **No rec** oder **Redo**, **◀ Prev**, **Next** und **Stop**. Sie nimmt nie den Fokus: Tastatur und die getestete App behalten den Eingabefokus. Die Logik des Testlaufs bleibt auf dem Computer; der einzige zusätzliche Bildschirm hier ist ein Prüfstand zum Tippen (siehe unten).
+Die Begleit-App für Plektra-QA zeigt Anweisungen und Schaltflächen in einer verschiebbaren, halbtransparenten Leiste. Ziehe die Anweisung, um die Leiste zu verschieben. Mit **−** wird sie zur QA-Blase. Tippe auf die Blase, um die Leiste zu öffnen, oder ziehe sie auf das **×** unten, um sie zu schließen. Das Eingabefeld behält den Fokus. Die App enthält auch einen Prüfstand zum Tippen. Beides zeigt die [Harness-Demo](../README.de.md#schnellstart-harness-demo).
 
 **Dies ist ein Testwerkzeug für Entwicklergeräte.** Es zeichnet über anderen Apps und nimmt Broadcasts von adb an. Nur auf einem Testgerät installieren.
 

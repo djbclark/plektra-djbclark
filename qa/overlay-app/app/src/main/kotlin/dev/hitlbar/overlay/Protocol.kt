@@ -56,6 +56,13 @@ fun layoutSlots(buttons: List<BarButton>): List<BarButton?> {
     return slots.toList()
 }
 
+/** Closing a bubble cancels a live card. Done is safe only on the final card. */
+fun dismissButton(buttons: List<BarButton>): BarButton? = when {
+    BarButton.STOP in buttons -> BarButton.STOP
+    buttons.toSet() == setOf(BarButton.DONE, BarButton.REDO) -> BarButton.DONE
+    else -> null
+}
+
 /** The instruction text, at most [MAX_TEXT_CHARS] chars, never cutting a surrogate pair. */
 fun clampText(raw: String?): String {
     if (raw == null) return ""

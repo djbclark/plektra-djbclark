@@ -24,6 +24,10 @@ qa-prep:
 qa-run suite *flags:
     cd "{{ justfile_directory() }}" && uv run --python 3.14 plektra-qa run "{{ suite }}" {{ flags }}
 
+# Demonstrate the harness and record every demo trial, even on a previously used device.
+qa-demo *flags:
+    cd "{{ justfile_directory() }}" && uv run --python 3.14 plektra-qa run suites/harness_demo.yaml --redo {{ flags }}
+
 # A promised batch will not run: tell the person that the phone may be used normally.
 qa-release *flags:
     cd "{{ justfile_directory() }}" && uv run --python 3.14 plektra-qa release {{ flags }}
