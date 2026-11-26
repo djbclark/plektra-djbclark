@@ -167,19 +167,27 @@ class WorkflowTopicTest(unittest.TestCase):
 
 
 class VariantContractTest(unittest.TestCase):
+    EXPECTED_VARIANTS = {
+        ('stable', 'release'): ('rocks.pkb.plektra', 'Plektra'),
+        ('stable', 'debug'): ('rocks.pkb.plektra.djb', 'Plektra djb'),
+        ('nightly', 'release'): ('rocks.pkb.plektra.nightly', 'Plektra Nightly'),
+        ('nightly', 'debug'): ('rocks.pkb.plektra.nightly.djb', 'Plektra djb'),
+        ('playStable', 'release'): ('rocks.pkb.plektra.unsovereign', 'Plektra'),
+        ('playStable', 'debug'): ('rocks.pkb.plektra.unsovereign.djb', 'Plektra djb'),
+        ('playNightly', 'release'): ('rocks.pkb.plektra.unsovereign.nightly', 'Plektra Nightly'),
+        ('playNightly', 'debug'): ('rocks.pkb.plektra.unsovereign.nightly.djb', 'Plektra djb'),
+        ('stableNoAccessibility', 'release'): ('rocks.pkb.plektra', 'Plektra'),
+        ('stableNoAccessibility', 'debug'): ('rocks.pkb.plektra.djb', 'Plektra djb'),
+        ('nightlyNoAccessibility', 'release'): ('rocks.pkb.plektra.nightly', 'Plektra Nightly'),
+        ('nightlyNoAccessibility', 'debug'): ('rocks.pkb.plektra.nightly.djb', 'Plektra djb'),
+    }
+
     def fixture(self, flavor='stable', build_type='release', *, fdroid=True):
         import xml.etree.ElementTree as ET
+        package, label = self.EXPECTED_VARIANTS[(flavor, build_type)]
         nightly = 'nightly' in flavor.lower()
         play = flavor.startswith('play')
         accessibility = 'NoAccessibility' not in flavor
-        debug = build_type == 'debug'
-        package = (
-            'rocks.pkb.plektra'
-            + ('.unsovereign' if play else '')
-            + ('.nightly' if nightly else '')
-            + ('.djb' if debug else '')
-        )
-        label = 'Plektra djb' if debug else ('Plektra Nightly' if nightly else 'Plektra')
         icon = '@mipmap/ic_launcher_nightly' if nightly else '@mipmap/ic_launcher'
         version_name = '26.11-nightly' if nightly else '26.11'
         config = {
@@ -211,6 +219,7 @@ class VariantContractTest(unittest.TestCase):
             ET.SubElement(manifest.find('application'), 'activity-alias', {
                 variants.ANDROID + 'name': 'rocks.pkb.plektra.' + name,
                 variants.ANDROID + 'enabled': str(name == enabled).lower(),
+                variants.ANDROID + 'label': label,
                 variants.ANDROID + 'icon': '@mipmap/' + alias_icon,
                 variants.ANDROID + 'roundIcon': '@mipmap/' + alias_icon + '_round',
                 variants.ANDROID + 'targetActivity': 'rocks.pkb.plektra.MainActivity'})
@@ -224,10 +233,26 @@ class VariantContractTest(unittest.TestCase):
                              ('ENABLE_ACCESSIBILITY_SERVICE', False), ('IS_FDROID_BUILD', False)]:
             with self.subTest(field=field, value=value), self.assertRaises(ValueError):
                 variants.check_contract(dict(config, **{field: value}), manifest, 'stable', 'release')
-        for mutation in ('package', 'version', 'accessibility', 'alias'):
+        for mutation in ('package', 'djb_package', 'app_label_djb', 'ime_label_djb', 'alias_label_djb',
+                         'djb_shizuku', 'djb_fileprovider', 'missing_provider',
+                         'version', 'accessibility', 'alias'):
             config, manifest = self.fixture()
             if mutation == 'package':
                 manifest.set('package', 'wrong')
+            elif mutation == 'djb_package':
+                manifest.set('package', 'rocks.pkb.plektra.djb')
+            elif mutation == 'app_label_djb':
+                manifest.find('application').set(variants.ANDROID + 'label', 'Plektra djb')
+            elif mutation == 'ime_label_djb':
+                manifest.findall('application/service')[0].set(variants.ANDROID + 'label', 'Plektra djb')
+            elif mutation == 'alias_label_djb':
+                manifest.find('application/activity-alias').set(variants.ANDROID + 'label', 'Plektra djb')
+            elif mutation == 'djb_shizuku':
+                manifest.findall('application/provider')[0].set(variants.ANDROID + 'authorities', 'rocks.pkb.plektra.djb.shizuku')
+            elif mutation == 'djb_fileprovider':
+                manifest.findall('application/provider')[1].set(variants.ANDROID + 'authorities', 'rocks.pkb.plektra.djb.fileprovider')
+            elif mutation == 'missing_provider':
+                manifest.find('application').remove(manifest.findall('application/provider')[1])
             elif mutation == 'version':
                 manifest.set(variants.ANDROID + 'versionCode', '1')
             elif mutation == 'accessibility':
@@ -237,31 +262,85 @@ class VariantContractTest(unittest.TestCase):
             with self.subTest(mutation=mutation), self.assertRaises(ValueError):
                 variants.check_contract(config, manifest, 'stable', 'release')
 
-    def test_fork_debug_variants_require_djb_suffix_label_and_authorities(self):
-        for flavor in variants.FLAVORS:
-            config, manifest = self.fixture(flavor, 'debug')
-            with self.subTest(flavor=flavor):
-                variants.check_contract(config, manifest, flavor, 'debug')
+    def test_all_twelve_variants_and_fork_debug_contract(self):
+        self.assertEqual(12, len(self.EXPECTED_VARIANTS))
+        for (flavor, build_type), _expected in self.EXPECTED_VARIANTS.items():
+            for fdroid in (True, False):
+                config, manifest = self.fixture(flavor, build_type, fdroid=fdroid)
+                with self.subTest(flavor=flavor, build_type=build_type, fdroid=fdroid):
+                    variants.check_contract(config, manifest, flavor, build_type, fdroid=fdroid)
         # Non-fdroid mode still requires GitHub update checks on direct builds when requested explicitly.
         non_fdroid_config, non_fdroid_manifest = self.fixture('stable', 'release', fdroid=False)
-        variants.check_contract(non_fdroid_config, non_fdroid_manifest, 'stable', 'release', fdroid=False)
         with self.assertRaises(ValueError):
             variants.check_contract(dict(non_fdroid_config, ENABLE_GITHUB_UPDATE_CHECKS=False),
                                     non_fdroid_manifest, 'stable', 'release', fdroid=False)
+        # Play flavors stay IS_FDROID_BUILD=False even when fdroid=True.
+        play_config, play_manifest = self.fixture('playStable', 'release', fdroid=True)
+        with self.assertRaises(ValueError):
+            variants.check_contract(dict(play_config, IS_FDROID_BUILD=True),
+                                    play_manifest, 'playStable', 'release', fdroid=True)
         # Upstream (un-suffixed) package, label, or provider authority must fail for fork debug builds.
         config, manifest = self.fixture('stable', 'debug')
         with self.assertRaises(ValueError):
             variants.check_contract(dict(config, APPLICATION_ID='rocks.pkb.plektra'), manifest, 'stable', 'debug')
-        for mutation in ('app_label', 'ime_label', 'authority'):
+        for mutation in ('app_label', 'ime_label', 'alias_label', 'shizuku_authority', 'fileprovider_authority'):
             config, manifest = self.fixture('stable', 'debug')
             if mutation == 'app_label':
                 manifest.find('application').set(variants.ANDROID + 'label', 'Plektra')
             elif mutation == 'ime_label':
                 manifest.findall('application/service')[0].set(variants.ANDROID + 'label', 'Plektra')
-            else:
+            elif mutation == 'alias_label':
+                manifest.find('application/activity-alias').set(variants.ANDROID + 'label', 'Plektra')
+            elif mutation == 'shizuku_authority':
                 manifest.findall('application/provider')[0].set(variants.ANDROID + 'authorities', 'rocks.pkb.plektra.shizuku')
+            else:
+                manifest.findall('application/provider')[1].set(variants.ANDROID + 'authorities', 'rocks.pkb.plektra.fileprovider')
             with self.subTest(mutation=mutation), self.assertRaises(ValueError):
                 variants.check_contract(config, manifest, 'stable', 'debug')
+
+    def test_main_enforces_fork_fdroid_default_and_explicit_overrides(self):
+        import xml.etree.ElementTree as ET
+
+        def write_generated(root, fdroid):
+            for flavor in variants.FLAVORS:
+                for kind in ('debug', 'release'):
+                    config, manifest = self.fixture(flavor, kind, fdroid=fdroid)
+                    cfg_path = root / f'app/build/generated/source/buildConfig/{flavor}/{kind}/rocks/pkb/plektra/BuildConfig.java'
+                    cfg_path.parent.mkdir(parents=True, exist_ok=True)
+                    lines = []
+                    for key, value in config.items():
+                        if isinstance(value, bool):
+                            lines.append(f'public static final boolean {key} = {str(value).lower()};')
+                        elif isinstance(value, int):
+                            lines.append(f'public static final int {key} = {value};')
+                        else:
+                            lines.append(f'public static final String {key} = "{value}";')
+                    cfg_path.write_text('\n'.join(lines))
+                    variant = flavor + kind.title()
+                    manifest_path = (
+                        root / f'app/build/intermediates/merged_manifest/{variant}'
+                        f'/process{variant[0].upper() + variant[1:]}MainManifest/AndroidManifest.xml'
+                    )
+                    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+                    ET.ElementTree(manifest).write(manifest_path, encoding='utf-8', xml_declaration=True)
+
+        for argv, expect_fdroid, expect_flag in (
+            (['ci-variants.py'], True, None),
+            (['ci-variants.py', '--fdroid'], True, '-PPLEKTRA_FDROID_BUILD=true'),
+            (['ci-variants.py', '--gradle-arg=-PPLEKTRA_FDROID_BUILD=false'], False, '-PPLEKTRA_FDROID_BUILD=false'),
+        ):
+            with self.subTest(argv=argv), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                write_generated(root, expect_fdroid)
+                with patch.object(variants, 'ROOT', root), \
+                        patch.object(variants.subprocess, 'run') as run, \
+                        patch('sys.argv', argv):
+                    variants.main()
+                command = run.call_args[0][0]
+                if expect_flag is None:
+                    self.assertFalse(any('PLEKTRA_FDROID_BUILD' in arg for arg in command))
+                else:
+                    self.assertIn(expect_flag, command)
 
 
 if __name__ == '__main__':
