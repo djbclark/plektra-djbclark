@@ -18,8 +18,10 @@ from __future__ import annotations
 import base64
 import os
 import re
+import secrets
 import shlex
 import subprocess
+import sys
 import time
 from dataclasses import dataclass
 from xml.etree import ElementTree
@@ -62,6 +64,8 @@ AWAKE_LOG = "/data/local/tmp/plektra-qa-awake.log"
 AWAKE_RELEASE = "/data/local/tmp/plektra-qa-release"
 AWAKE_STOPPED = "/data/local/tmp/plektra-qa-stopped"
 AWAKE_NOTES = "/data/local/tmp/plektra-qa-notes.txt"
+KEYBOARD_JOURNAL = "/data/local/tmp/plektra-qa-keyboard-mode"
+KEYBOARD_LOCK = "/data/local/tmp/plektra-qa-keyboard-lock"
 _FOREGROUND_RE = re.compile(r"\bu\d+\s+([A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)+)/")
 _LOCK_MARKERS = (
     "mDreamingLockscreen=true",
@@ -129,6 +133,97 @@ def _heads_restore_line(saved: str) -> str:
     return ""
 
 
+# The handset lock serializes mode changes with rollback when a swipe lands mid-toggle.
+_KEYBOARD_COMMANDS = r"""
+lock_qa_keyboard() {
+    attempts=0
+    until mkdir "$keyboard_lock" 2>/dev/null; do
+        attempts=$((attempts + 1))
+        [ "$attempts" -lt 100 ] || return 1
+        sleep 0.1
+    done
+    trap 'rmdir "$keyboard_lock"' EXIT
+    trap 'exit 1' HUP INT TERM
+}
+
+qa_keyboard_override() {
+    prefs=$(run-as "$keyboard_package" cat "$keyboard_prefs") || return 1
+    override=$(printf '%s\n' "$prefs" | grep -F "$keyboard_key")
+    case "$override" in
+        '') echo absent ;;
+        *'>force_hardware</string>'*) echo force_hardware ;;
+        *'>force_virtual</string>'*) echo force_virtual ;;
+        *) return 1 ;;
+    esac
+}
+
+toggle_qa_keyboard() {
+    output=$(am start -W -a "$keyboard_action" -n "$keyboard_activity") || return 1
+    printf '%s\n' "$output" | grep -qF 'Status: ok'
+}
+
+clear_qa_keyboard() {
+    output=$(am broadcast -n "$keyboard_receiver" --ez clearSoftwareOverride true) || return 1
+    printf '%s\n' "$output" | grep -qF 'result=0, data="Temporary software-keyboard mode cleared"'
+}
+
+wait_qa_keyboard_change() {
+    attempts=0
+    while [ "$attempts" -lt 20 ]; do
+        current=$(qa_keyboard_override) || return 1
+        [ "$current" = "$1" ] || return 0
+        attempts=$((attempts + 1))
+        sleep 0.1
+    done
+    return 1
+}
+
+change_qa_keyboard() (
+    lock_qa_keyboard || exit 1
+    [ ! -f "$keyboard_stop" ] && [ ! -f "$keyboard_release" ] && [ -f "$keyboard_watcher" ] || exit 1
+    before=$(qa_keyboard_override) || exit 1
+    if [ ! -f "$keyboard_journal" ]; then
+        original=$before
+        # Confirm this build supports clearing an absent override before changing it.
+        if [ "$original" = absent ]; then
+            clear_qa_keyboard || exit 1
+        fi
+        printf '%s %s %s\n' "$keyboard_batch" "$keyboard_package" "$original" > "$keyboard_journal" || exit 1
+    else
+        read -r saved_batch saved_package original < "$keyboard_journal" || exit 1
+        [ "$saved_batch" = "$keyboard_batch" ] && [ "$saved_package" = "$keyboard_package" ] || exit 1
+    fi
+    toggle_qa_keyboard && wait_qa_keyboard_change "$before"
+)
+
+restore_qa_keyboard() (
+    lock_qa_keyboard || exit 1
+    [ -f "$keyboard_journal" ] || exit 0
+    read -r saved_batch saved_package original < "$keyboard_journal" || exit 1
+    [ "$saved_batch" = "$keyboard_batch" ] && [ "$saved_package" = "$keyboard_package" ] || exit 1
+    case "$original" in
+        absent|force_hardware|force_virtual) ;;
+        *) exit 1 ;;
+    esac
+    current=$(qa_keyboard_override) || exit 1
+    if [ "$current" != "$original" ]; then
+        if [ "$original" = absent ]; then
+            clear_qa_keyboard && wait_qa_keyboard_change "$current" || exit 1
+        else
+            # An absent override may take two toggles to get back to forced hardware.
+            for attempt in 1 2; do
+                toggle_qa_keyboard && wait_qa_keyboard_change "$current" || exit 1
+                current=$(qa_keyboard_override) || exit 1
+                [ "$current" != "$original" ] || break
+            done
+        fi
+    fi
+    [ "$(qa_keyboard_override)" = "$original" ] || exit 1
+    rm -f "$keyboard_journal"
+)
+"""
+
+
 class ScreenGate:
     """Context manager. Enter keeps the screen on and suppresses heads-up popups.
 
@@ -163,9 +258,14 @@ class ScreenGate:
         self._saved_stay: str | None = None
         self.took_screen = False  # True once an earlier run's stop mark is gone, so user_stopped() is this run's
         self._restored = False
+        self._keyboard_package = os.environ.get("PLEKTRA_QA_PACKAGE", "").strip() or DEFAULT_PACKAGE
+        self._keyboard_changed = False
+        self._keyboard_batch = secrets.token_hex(8)
 
     def __enter__(self) -> ScreenGate:
         self._restored = False
+        self._keyboard_changed = False
+        self._keyboard_batch = secrets.token_hex(8)
         self._retire_previous_watcher()
         self._saved_heads = self._get("global", HEADS_UP_KEY).strip()
         timeout = self._digits("system", TIMEOUT_KEY)
@@ -216,7 +316,7 @@ class ScreenGate:
             )
 
     def keyboard_state(self) -> KeyboardState:
-        package = os.environ.get("PLEKTRA_QA_PACKAGE", "").strip() or DEFAULT_PACKAGE
+        package = self._keyboard_package
         prefs = shell_line(["run-as", package, "cat", PREFS_PATH])
         # Only return the two mode preferences. Keep the rest of the IME's XML on the phone.
         pattern = shell_line(['name="software_keyboard_mode(_runtime_override)?"'])
@@ -247,11 +347,11 @@ class ScreenGate:
             return state
 
         if state.mode != mode:
-            package = os.environ.get("PLEKTRA_QA_PACKAGE", "").strip() or DEFAULT_PACKAGE
-            self._shell([
-                "am", "start", "-W", "-a", TOGGLE_ACTION,
-                "-n", f"{package}/rocks.pkb.plektra.SoftwareKeyboardModeActionActivity",
-            ])
+            self._keyboard_changed = True
+            try:
+                self._shell(["sh", "-c", self._keyboard_script("change_qa_keyboard")])
+            except RuntimeError as exc:
+                raise RuntimeError("could not change the software keyboard with phone-side rollback") from exc
         for _ in range(4):
             restored = self.keyboard_state()
             if restored.mode == mode and (not showing or restored.view_shown):
@@ -311,6 +411,12 @@ class ScreenGate:
         # Write the release file before snoozing. A missing stop card is a
         # swipe only when this file is absent, so exit is not an abort.
         self._release_awake()
+        if self._keyboard_changed:
+            try:
+                self._shell(["sh", "-c", self._keyboard_script("restore_qa_keyboard")])
+            except RuntimeError:
+                print("QA could not verify that the original keyboard mode was restored.", file=sys.stderr)
+            self._keyboard_changed = False
         self._set_inversion(False)
         self._snooze_ours()
         saved = self._saved_heads
@@ -409,6 +515,25 @@ class ScreenGate:
         )
         self._shell(["sh", "-c", start])
 
+    def _keyboard_script(self, action: str) -> str:
+        package = self._keyboard_package
+        values = {
+            "package": package,
+            "batch": self._keyboard_batch,
+            "prefs": PREFS_PATH,
+            "key": f'name="{MODE_OVERRIDE}"',
+            "action": TOGGLE_ACTION,
+            "activity": f"{package}/rocks.pkb.plektra.SoftwareKeyboardModeActionActivity",
+            "receiver": f"{package}/rocks.pkb.plektra.KeyboardBarTestReceiver",
+            "journal": KEYBOARD_JOURNAL,
+            "lock": KEYBOARD_LOCK,
+            "stop": AWAKE_STOPPED,
+            "release": AWAKE_RELEASE,
+            "watcher": AWAKE_PID,
+        }
+        config = "\n".join(f"keyboard_{key}={shlex.quote(value)}" for key, value in values.items())
+        return f"{config}\n{_KEYBOARD_COMMANDS}\n{action}"
+
     def _watcher_text(self) -> str:
         timeout = self._saved_timeout
         stay = self._saved_stay
@@ -451,6 +576,7 @@ class ScreenGate:
             "    break",
             "  fi",
             "done",
+            self._keyboard_script('restore_qa_keyboard || echo "keyboard mode restore failed"'),
             f"settings put secure {INVERSION_KEY} 0",
             f"settings put system {TIMEOUT_KEY} {timeout}",
             f"settings put global {STAY_KEY} {stay}",
