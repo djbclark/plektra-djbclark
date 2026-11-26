@@ -95,6 +95,21 @@ class CatalogGuardTest(unittest.TestCase):
             report.write_text('<testsuite name="example.SampleTest" tests="2" skipped="1"/>')
             self.assertIn('2 tests, 1 skipped', catalog.verify_results(directory, ['example.SampleTest']))
 
+    def test_opt_in_skipped_eval_classes_require_tests_and_zero_failures(self):
+        opt_in = next(iter(catalog.OPT_IN_SKIPPED))
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            report = directory / f'TEST-{opt_in}.xml'
+            report.write_text(f'<testsuite name="{opt_in}" tests="2" skipped="2"/>')
+            self.assertIn('2 tests, 2 skipped', catalog.verify_results(directory, [opt_in]))
+            for bad_xml in (
+                f'<testsuite name="{opt_in}" tests="0" skipped="0"/>',
+                f'<testsuite name="{opt_in}" tests="2" skipped="1" failures="1"/>',
+            ):
+                report.write_text(bad_xml)
+                with self.subTest(bad_xml=bad_xml), self.assertRaises(ValueError):
+                    catalog.verify_results(directory, [opt_in])
+
 
 class LintGuardTest(unittest.TestCase):
     def test_lint_paths_are_portable_and_source_changes_are_new_findings(self):
@@ -129,7 +144,9 @@ variants = module('ci_variants', SCRIPTS / 'ci-variants.py')
 class PathSelectionTest(unittest.TestCase):
     def test_only_clear_documentation_skips_android(self):
         self.assertEqual((False, False), paths.selection(['README.md', 'docs/setup.md']))
+        self.assertEqual((False, False), paths.selection(['README.md', 'qa/README.md', 'qa/plektra_qa/screen_gate.py']))
         for changed in ([], ['new/unknown.file'], ['app/src/main/README.md'], ['CMakeLists.txt'],
+                        ['qa'], ['qa/README.md', 'app/src/main/Example.kt'],
                         ['README.md', 'app/src/main/Example.kt']):
             with self.subTest(changed=changed):
                 self.assertTrue(paths.selection(changed)[0])
