@@ -367,7 +367,8 @@
         <service
             android:name="moe.shizuku.manager.adb.AdbPairingService"
             android:exported="false"
-            android:foregroundServiceType="connectedDevice" />
+            android:foregroundServiceType="connectedDevice"
+            tools:targetApi="30" />
 
         <!-- djb/backlight: Quick Settings tile for the Titan 2 Elite keyboard backlight -->
         <service
