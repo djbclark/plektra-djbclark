@@ -13,13 +13,15 @@ FLAVORS = ('stable', 'nightly', 'playStable', 'playNightly',
            'stableNoAccessibility', 'nightlyNoAccessibility')
 
 
-def check_contract(config, manifest, flavor, build_type, fdroid=False):
+def check_contract(config, manifest, flavor, build_type, fdroid=True):
     nightly = 'nightly' in flavor.lower()
     play = flavor.startswith('play')
     accessibility = 'NoAccessibility' not in flavor
     debug = build_type == 'debug'
     # Fork debug builds carry the .djb suffix and "Plektra djb" label so they
     # install beside official signed builds (app/build.gradle.kts).
+    # Fork gradle.properties sets PLEKTRA_FDROID_BUILD=true so direct builds
+    # never check upstream GitHub for updates.
     package = (
         'rocks.pkb.plektra'
         + ('.unsovereign' if play else '')
@@ -103,7 +105,8 @@ def main():
         variant = flavor + kind.title()
         config = ROOT / f'app/build/generated/source/buildConfig/{flavor}/{kind}/rocks/pkb/plektra/BuildConfig.java'
         manifest = ROOT / f'app/build/intermediates/merged_manifest/{variant}/process{variant[0].upper() + variant[1:]}MainManifest/AndroidManifest.xml'
-        check_contract(read_config(config), ET.parse(manifest).getroot(), flavor, kind, args.fdroid)
+        # Fork gradle.properties enables PLEKTRA_FDROID_BUILD=true by default.
+        check_contract(read_config(config), ET.parse(manifest).getroot(), flavor, kind, fdroid=True)
         print(f'{variant}: generated BuildConfig and merged manifest verified', flush=True)
 
 

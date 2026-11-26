@@ -167,7 +167,7 @@ class WorkflowTopicTest(unittest.TestCase):
 
 
 class VariantContractTest(unittest.TestCase):
-    def fixture(self, flavor='stable', build_type='release', *, fdroid=False):
+    def fixture(self, flavor='stable', build_type='release', *, fdroid=True):
         import xml.etree.ElementTree as ET
         nightly = 'nightly' in flavor.lower()
         play = flavor.startswith('play')
@@ -219,9 +219,9 @@ class VariantContractTest(unittest.TestCase):
     def test_configuration_manifest_and_overlay_regressions_fail(self):
         config, manifest = self.fixture()
         variants.check_contract(config, manifest, 'stable', 'release')
-        for field, value in [('ENABLE_GITHUB_UPDATE_CHECKS', False), ('APPLICATION_ID', 'wrong'),
+        for field, value in [('ENABLE_GITHUB_UPDATE_CHECKS', True), ('APPLICATION_ID', 'wrong'),
                              ('APPLICATION_ID', 'rocks.pkb.plektra.djb'),
-                             ('ENABLE_ACCESSIBILITY_SERVICE', False), ('IS_FDROID_BUILD', True)]:
+                             ('ENABLE_ACCESSIBILITY_SERVICE', False), ('IS_FDROID_BUILD', False)]:
             with self.subTest(field=field, value=value), self.assertRaises(ValueError):
                 variants.check_contract(dict(config, **{field: value}), manifest, 'stable', 'release')
         for mutation in ('package', 'version', 'accessibility', 'alias'):
@@ -242,6 +242,12 @@ class VariantContractTest(unittest.TestCase):
             config, manifest = self.fixture(flavor, 'debug')
             with self.subTest(flavor=flavor):
                 variants.check_contract(config, manifest, flavor, 'debug')
+        # Non-fdroid mode still requires GitHub update checks on direct builds when requested explicitly.
+        non_fdroid_config, non_fdroid_manifest = self.fixture('stable', 'release', fdroid=False)
+        variants.check_contract(non_fdroid_config, non_fdroid_manifest, 'stable', 'release', fdroid=False)
+        with self.assertRaises(ValueError):
+            variants.check_contract(dict(non_fdroid_config, ENABLE_GITHUB_UPDATE_CHECKS=False),
+                                    non_fdroid_manifest, 'stable', 'release', fdroid=False)
         # Upstream (un-suffixed) package, label, or provider authority must fail for fork debug builds.
         config, manifest = self.fixture('stable', 'debug')
         with self.assertRaises(ValueError):
