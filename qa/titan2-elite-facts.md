@@ -104,6 +104,11 @@ FIRERPA install and the HITL harness spec: `qa/firerpa-hitl.md`.
 3. Space never appears on the keyboard input device in `getevent` (Space is also the fingerprint sensor; vendor
    package `com.agui.spacebarkey`). Outside a text field, pressing it left Calculator and showed the launcher page
    Calculator was opened from (more than Back, which only closes the dialog). Do not use Space as a control key.
+   - **Inside a text field when `inputShown=false` (2026-11-26, upstream `Hardware keyboard only` mode, #228):**
+     with vendor prop `persist.sys.space_key_gohome=1` and Plektra suppressing its IME window (`inputShown=false`),
+     pressing `KEYCODE_SPACE` (scanCode 57) inside an active text editor caused `system_server`
+     (`A85ShortcutFunction` / `AguiKeyboardShortcut`, uid 0) to fire `ACTION_MAIN` / `CATEGORY_HOME`, exiting
+     directly to the Home launcher. With `inputShown=true` on the same build and field, Space typed normally.
 4. Screen trackpad (`screen_trackpad_enabled`) was on before Reset all and is off after it (default false);
    `nav_mode_ctrl_hold_enabled` was true before and is back to its default after.
 5. **A key that wakes the keyboard backlight changes the configuration and relaunches the foreground activity.**
