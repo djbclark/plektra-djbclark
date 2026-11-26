@@ -16,11 +16,32 @@ inversion and that wake lock on the phone even when the computer run is gone.
 from __future__ import annotations
 
 import base64
+import os
 import re
 import shlex
 import subprocess
 import time
+from dataclasses import dataclass
+from xml.etree import ElementTree
 from collections.abc import Callable, Sequence
+
+from plektra_qa.keys import DEFAULT_PACKAGE, PREFS_PATH
+
+IME_ID = re.compile(r"(?m)^\s*mCurId=([^/\s]+)/")
+IME_SHOWN = re.compile(r"\bmInputShown=(true|false)\b")
+MODE_OVERRIDE = "software_keyboard_mode_runtime_override"
+TOGGLE_ACTION = "rocks.pkb.plektra.action.TOGGLE_SOFTWARE_KEYBOARD_MODE"
+
+
+@dataclass(frozen=True)
+class KeyboardState:
+    override: str | None
+    mode: str
+    view_shown: bool
+
+    def __str__(self) -> str:
+        return f"{self.mode} (override={self.override or 'none'}, IME window={'shown' if self.view_shown else 'hidden'})"
+
 
 INVERSION_KEY = "accessibility_display_inversion_enabled"
 HEADS_UP_KEY = "heads_up_notifications_enabled"
@@ -194,16 +215,61 @@ class ScreenGate:
                 "display inversion did not turn on (or the card was not posted); refusing to control the screen"
             )
 
+    def keyboard_state(self) -> KeyboardState:
+        package = os.environ.get("PLEKTRA_QA_PACKAGE", "").strip() or DEFAULT_PACKAGE
+        prefs = shell_line(["run-as", package, "cat", PREFS_PATH])
+        # Only return the two mode preferences. Keep the rest of the IME's XML on the phone.
+        pattern = shell_line(['name="software_keyboard_mode(_runtime_override)?"'])
+        script = (
+            f'prefs=$({prefs}) || exit 1; printf "%s\\n" "$prefs" | grep -E {pattern}; '
+            "dumpsys input_method | grep -E 'mCurId=|mInputShown='"
+        )
+        data = self._shell(["sh", "-c", script])
+        ime = IME_ID.search(data)
+        shown = IME_SHOWN.search(data)
+        if ime is None or ime[1] != package or shown is None:
+            raise RuntimeError("could not read the active Plektra IME window")
+        values = {}
+        for line in data.splitlines():
+            if line.lstrip().startswith("<string "):
+                item = ElementTree.fromstring(line.strip())
+                values[item.attrib["name"]] = item.text
+        override = values.get(MODE_OVERRIDE)
+        mode = override or values.get("software_keyboard_mode") or "auto"
+        # Auto with a connected physical keyboard uses the hardware surface. Android can report
+        # its compact control bar as an input window, so mInputShown alone cannot distinguish it.
+        return KeyboardState(override, mode, shown[1] == "true")
+
+    def restore_keyboard(self, wanted: str, state: KeyboardState) -> KeyboardState:
+        showing = wanted == "shown"
+        mode = "force_virtual" if showing else "force_hardware"
+        if (state.mode == mode and (not showing or state.view_shown)) or (not showing and state.mode == "auto"):
+            return state
+
+        if state.mode != mode:
+            package = os.environ.get("PLEKTRA_QA_PACKAGE", "").strip() or DEFAULT_PACKAGE
+            self._shell([
+                "am", "start", "-W", "-a", TOGGLE_ACTION,
+                "-n", f"{package}/rocks.pkb.plektra.SoftwareKeyboardModeActionActivity",
+            ])
+        for _ in range(4):
+            restored = self.keyboard_state()
+            if restored.mode == mode and (not showing or restored.view_shown):
+                return restored
+            self._sleep(0.12)
+        raise RuntimeError(f"software keyboard did not become {wanted}: {restored}")
+
     def yield_to_human(self, action: str, *, shade: bool = True) -> None:
         """Ordinary colors. The shade shows the action, then closes before typing.
 
-        shade=False: only the colors change; the on-screen bar carries the action.
+        With the on-screen bar, post the action without opening the shade.
         """
-        if not self._set_inversion(False):
+        text = action.strip()
+        card = shell_line(["cmd", "notification", "post", "-t", text, NOTIFY_TAG, text]) if text and not shade else ""
+        if not self._set_inversion(False, f"{card} >/dev/null" if card else ""):
             raise RuntimeError("display inversion did not turn off")
         if not shade:
             return
-        text = action.strip()
         self._notify(text, text)
         self._expand()
         self._sleep(self.read_s)

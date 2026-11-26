@@ -8,6 +8,24 @@ Der Computer tippt nie für dich. Plektras Aufgabe ist es, physische Tastendrüc
 
 Stand: nur im Fork, nicht Teil von Upstream-Plektra. Erprobt auf einem Unihertz Titan 2 Elite (Android 16, ohne Root). Jedes Android-Telefon, auf dem FIRERPA 10.12 über adb läuft, sollte funktionieren.
 
+[Einrichtung mit einem KI-Agenten (Englisch)](SETUP.md) · [Demo-Video (2:03, MP4)](media/harness-demo.mp4) · [Screenshots](README.md#see-it-in-action)
+
+## Schnellstart: Harness-Demo
+
+Nach der [Einrichtung](#3-einmalige-einrichtung) und Installation der Overlay-App (Version 0.4.1 oder neuer):
+
+```bash
+cd qa
+just qa-connect
+just qa-demo
+```
+
+Die [Demo](suites/harness_demo.yaml) verwendet nur den eingebauten Prüfstand und Beispieldaten. Sie zeigt die verschiebbare Leiste, die Blase, **Redo**, den Wechsel der Tastaturansicht, den Eingabefokus und den Abschluss. Die vollständige Aufnahme soll etwa zwei bis sechs Minuten dauern.
+
+Starte am Handy mit **Done** für eine Aufnahme oder **No rec** ohne Aufnahme. In T2 probierst du **Redo** einmal aus. Tippe auf der Schlusskarte erneut auf **Done**. Das Terminal zeigt den Pfad zur vollständigen MP4-Datei und zum Zusammenschnitt der bestandenen Versuche. Prüfe in der vollständigen Datei Bild, Ton, Kapitel, Tasten- und Berührungsspur sowie mögliche private Inhalte. Die [englische Anleitung](README.md#check-the-video) enthält einen `ffprobe`-Befehl zur Prüfung.
+
+Die Sprachausgabe läuft auf dem Host-Computer. Schalte andere Ansagen für den Durchlauf stumm, wenn sie sich mit der Demo überschneiden. In Paseo Herald gilt **Mute here** für das aktuelle Gerät.
+
 ## Inhalt
 
 1. [Wie ein Durchlauf aussieht und klingt](#1-wie-ein-durchlauf-aussieht-und-klingt)
@@ -65,6 +83,7 @@ Der Harness hält den Bildschirm während eines Durchlaufs an. Am Ende (normal, 
    FIRERPA_CERT=/absoluter/pfad/zu/lamda.pem
    FIRERPA_VERSION=10.12
    ADB_TARGET=SERIENNUMMER_ODER_IP:5555  # ein Gerät, das `adb devices` gerade listet
+   # PLEKTRA_QA_PACKAGE=rocks.pkb.plektra.djb  # App-ID des aktiven Debug-Builds, falls sie abweicht
    # PLEKTRA_QA_VOICE=auto          # auto, kokoro, say, espeak oder off
    # PLEKTRA_QA_VOICE_NAME=af_heart # eine Kokoro-Stimme; `kokoro voices` listet sie
    # PLEKTRA_QA_KEYMAP=/pfad/zum/profil.yaml  # Tastenprofil, Standard keymaps/titan2-elite-baseline.yaml (Abschnitt 7)
@@ -142,7 +161,9 @@ cd qa && just qa-release                                      # er läuft doch n
 
 ### Schaltflächenleiste (Standard; `--no-bar` nimmt die Benachrichtigungskarte)
 
-`just qa-run SUITE` (wie `--bar`) zeigt eine kleine Leiste auf dem Bildschirm, statt die Benachrichtigungsleiste herunterzuziehen: die Anweisung über die ganze Breite und darunter eine schmale Reihe kleiner Schaltflächen (40 dp hoch, jede ein Fünftel der Leiste breit, jede in eigener Farbe und immer am selben Platz). Ein passender Text beendet einen Versuch nicht; du beendest ihn mit **Done**, kannst also vorher einen Tippfehler korrigieren. Der Durchlauf startet nur mit **Done** der Leiste (oder **No rec**, ohne Aufnahme, auf der Startkarte eines aufgenommenen Durchlaufs) oder einem getippten `go` (oder `norec`), nie mit einer Taste oder Berührung. Mit `--no-bar` startet nur ein Tastendruck (keine Berührung) oder das getippte Wort den Durchlauf, und ein Versuch ohne `timeout_s` endet nach 20 s ohne Taste, sobald getippt wurde.
+`just qa-run SUITE` (wie `--bar`) zeigt eine kleine Leiste auf dem Bildschirm, statt die Benachrichtigungsleiste herunterzuziehen: eine halbtransparente Anweisung mit einer Reihe kleiner halbtransparenter Schaltflächen darunter (40 dp hoch, jede ein Fünftel der Leiste breit, jede in eigener Farbe und immer am selben Platz). Ein passender Text beendet einen Versuch nicht; du beendest ihn mit **Done**, kannst also vorher einen Tippfehler korrigieren. Der Durchlauf startet nur mit **Done** der Leiste (oder **No rec**, ohne Aufnahme, auf der Startkarte eines aufgenommenen Durchlaufs) oder einem getippten `go` (oder `norec`), nie mit einer Taste oder Berührung. Mit `--no-bar` startet nur ein Tastendruck (keine Berührung) oder das getippte Wort den Durchlauf, und ein Versuch ohne `timeout_s` endet nach 20 s ohne Taste, sobald getippt wurde.
+
+Ziehe die Anweisung, um die Leiste zu verschieben. Mit **−** verkleinerst du sie zu einer Sprechblase. Ziehe die Blase an eine andere Stelle oder tippe auf **QA**, um die Leiste wieder zu öffnen. Ziehe die Blase auf das **×** am unteren Bildschirmrand, um sie zu schließen. Wenn ein Versuch läuft, beendet das den Durchlauf. Die Leiste bleibt bei neuen Anweisungen an ihrer Position.
 
 | Schaltfläche | Farbe | Wo | Wirkung |
 | --- | --- | --- | --- |

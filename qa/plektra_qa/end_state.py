@@ -106,16 +106,22 @@ class EndNotice:
                 self.console.print(f"end card: {exc}", markup=False)
 
     def deliver(self, *, stopped: bool = False) -> None:
-        """Notification, voice, then the bar (or the opened shade) for VISIBLE_S seconds."""
+        """Finish speaking before posting or displaying the end card."""
         text = self.text(stopped)
         self.told = text
         self.console.print(text, markup=False)
-        self._post(text)
         if self.speaker is not None:
             try:
                 self.speaker.say(text)
+                wait = getattr(self.speaker, "wait_idle", None)
+                if callable(wait):
+                    wait(SPEECH_WAIT_S)
+                    # Bound the wait and finish playback before another service reads the card.
+                    if self.speaker.speaking():
+                        self.speaker.stop()
             except Exception as exc:
                 self.console.print(f"end voice: {exc}", markup=False)
+        self._post(text)
         self._show(text)
 
     def finish(self, gate: Any | None = None) -> None:
@@ -198,9 +204,6 @@ def release(
         finally:
             if bar is not None:
                 bar_cm.__exit__(None, None, None)
-        wait = getattr(speaker, "wait_idle", None)
-        if callable(wait):
-            wait(SPEECH_WAIT_S)
         return notice
     finally:
         runlock.release(serial)

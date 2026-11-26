@@ -146,7 +146,8 @@ class StartGate:
             # The bar holds 200 characters in four lines. How to start (and that it records) comes first: a
             # cut card may lose the end of the reason, which the terminal and the voice also give.
             bar_text = f"{bar_text or BAR_PLAIN_CARD} {repeat_line(repeat_reason)}"
-        self._show_card(title, text, ("done", "norec") if recording else ("done",), bar_text=bar_text)
+        buttons = ("done", "norec", "stop") if recording else ("done", "stop")
+        self._show_card(title, text, buttons, bar_text=bar_text)
         if self.speaker is not None:
             self.speaker.say(text, rate=SPEECH_RATE)
         if confirmed:
@@ -169,6 +170,11 @@ class StartGate:
                 # A bar button is pressed on purpose: it counts while the instruction is still being read.
                 if self.bar is not None and now - card_up >= SETTLE_S:
                     pressed = self.bar.pressed()
+                    if pressed == "stop":
+                        stop_speaking = getattr(self.speaker, "stop", None)
+                        if callable(stop_speaking):
+                            stop_speaking()
+                        raise StartGateError("not started: cancelled on the phone")
                     if pressed == "done" or (recording and pressed == "norec"):
                         self.record_declined = pressed == "norec"
                         return self._done("bar")

@@ -10,6 +10,10 @@ Plektra grew out of Pastiera, created by Andrea Palumbo (PalSoftware). Patrick Z
 
 [Product page](https://pkb.rocks/) · [Releases](https://github.com/pkb-rocks/plektra/releases) · [Installation guide](docs/getting-started.md)
 
+**Set up device QA with your AI agent** · [Setup guide](qa/SETUP.md)
+
+> Follow [qa/SETUP.md](qa/SETUP.md) to install and verify the guided QA harness for this Plektra checkout.
+
 <a href="https://opencollective.com/plektra"><img src="docs/branding/opencollective-button.png" alt="Support Plektra on Open Collective" width="298" height="48"></a>
 
 ## Special thanks to Clicks Technology
@@ -20,7 +24,15 @@ Our ambition is to make Plektra **the** keyboard app for power users.
 
 ## Contents
 
-[Highlights](#highlights) · [Keys and bar](#keys-and-bar) · [Text and tools](#text-and-tools) · [Look and layout](#look-and-layout) · [Download and install](#download-and-install) · [Devices](#devices) · [Build and contribute](#build-and-contribute)
+[Guided device QA](#guided-device-qa) · [Highlights](#highlights) · [Keys and bar](#keys-and-bar) · [Text and tools](#text-and-tools) · [Look and layout](#look-and-layout) · [Download and install](#download-and-install) · [Devices](#devices) · [Build and contribute](#build-and-contribute)
+
+## Guided device QA
+
+This fork includes a guided Android keyboard test bench with spoken instructions, a movable overlay, and recordings that synchronize the screen, keys, touches, and test log.
+
+[![Titan 2 Elite test bench with a translucent QA bar and a synchronized terminal log](qa/media/movable-bar.png)](qa/media/harness-demo.mp4)
+
+[Watch the 2:03 demo (MP4)](qa/media/harness-demo.mp4) · [More screenshots and quick start](qa/README.md#see-it-in-action) · [Set up the harness](qa/SETUP.md)
 
 ## Highlights
 
@@ -230,6 +242,8 @@ python3 scripts/debug_device.py --device <serial> --env .env restore <backup-dir
 ```
 
 Restore requires the same package on the same device with a debuggable APK installed. Only supplied keys and optional speech settings are changed by the key import; omitted settings remain unchanged.
+
+The fork includes a [guided phone QA harness](qa/README.md) with a synthetic test bench, spoken prompts, and chaptered screen recordings. Start with its [short harness demo](qa/README.md#quick-start-harness-demo).
 
 Distributed forks must use their own name, application ID, update endpoints and branding, and must not present themselves as official Plektra releases.
 

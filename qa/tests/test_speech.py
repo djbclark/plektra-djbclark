@@ -114,13 +114,13 @@ def test_voice_reprompts_after_a_quiet_spell_then_stops_the_batch():
     assert [r.error for r in results] == [NOT_STARTED]
     assert speaker.said == [
         HANDS_OFF,
-        "Type hello",
-        REPROMPT + "Type hello",
-        REPROMPT + "Type hello",
+        "T1. Type hello",
+        REPROMPT + "T1. Type hello",
+        REPROMPT + "T1. Type hello",
         END_DONE_TEXT,
     ]
-    assert "Type hello" in speaker.prepared
-    assert REPROMPT + "digits: 42" in speaker.prepared
+    assert "T1. Type hello" in speaker.prepared
+    assert REPROMPT + "T2. digits: 42" in speaker.prepared
 
 
 def test_typing_ends_the_reprompts_and_the_trial_passes():
@@ -134,7 +134,7 @@ def test_typing_ends_the_reprompts_and_the_trial_passes():
         speaker,
     )
     assert results[0].passed
-    assert speaker.said == [HANDS_OFF, "Type hello now", END_DONE_TEXT]
+    assert speaker.said == [HANDS_OFF, "T1. Type hello now", END_DONE_TEXT]
 
 
 def test_without_a_voice_the_old_start_window_still_applies():

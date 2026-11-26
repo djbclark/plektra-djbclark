@@ -173,10 +173,6 @@ def run(
         runlock.release(serial)
 
 
-def _raise_interrupt(signum: int, _frame: Any) -> None:
-    raise KeyboardInterrupt(f"signal {signum}")
-
-
 def _run_locked(
     suite: Path, all_trials: list[Any], build: str, target: str, serial: str, record: bool, panel: bool,
     record_dir: Path | None, bar: bool, bar_package: str, redo: bool,
@@ -238,7 +234,20 @@ def _run_locked(
         notice.finish(gate)
 
     interrupted = False
-    old_handlers = {sig: signal.signal(sig, _raise_interrupt) for sig in (signal.SIGTERM, signal.SIGHUP)}
+    finishing_recording = False
+
+    def interrupt(signum: int, _frame: Any) -> None:
+        nonlocal interrupted
+        already_interrupted = interrupted
+        interrupted = True
+        notice.stopped = True
+        # A wrapper can forward the same TERM a second time. Let capture and muxing finish.
+        if not already_interrupted and not finishing_recording:
+            raise KeyboardInterrupt(f"signal {signum}")
+
+    old_handlers = {
+        sig: signal.signal(sig, interrupt) for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP)
+    }
     try:
         with ExitStack() as stack:
             button_bar = None
@@ -271,11 +280,16 @@ def _run_locked(
                     voice = "with the voice" if speaker.enabled else "video only (voice is off)"
                     console.print(f"recording the screen {voice} to {recorder.output}")
                     runlock.note_children(serial)
-                run_chord_batch(
-                    controller, trials, console, gate, speaker,
-                    on_trial=on_trial, on_result=on_result, overlay=button_bar, gate_entered=True,
-                    on_redo=on_redo, on_discard=on_discard, probe=probe, notice=notice,
-                )
+                try:
+                    run_chord_batch(
+                        controller, trials, console, gate, speaker,
+                        on_trial=on_trial, on_result=on_result, overlay=button_bar, gate_entered=True,
+                        on_redo=on_redo, on_discard=on_discard, probe=probe, notice=notice,
+                    )
+                finally:
+                    finishing_recording = True
+                    if interrupted:
+                        notice.stopped = True
     except KeyboardInterrupt:
         interrupted = True
         console.print("interrupted: passes so far are kept.", markup=False)

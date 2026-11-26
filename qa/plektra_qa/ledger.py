@@ -43,6 +43,8 @@ def trial_key(trial: Any) -> str:
     prompt = getattr(trial, "raw_prompt", "") or getattr(trial, "prompt", "") or ""
     parts = [getattr(trial, name, "") or "" for name in ("phase", "prompt", "expect", "verify_mode", "sentinel")]
     parts[1] = prompt
+    if getattr(trial, "software_keyboard", "hidden") == "shown":
+        parts.append("software_keyboard=shown")
     return _hash(parts)
 
 

@@ -33,6 +33,31 @@ def test_write_panel_lists_one_png_per_state(tmp_path: Path):
     assert Image.open(first).size == (PANEL_W, 400)
 
 
+def test_dense_notes_share_a_tick_without_delaying_later_notes(tmp_path: Path, monkeypatch):
+    from plektra_qa import overlay
+
+    notes = [
+        (0.02, "touch", "first"),
+        (0.09, "touch", "middle"),
+        (0.18, "touch", "last"),
+        (1.0, "voice", "next"),
+    ]
+    states = []
+    draw = overlay.panel_image
+
+    def capture(lines, *args):
+        states.append(lines)
+        return draw(lines, *args)
+
+    monkeypatch.setattr(overlay, "panel_image", capture)
+    listing = write_panel(notes, 2.0, PANEL_W, 400, tmp_path).read_text()
+    assert [line for line in listing.splitlines() if line.startswith("duration ")] == [
+        "duration 0.200", "duration 0.800", "duration 1.000"
+    ]
+    assert states[0] == [] and len(states[1]) == 3
+    assert states[1][-1][-1].endswith("last") and states[2][-1][-1].endswith("next")
+
+
 def test_srt_numbers_cues_and_caps_their_length():
     out = srt(NOTES, 12.0)
     assert out.startswith("1\n00:00:01,000 --> 00:00:02,500\ntrial 1: alpha: hello")

@@ -183,7 +183,8 @@ class ButtonBar:
             self._proc = self._popen(
                 ["adb", "-s", self.serial, "logcat", "-T", since, "-v", "threadtime", "-v", "uid",
                  "-s", f"{LOG_TAG}:I"],
-                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                # The end card still needs acknowledgements after terminal Ctrl-C.
+                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, start_new_session=True,
             )
         except OSError as exc:
             raise OverlayError(f"cannot read the overlay's button presses: {exc}") from exc

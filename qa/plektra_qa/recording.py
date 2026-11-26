@@ -164,6 +164,15 @@ class Recorder:
                 f"recording needs {', '.join(missing)} on PATH (macOS: brew install scrcpy ffmpeg)"
             )
         self.out_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            self._start_capture()
+        except RecordingError as exc:
+            self.warnings.append(f"{exc}; retrying scrcpy once")
+            self._raw = self._raw.with_name(self._raw.name.replace(".raw.mkv", ".retry.raw.mkv"))
+            self._log = self._log.with_name(self._log.name.replace(".scrcpy.log", ".retry.scrcpy.log"))
+            self._start_capture()
+
+    def _start_capture(self) -> None:
         cmd = [
             "scrcpy", "-s", self.serial, "--no-control", "--no-audio", "--no-window",
             "--record", str(self._raw), "--record-format", "mkv",
@@ -172,30 +181,34 @@ class Recorder:
         # terminal: its lines then arrive as they happen.
         master, slave = pty.openpty()
         try:
-            self._proc = self._popen(cmd, stdout=slave, stderr=slave)
+            self._proc = self._popen(cmd, stdout=slave, stderr=slave, start_new_session=True)
         except OSError as exc:
             os.close(master)
             raise RecordingError(f"scrcpy did not start: {exc}") from exc
         finally:
             os.close(slave)
-        threading.Thread(target=self._pump, args=(master,), name="scrcpy-log", daemon=True).start()
+        pump = threading.Thread(target=self._pump, args=(master, self._log), name="scrcpy-log", daemon=True)
+        pump.start()
         deadline = self._clock() + START_TIMEOUT_S
-        while self._clock() < deadline:
-            # "Recording started" comes once the phone's stream is connected,
-            # so the first frame follows at once. The file exists earlier and
-            # stays empty on a still screen, so it is no signal.
-            if "Recording started" in self._log_text():
-                self._t0 = self._clock()
-                self._start_input()
-                return
-            if self._proc.poll() is not None:
-                raise RecordingError(f"scrcpy stopped at start: {self._tail()}")
-            time.sleep(0.02)
-        self._terminate()
-        raise RecordingError(f"scrcpy did not start recording within {START_TIMEOUT_S:.0f} s: {self._tail()}")
+        try:
+            while self._clock() < deadline:
+                if self._proc.poll() is not None:
+                    pump.join(timeout=0.5)
+                    raise RecordingError(f"scrcpy stopped at start: {self._tail()}")
+                # The stream can be connected while a still screen leaves the file empty.
+                if "Recording started" in self._log_text():
+                    self._t0 = self._clock()
+                    self._start_input()
+                    return
+                time.sleep(0.02)
+            raise RecordingError(f"scrcpy did not start recording within {START_TIMEOUT_S:.0f} s: {self._tail()}")
+        except BaseException:
+            self._terminate()
+            self._show_touches(False)
+            raise
 
-    def _pump(self, master: int) -> None:
-        with self._log.open("ab") as log:
+    def _pump(self, master: int, path: Path) -> None:
+        with path.open("ab") as log:
             while True:
                 try:
                     data = os.read(master, 4096)
@@ -349,7 +362,9 @@ class Recorder:
     def _encode(self, cmd: list[str], frames: Iterator[bytes]) -> None:
         """Run ffmpeg with the overlay band streamed to its stdin."""
         with self._ffmpeg_log.open("wb") as err:
-            proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=err)
+            proc = subprocess.Popen(
+                cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=err, start_new_session=True
+            )
             try:
                 assert proc.stdin is not None
                 for frame in frames:
@@ -447,14 +462,17 @@ class Recorder:
                 cmd += ["-map", f"{audio}:a", "-c:a", "aac", "-af", "apad"]
             if srt_index > 0:
                 cmd += ["-map", f"{srt_index}:s", "-c:s", "mov_text", "-metadata:s:s:0", "title=Terminal log"]
+            pending = self.output.with_suffix(".partial.mp4")
             cmd += [
                 "-map_metadata", str(meta_index), "-map_chapters", str(meta_index),
                 "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
-                "-t", f"{length:.2f}", "-movflags", "+faststart", str(self.output),
+                "-t", f"{length:.2f}", "-movflags", "+faststart", str(pending),
             ]
             try:
                 self._encode(cmd, band_frames(length, width, keys, touches, self._t0))
+                pending.replace(self.output)
             except (OSError, subprocess.SubprocessError) as exc:
+                pending.unlink(missing_ok=True)
                 self.warnings.append(f"ffmpeg could not write {self.output.name}; the raw video is kept at {self._raw}: {exc}")
                 return None
             self.chapters_file = write_chapter_files(items, length, self.output)

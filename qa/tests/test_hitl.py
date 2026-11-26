@@ -453,7 +453,7 @@ def test_batch_holds_the_screen_then_yields_for_typing():
     assert gate.events == [
         "enter",
         ("hold", "Preparing the field"),
-        ("yield", "alpha: hello"),
+        ("yield", "T1. alpha: hello"),
         "exit",
     ]
 

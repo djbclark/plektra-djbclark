@@ -2,7 +2,7 @@
 
 [Deutsch](README.de.md)
 
-A tiny Android overlay app for human-in-the-loop test harnesses. It draws a compact bar at the top of the screen (below the status bar): an instruction text across the full width and one thin row of small buttons under it, **Done**, **No rec** or **Redo**, **◀ Prev**, **Next** and **Stop**. It never takes focus, so the keyboard and the app under test keep the input focus. The harness's own logic stays on the computer; the one extra screen here is a test bench for typing (below).
+The Plektra QA companion app shows instructions and controls in a movable, translucent Android overlay. Drag the instruction to move the bar. Tap **−** for a single QA bubble, tap the bubble to reopen the bar, or drag it to the bottom **×** to dismiss it. The focused field and keyboard stay available while you move the overlay. The app also provides a built-in typing bench. Try both in the [harness demo](../README.md#quick-start-harness-demo).
 
 **This is a test tool for developer devices.** It draws over other apps and accepts broadcasts from adb. Install it only on a device you test with.
 

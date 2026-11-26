@@ -7,7 +7,7 @@ import subprocess
 import sys
 import threading
 import time
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -285,7 +285,7 @@ def test_the_lock_is_keyed_on_the_phones_own_serial():
         return SimpleNamespace(stdout="ABC123\n")
 
     assert runlock.device_serial("192.168.68.78:5555", run) == "ABC123"
-    assert runlock.device_serial("100.73.253.10:5555", run) == "ABC123"  # same phone, same lock
+    assert runlock.device_serial("198.51.100.42:5555", run) == "ABC123"  # same phone, same lock
     assert runlock.device_serial("x", lambda *a, **k: SimpleNamespace(stdout="error: closed")) == "x"
 
 
@@ -421,8 +421,30 @@ def test_sigterm_in_run_becomes_a_keyboard_interrupt_and_the_handler_is_restored
 
     _patch_cli(monkeypatch, tmp_path, batch=batch)
     result = CliRunner().invoke(cli.app, ["run", str(SUITE)])
-    assert result.exit_code == 130 and seen["handler"] is cli._raise_interrupt
+    assert result.exit_code == 130 and seen["handler"] is not before
     assert signal.getsignal(signal.SIGTERM) == before
+
+
+def test_a_second_sigterm_during_recording_cleanup_does_not_interrupt_it(monkeypatch, tmp_path):
+    cleanup = []
+
+    def batch(*_args, **_kwargs):
+        os.kill(os.getpid(), signal.SIGTERM)
+        raise AssertionError("SIGTERM did not interrupt")
+
+    @contextmanager
+    def recording(*_args, **_kwargs):
+        try:
+            yield None
+        finally:
+            os.kill(os.getpid(), signal.SIGTERM)
+            cleanup.append("finished")
+
+    _patch_cli(monkeypatch, tmp_path, batch=batch)
+    monkeypatch.setattr(cli, "recording", recording)
+    result = CliRunner().invoke(cli.app, ["run", str(SUITE)])
+    assert cleanup == ["finished"]
+    assert result.exit_code == 130
 
 
 def test_bar_is_the_default_for_run():

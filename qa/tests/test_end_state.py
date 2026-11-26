@@ -115,6 +115,17 @@ def test_done_goes_to_the_shade_the_voice_and_the_bar_which_then_closes(monkeypa
     assert slept == [7.0] and end.posted and end.on_bar
 
 
+def test_end_voice_finishes_before_showing_or_posting_the_card():
+    phone = Phone()
+    end = notice(phone, sleep=lambda _seconds: None)
+    end.speaker.wait_idle = lambda seconds: phone.events.append(("voice-idle", seconds))
+    end.deliver()
+    wait = phone.events.index(("voice-idle", end_state.SPEECH_WAIT_S))
+    post = next(i for i, event in enumerate(phone.events) if event[:4] == ("adb", "cmd", "notification", "post"))
+    assert phone.events.index(("say", END_DONE_TEXT)) < wait < post
+    assert post < phone.events.index(("show", END_DONE_TEXT, ()))
+
+
 def test_more_coming_says_wait_unless_the_person_stopped():
     phone = Phone()
     notice(phone, more_coming=True).deliver()
