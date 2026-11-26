@@ -22,8 +22,6 @@ from a profile in `qa/keymaps/`. The live read wins when they disagree.
 
 from __future__ import annotations
 
-import html
-import json
 import os
 import re
 import subprocess
@@ -32,6 +30,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any
+from xml.etree import ElementTree as ET
 
 import yaml
 
@@ -286,26 +285,47 @@ def read_vendor_props(serial: str, run: Runner = _run) -> dict[str, int]:
     return {name: int(value) for name, value in _PROP_RE.findall(result.stdout)}
 
 
+# Current HardwareKeyRemapRegistry options (SettingsManager.KEY_KEY_REMAP_PREFIX = "key_remap_").
+# Each entry maps option id -> (unsupported profiles, rules).
+_KEY_REMAP_PREFIX = "key_remap_"
+_KEY_REMAP_OPTIONS: dict[str, tuple[frozenset[str], tuple[Rule, ...]]] = {
+    "swap_shift_right_enter": (
+        frozenset({"q25"}),
+        (Rule("scan", 66, scan=54, key=60), Rule("key", 60, key=66)),
+    ),
+}
+
+
 def rules_from_prefs(xml: str, remap_profile: str) -> tuple[Rule, ...] | None:
-    """Plektra's rules for this keyboard, from its prefs XML; None when unreadable."""
-    match = re.search(r'<string name="hardware_key_remaps">(.*?)</string>', xml, re.S)
-    if match:
-        try:
-            doc = json.loads(html.unescape(match.group(1)))
-        except json.JSONDecodeError:
-            return None
-        if not isinstance(doc, dict) or int(doc.get("v", 0)) > 1:
-            return None  # a newer format: the app would not read it either
-        stored = (doc.get("profiles") or {}).get(remap_profile.lower()) or {}
-        rules: list[Rule] = []
-        for raw in stored.get("rules") or []:
-            if isinstance(raw, dict) and (rule := _rule(raw, "plektra prefs")) is not None:
-                rules.append(rule)
-        return tuple(rules)
-    # Older builds: one boolean for the only remap there was.
-    if re.search(r'<boolean name="key_remap_swap_shift_right_enter" value="true"', xml):
-        return (Rule("scan", 66, scan=54, key=60), Rule("key", 60, key=66))
-    return ()
+    """Plektra's active key-remap-v2 rules from its prefs XML; None when unreadable.
+
+    Plektra reads boolean preferences named `key_remap_<option_id>` (see
+    `SettingsManager.getEnabledKeyRemaps` and `HardwareKeyRemapRegistry`). Any
+    leftover v1 `hardware_key_remaps` JSON string is ignored by the app and
+    therefore ignored here too.
+    """
+    try:
+        root = ET.fromstring(xml)
+    except ET.ParseError:
+        return None
+    if root.tag != "map":
+        return None
+    profile = remap_profile.lower()
+    rules: list[Rule] = []
+    for elem in root.findall("boolean"):
+        name = elem.attrib.get("name", "")
+        if not name.startswith(_KEY_REMAP_PREFIX):
+            continue
+        if elem.attrib.get("value", "").lower() != "true":
+            continue
+        option_id = name[len(_KEY_REMAP_PREFIX):]
+        option = _KEY_REMAP_OPTIONS.get(option_id)
+        if option is None:
+            return None  # an enabled option this harness does not know how to resolve
+        unsupported, option_rules = option
+        if profile not in unsupported:
+            rules.extend(option_rules)
+    return tuple(rules)
 
 
 def read_plektra_rules(

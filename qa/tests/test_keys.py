@@ -272,6 +272,12 @@ GETPROP = """\
 PREFS = """<?xml version='1.0' encoding='utf-8' standalone='yes' ?>
 <map>
     <boolean name="autocap" value="true" />
+    <boolean name="key_remap_swap_shift_right_enter" value="true" />
+</map>
+"""
+STALE_V1_PREFS = """<?xml version='1.0' encoding='utf-8' standalone='yes' ?>
+<map>
+    <boolean name="autocap" value="true" />
     <string name="hardware_key_remaps">{&quot;v&quot;:1,&quot;profiles&quot;:{&quot;titan2elite_qwerty&quot;:{&quot;rules&quot;:[{&quot;match&quot;:&quot;scan&quot;,&quot;scan&quot;:54,&quot;key&quot;:60,&quot;to&quot;:66},{&quot;match&quot;:&quot;key&quot;,&quot;key&quot;:66,&quot;to&quot;:60}]}}}</string>
 </map>
 """
@@ -299,17 +305,27 @@ def test_vendor_props_are_parsed_from_getprop_output():
     assert "volume" in props and "build" not in props
 
 
-def test_prefs_rules_are_read_from_the_stored_json():
+def test_prefs_rules_read_key_remap_v2_booleans_and_ignore_stale_v1_json():
     assert rules_from_prefs(PREFS, "titan2elite_qwerty") == (
         Rule("scan", 66, scan=54, key=60),
         Rule("key", 60, key=66),
     )
-    assert rules_from_prefs(PREFS, "other_profile") == ()
+    # Q25 is unsupported for swap_shift_right_enter (HardwareKeyRemapRegistry).
+    assert rules_from_prefs(PREFS, "Q25") == ()
     assert rules_from_prefs("<map></map>", "titan2elite_qwerty") == ()
-    legacy = '<map><boolean name="key_remap_swap_shift_right_enter" value="true" /></map>'
-    assert len(rules_from_prefs(legacy, "titan2elite_qwerty")) == 2
-    newer = '<map><string name="hardware_key_remaps">{&quot;v&quot;:2}</string></map>'
-    assert rules_from_prefs(newer, "titan2elite_qwerty") is None
+    # A leftover v1 JSON pref must NOT turn on the swap when key_remap_swap_shift_right_enter is off/absent.
+    assert rules_from_prefs(STALE_V1_PREFS, "titan2elite_qwerty") == ()
+    off_with_stale = STALE_V1_PREFS.replace(
+        "</map>", '    <boolean name="key_remap_swap_shift_right_enter" value="false" />\n</map>'
+    )
+    assert rules_from_prefs(off_with_stale, "titan2elite_qwerty") == ()
+    # Attribute order in XML does not matter.
+    reordered = '<map><boolean value="true" name="key_remap_swap_shift_right_enter" /></map>'
+    assert len(rules_from_prefs(reordered, "titan2elite_qwerty")) == 2
+    # Unknown enabled key_remap_* option or malformed XML returns None.
+    unknown = '<map><boolean name="key_remap_future_option" value="true" /></map>'
+    assert rules_from_prefs(unknown, "titan2elite_qwerty") is None
+    assert rules_from_prefs("<map><broken", "titan2elite_qwerty") is None
 
 
 def test_live_keymap_reads_both_layers_and_only_reads(tmp_path):
