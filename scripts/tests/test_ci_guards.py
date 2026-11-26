@@ -167,29 +167,52 @@ class WorkflowTopicTest(unittest.TestCase):
 
 
 class VariantContractTest(unittest.TestCase):
-    def fixture(self):
+    def fixture(self, flavor='stable', build_type='release', *, fdroid=False):
         import xml.etree.ElementTree as ET
+        nightly = 'nightly' in flavor.lower()
+        play = flavor.startswith('play')
+        accessibility = 'NoAccessibility' not in flavor
+        debug = build_type == 'debug'
+        package = (
+            'rocks.pkb.plektra'
+            + ('.unsovereign' if play else '')
+            + ('.nightly' if nightly else '')
+            + ('.djb' if debug else '')
+        )
+        label = 'Plektra djb' if debug else ('Plektra Nightly' if nightly else 'Plektra')
+        icon = '@mipmap/ic_launcher_nightly' if nightly else '@mipmap/ic_launcher'
+        version_name = '26.11-nightly' if nightly else '26.11'
         config = {
-            'APPLICATION_ID': 'rocks.pkb.plektra', 'BUILD_TYPE': 'release', 'FLAVOR': 'stable',
-            'RELEASE_CHANNEL': 'stable', 'DISTRIBUTION_CHANNEL': 'direct',
-            'IS_FDROID_BUILD': False, 'ENABLE_GITHUB_UPDATE_CHECKS': True,
-            'ENABLE_ACCESSIBILITY_SERVICE': True, 'APK_VARIANT': 'full',
-            'GITHUB_REPOSITORY': 'pkb-rocks/plektra', 'VERSION_NAME': '26.11', 'VERSION_CODE': 26110000,
+            'APPLICATION_ID': package, 'BUILD_TYPE': build_type, 'FLAVOR': flavor,
+            'RELEASE_CHANNEL': 'nightly' if nightly else 'stable',
+            'DISTRIBUTION_CHANNEL': 'play' if play else 'direct',
+            'IS_FDROID_BUILD': fdroid and not play,
+            'ENABLE_GITHUB_UPDATE_CHECKS': not (fdroid or play),
+            'ENABLE_ACCESSIBILITY_SERVICE': accessibility,
+            'APK_VARIANT': 'full' if accessibility else 'no-accessibility',
+            'GITHUB_REPOSITORY': 'pkb-rocks/plektra', 'VERSION_NAME': version_name, 'VERSION_CODE': 26110000,
         }
-        manifest = ET.fromstring('''<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-            package="rocks.pkb.plektra" android:versionName="26.11" android:versionCode="26110000">
-            <application android:label="Plektra" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round">
+        accessibility_service = (
+            '<service android:name="rocks.pkb.plektra.inputmethod.ClicksLauncherButtonAccessibilityService"/>'
+            if accessibility else ''
+        )
+        manifest = ET.fromstring(f'''<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+            package="{package}" android:versionName="{version_name}" android:versionCode="26110000">
+            <application android:label="{label}" android:icon="{icon}" android:roundIcon="{icon}_round">
             <service android:name="rocks.pkb.plektra.inputmethod.PhysicalKeyboardInputMethodService"
-                android:permission="android.permission.BIND_INPUT_METHOD" android:label="Plektra"/>
-            <service android:name="rocks.pkb.plektra.inputmethod.ClicksLauncherButtonAccessibilityService"/>
+                android:permission="android.permission.BIND_INPUT_METHOD" android:label="{label}"/>
+            {accessibility_service}
+            <provider android:name="rikka.shizuku.ShizukuProvider" android:authorities="{package}.shizuku"/>
+            <provider android:name="androidx.core.content.FileProvider" android:authorities="{package}.fileprovider"/>
             </application></manifest>''')
-        for name, icon in [('OrangeLauncherAlias', 'ic_launcher'), ('OpenOrangeLauncherAlias', 'ic_launcher_open'),
-                           ('BlueLauncherAlias', 'ic_launcher_nightly'), ('OpenBlueLauncherAlias', 'ic_launcher_nightly_open')]:
+        enabled = 'BlueLauncherAlias' if nightly else 'OrangeLauncherAlias'
+        for name, alias_icon in [('OrangeLauncherAlias', 'ic_launcher'), ('OpenOrangeLauncherAlias', 'ic_launcher_open'),
+                                 ('BlueLauncherAlias', 'ic_launcher_nightly'), ('OpenBlueLauncherAlias', 'ic_launcher_nightly_open')]:
             ET.SubElement(manifest.find('application'), 'activity-alias', {
                 variants.ANDROID + 'name': 'rocks.pkb.plektra.' + name,
-                variants.ANDROID + 'enabled': str(name == 'OrangeLauncherAlias').lower(),
-                variants.ANDROID + 'icon': '@mipmap/' + icon,
-                variants.ANDROID + 'roundIcon': '@mipmap/' + icon + '_round',
+                variants.ANDROID + 'enabled': str(name == enabled).lower(),
+                variants.ANDROID + 'icon': '@mipmap/' + alias_icon,
+                variants.ANDROID + 'roundIcon': '@mipmap/' + alias_icon + '_round',
                 variants.ANDROID + 'targetActivity': 'rocks.pkb.plektra.MainActivity'})
         return config, manifest
 
@@ -197,8 +220,9 @@ class VariantContractTest(unittest.TestCase):
         config, manifest = self.fixture()
         variants.check_contract(config, manifest, 'stable', 'release')
         for field, value in [('ENABLE_GITHUB_UPDATE_CHECKS', False), ('APPLICATION_ID', 'wrong'),
+                             ('APPLICATION_ID', 'rocks.pkb.plektra.djb'),
                              ('ENABLE_ACCESSIBILITY_SERVICE', False), ('IS_FDROID_BUILD', True)]:
-            with self.subTest(field=field), self.assertRaises(ValueError):
+            with self.subTest(field=field, value=value), self.assertRaises(ValueError):
                 variants.check_contract(dict(config, **{field: value}), manifest, 'stable', 'release')
         for mutation in ('package', 'version', 'accessibility', 'alias'):
             config, manifest = self.fixture()
@@ -212,6 +236,26 @@ class VariantContractTest(unittest.TestCase):
                 manifest.find('application/activity-alias').set(variants.ANDROID + 'enabled', 'false')
             with self.subTest(mutation=mutation), self.assertRaises(ValueError):
                 variants.check_contract(config, manifest, 'stable', 'release')
+
+    def test_fork_debug_variants_require_djb_suffix_label_and_authorities(self):
+        for flavor in variants.FLAVORS:
+            config, manifest = self.fixture(flavor, 'debug')
+            with self.subTest(flavor=flavor):
+                variants.check_contract(config, manifest, flavor, 'debug')
+        # Upstream (un-suffixed) package, label, or provider authority must fail for fork debug builds.
+        config, manifest = self.fixture('stable', 'debug')
+        with self.assertRaises(ValueError):
+            variants.check_contract(dict(config, APPLICATION_ID='rocks.pkb.plektra'), manifest, 'stable', 'debug')
+        for mutation in ('app_label', 'ime_label', 'authority'):
+            config, manifest = self.fixture('stable', 'debug')
+            if mutation == 'app_label':
+                manifest.find('application').set(variants.ANDROID + 'label', 'Plektra')
+            elif mutation == 'ime_label':
+                manifest.findall('application/service')[0].set(variants.ANDROID + 'label', 'Plektra')
+            else:
+                manifest.findall('application/provider')[0].set(variants.ANDROID + 'authorities', 'rocks.pkb.plektra.shizuku')
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                variants.check_contract(config, manifest, 'stable', 'debug')
 
 
 if __name__ == '__main__':

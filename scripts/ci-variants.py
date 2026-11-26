@@ -17,7 +17,15 @@ def check_contract(config, manifest, flavor, build_type, fdroid=False):
     nightly = 'nightly' in flavor.lower()
     play = flavor.startswith('play')
     accessibility = 'NoAccessibility' not in flavor
-    package = 'rocks.pkb.plektra' + ('.unsovereign' if play else '') + ('.nightly' if nightly else '')
+    debug = build_type == 'debug'
+    # Fork debug builds carry the .djb suffix and "Plektra djb" label so they
+    # install beside official signed builds (app/build.gradle.kts).
+    package = (
+        'rocks.pkb.plektra'
+        + ('.unsovereign' if play else '')
+        + ('.nightly' if nightly else '')
+        + ('.djb' if debug else '')
+    )
     expected = {
         'APPLICATION_ID': package, 'BUILD_TYPE': build_type, 'FLAVOR': flavor,
         'RELEASE_CHANNEL': 'nightly' if nightly else 'stable',
@@ -39,7 +47,7 @@ def check_contract(config, manifest, flavor, build_type, fdroid=False):
         if manifest.get(ANDROID + key) != str(config[field]):
             raise ValueError(f'{flavor}: manifest {key} differs from BuildConfig')
     app = manifest.find('application')
-    label = 'Plektra Nightly' if nightly else 'Plektra'
+    label = 'Plektra djb' if debug else ('Plektra Nightly' if nightly else 'Plektra')
     icon = '@mipmap/ic_launcher_nightly' if nightly else '@mipmap/ic_launcher'
     for key, value in [('label', label), ('icon', icon), ('roundIcon', icon + '_round')]:
         if app.get(ANDROID + key) != value:
