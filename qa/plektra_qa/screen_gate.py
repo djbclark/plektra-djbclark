@@ -197,7 +197,7 @@ change_qa_keyboard() (
 )
 
 restore_qa_keyboard() (
-    lock_qa_keyboard || exit 1
+    lock_qa_keyboard || exit 75
     [ -f "$keyboard_journal" ] || exit 0
     read -r saved_batch saved_package original < "$keyboard_journal" || exit 1
     [ "$saved_batch" = "$keyboard_batch" ] && [ "$saved_package" = "$keyboard_package" ] || exit 1
@@ -221,6 +221,14 @@ restore_qa_keyboard() (
     [ "$(qa_keyboard_override)" = "$original" ] || exit 1
     rm -f "$keyboard_journal"
 )
+
+restore_qa_keyboard_after_stop() {
+    # An in-flight Android activity can outlast one lock wait. Keep the
+    # watcher and journal alive until that command has released the lock.
+    until restore_qa_keyboard; do
+        [ "$?" -eq 75 ] || return 1
+    done
+}
 """
 
 
@@ -576,7 +584,6 @@ class ScreenGate:
             "    break",
             "  fi",
             "done",
-            self._keyboard_script('restore_qa_keyboard || echo "keyboard mode restore failed"'),
             f"settings put secure {INVERSION_KEY} 0",
             f"settings put system {TIMEOUT_KEY} {timeout}",
             f"settings put global {STAY_KEY} {stay}",
@@ -600,6 +607,7 @@ class ScreenGate:
                 ),
                 "  esac",
                 'done < "$notes"',
+                self._keyboard_script('restore_qa_keyboard_after_stop || echo "keyboard mode restore failed"'),
                 f'rm -f "$release" {AWAKE_PID} {AWAKE_SCRIPT} "$notes"',
                 "echo done",
             ]

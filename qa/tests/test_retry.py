@@ -498,13 +498,14 @@ def test_keyboard_guard_reads_override_and_window_and_restores_the_next_surface(
     assert len(actions) == 3 and "SoftwareKeyboardModeActionActivity" in actions[1][-1]
 
 
-@pytest.mark.parametrize(("original", "phone_stop"), [
-    ("absent", False),
-    ("absent", True),
-    ("force_hardware", True),
-    ("force_virtual", False),
+@pytest.mark.parametrize(("original", "phone_stop", "lock_contention"), [
+    ("absent", False, False),
+    ("absent", True, False),
+    ("force_hardware", True, False),
+    ("force_virtual", False, False),
+    ("absent", True, True),
 ])
-def test_keyboard_mode_journal_restores_exact_override(tmp_path, monkeypatch, original, phone_stop):
+def test_keyboard_mode_journal_restores_exact_override(tmp_path, monkeypatch, original, phone_stop, lock_contention):
     for name in (
         "KEYBOARD_JOURNAL", "KEYBOARD_LOCK", "AWAKE_PID", "AWAKE_SCRIPT",
         "AWAKE_RELEASE", "AWAKE_STOPPED", "AWAKE_NOTES",
@@ -549,8 +550,18 @@ fi
 """)
     for name in ("settings", "sleep", "svc"):
         command(name, "exit 0\n")
+    contention = tmp_path / "lock-attempts"
+    command("mkdir", """
+if [ -f "$QA_CONTENDED" ]; then
+    attempts=$(cat "$QA_CONTENDED")
+    echo "$((attempts + 1))" > "$QA_CONTENDED"
+    [ "$attempts" -ge 101 ] || exit 1
+fi
+exec /bin/mkdir "$@"
+""")
     env = dict(os.environ, PATH=f"{commands}:{os.environ['PATH']}",
-               QA_OVERRIDE=str(override), QA_STOP_SEEN=str(tmp_path / "seen"))
+               QA_OVERRIDE=str(override), QA_STOP_SEEN=str(tmp_path / "seen"),
+               QA_CONTENDED=str(contention))
     gate = ScreenGate("s")
     gate._saved_timeout = "120000"
     gate._saved_stay = "0"
@@ -565,7 +576,11 @@ fi
     assert journal.read_text().split()[-2:] == ["example.ime", original]
 
     if phone_stop:
+        if lock_contention:
+            contention.write_text("0")
         run(gate._watcher_text())
+        if lock_contention:
+            assert int(contention.read_text()) > 100
         assert Path(screen_gate.AWAKE_STOPPED).is_file()
         assert run(gate._keyboard_script("change_qa_keyboard"), check=False).returncode
     else:
