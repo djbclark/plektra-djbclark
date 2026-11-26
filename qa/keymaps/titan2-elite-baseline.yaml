@@ -104,9 +104,10 @@ vendor:
   recent: 61     # Tab
   func1: 85      # Media
 
-# Plektra's remap layer, as stored in the hardware_key_remaps pref. A scan
-# rule beats a key rule; a key rule matches the key code the vendor layer
-# delivers. This is the "Swap right Shift and Enter" setting, on.
+# Plektra's remap layer, controlled by key_remap_<id> boolean prefs (for example
+# key_remap_swap_shift_right_enter). A scan rule beats a key rule; a key rule
+# matches the key code the vendor layer delivers. This baseline has "Swap right
+# Shift and Enter" on.
 plektra_remap:
   - {match: scan, scan: 54, key: 60, to: 66}   # printed right shift types Enter
   - {match: key, key: 66, to: 60}              # printed Enter types Shift
