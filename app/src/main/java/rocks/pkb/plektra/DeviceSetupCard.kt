@@ -456,5 +456,6 @@ private fun armPairing(context: Context) {
 }
 
 private fun stopPairing(context: Context) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
     runCatching { context.stopService(AdbPairingService.stopIntent(context)) }
 }

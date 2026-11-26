@@ -17,6 +17,12 @@ SOURCES = {'unit': ('test', 'testDebug'), 'instrumented': ('androidTest',)}
 VARIANTS = ('StableDebug', 'StableRelease', 'NightlyDebug', 'NightlyRelease',
             'PlayStableDebug', 'PlayNightlyDebug',
             'StableNoAccessibilityDebug', 'NightlyNoAccessibilityDebug')
+# Opt-in real-dictionary evaluation classes skip all methods via Assume unless
+# -Ppastiera.eval.realDictionary=true is passed; still require tests > 0 and 0 failures.
+OPT_IN_SKIPPED = frozenset({
+    'rocks.pkb.plektra.core.suggestions.eval.AutoCorrectLiteRealDictionaryTest',
+    'rocks.pkb.plektra.core.suggestions.eval.AutocorrectEvalRealDictionaryTest',
+})
 
 
 def discover(root=ROOT):
@@ -68,13 +74,20 @@ def validate_workflow(catalog, workflow):
         raise ValueError(f'CI topic steps differ from catalog: workflow={topics}, expected={sorted([*catalog["unit"], UNSORTED])}')
 
 
-def verify_results(directory, expected):
+def verify_results(directory, expected, allow_all_skipped=OPT_IN_SKIPPED):
     suites = [ET.parse(path).getroot() for path in directory.glob('TEST-*.xml')]
     actual = {suite.get('name') for suite in suites}
     duplicate = sorted(name for name, count in Counter(s.get('name') for s in suites).items() if count != 1)
     missing = set(expected) - actual
     unexpected = actual - set(expected)
-    empty = [suite.get('name') for suite in suites if int(suite.get('tests', 0)) <= int(suite.get('skipped', 0))]
+    empty = [
+        suite.get('name') for suite in suites
+        if int(suite.get('tests', 0)) == 0
+        or (
+            int(suite.get('tests', 0)) <= int(suite.get('skipped', 0))
+            and suite.get('name') not in allow_all_skipped
+        )
+    ]
     failures = sum(int(s.get('failures', 0)) + int(s.get('errors', 0)) for s in suites)
     skipped = sum(int(s.get('skipped', 0)) for s in suites)
     tests = sum(int(s.get('tests', 0)) for s in suites)

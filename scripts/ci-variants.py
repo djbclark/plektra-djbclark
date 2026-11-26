@@ -13,11 +13,21 @@ FLAVORS = ('stable', 'nightly', 'playStable', 'playNightly',
            'stableNoAccessibility', 'nightlyNoAccessibility')
 
 
-def check_contract(config, manifest, flavor, build_type, fdroid=False):
+def check_contract(config, manifest, flavor, build_type, fdroid=True):
     nightly = 'nightly' in flavor.lower()
     play = flavor.startswith('play')
     accessibility = 'NoAccessibility' not in flavor
-    package = 'rocks.pkb.plektra' + ('.unsovereign' if play else '') + ('.nightly' if nightly else '')
+    debug = build_type == 'debug'
+    # Fork debug builds carry the .djb suffix and "Plektra djb" label so they
+    # install beside official signed builds (app/build.gradle.kts).
+    # Fork gradle.properties sets PLEKTRA_FDROID_BUILD=true so direct builds
+    # never check upstream GitHub for updates.
+    package = (
+        'rocks.pkb.plektra'
+        + ('.unsovereign' if play else '')
+        + ('.nightly' if nightly else '')
+        + ('.djb' if debug else '')
+    )
     expected = {
         'APPLICATION_ID': package, 'BUILD_TYPE': build_type, 'FLAVOR': flavor,
         'RELEASE_CHANNEL': 'nightly' if nightly else 'stable',
@@ -39,7 +49,7 @@ def check_contract(config, manifest, flavor, build_type, fdroid=False):
         if manifest.get(ANDROID + key) != str(config[field]):
             raise ValueError(f'{flavor}: manifest {key} differs from BuildConfig')
     app = manifest.find('application')
-    label = 'Plektra Nightly' if nightly else 'Plektra'
+    label = 'Plektra djb' if debug else ('Plektra Nightly' if nightly else 'Plektra')
     icon = '@mipmap/ic_launcher_nightly' if nightly else '@mipmap/ic_launcher'
     for key, value in [('label', label), ('icon', icon), ('roundIcon', icon + '_round')]:
         if app.get(ANDROID + key) != value:
@@ -59,15 +69,23 @@ def check_contract(config, manifest, flavor, build_type, fdroid=False):
                              ('OpenBlueLauncherAlias', 'ic_launcher_nightly_open')]:
         alias = aliases[name]
         for key, value in [('enabled', str(name == enabled).lower()),
+                           ('label', label),
                            ('icon', '@mipmap/' + alias_icon),
                            ('roundIcon', '@mipmap/' + alias_icon + '_round'),
                            ('targetActivity', 'rocks.pkb.plektra.MainActivity')]:
             if alias.get(ANDROID + key) != value:
                 raise ValueError(f'{flavor}: incorrect launcher alias {name}/{key}')
+    expected_authorities = {f'{package}.shizuku', f'{package}.fileprovider'}
+    found_authorities = set()
     for provider in app.findall('provider'):
         authority = provider.get(ANDROID + 'authorities', '')
-        if authority.endswith(('.shizuku', '.fileprovider')) and not authority.startswith(package + '.'):
-            raise ValueError(f'{flavor}: incorrect provider authority')
+        if authority.endswith(('.shizuku', '.fileprovider')):
+            if authority not in expected_authorities:
+                raise ValueError(f'{flavor}/{build_type}: incorrect provider authority {authority!r}')
+            found_authorities.add(authority)
+    if found_authorities != expected_authorities:
+        missing = sorted(expected_authorities - found_authorities)
+        raise ValueError(f'{flavor}/{build_type}: missing provider authorities {missing}')
 
 
 def read_config(path):
@@ -91,11 +109,16 @@ def main():
     if args.fdroid:
         command.append('-PPLEKTRA_FDROID_BUILD=true')
     subprocess.run(command, cwd=ROOT, check=True)
+    # Fork gradle.properties enables PLEKTRA_FDROID_BUILD=true by default unless
+    # explicitly overridden via --gradle-arg -PPLEKTRA_FDROID_BUILD=false.
+    fdroid = args.fdroid or not any(
+        arg.lower() == '-pplektra_fdroid_build=false' for arg in args.gradle_arg
+    )
     for flavor, kind in variants:
         variant = flavor + kind.title()
         config = ROOT / f'app/build/generated/source/buildConfig/{flavor}/{kind}/rocks/pkb/plektra/BuildConfig.java'
         manifest = ROOT / f'app/build/intermediates/merged_manifest/{variant}/process{variant[0].upper() + variant[1:]}MainManifest/AndroidManifest.xml'
-        check_contract(read_config(config), ET.parse(manifest).getroot(), flavor, kind, args.fdroid)
+        check_contract(read_config(config), ET.parse(manifest).getroot(), flavor, kind, fdroid=fdroid)
         print(f'{variant}: generated BuildConfig and merged manifest verified', flush=True)
 
 

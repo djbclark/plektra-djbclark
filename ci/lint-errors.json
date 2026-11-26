@@ -12,6 +12,24 @@
     },
     {
       "id": "FullBackupContent",
+      "message": "`direct_boot_files/` is not in an included path",
+      "files": [
+        "app/src/main/res/xml/backup_rules.xml"
+      ],
+      "source": "<exclude domain=\"device_file\" path=\"direct_boot_files/\"/>",
+      "count": 1
+    },
+    {
+      "id": "FullBackupContent",
+      "message": "`direct_boot_files/` is not in an included path",
+      "files": [
+        "app/src/main/res/xml/data_extraction_rules.xml"
+      ],
+      "source": "<exclude domain=\"device_file\" path=\"direct_boot_files/\"/>",
+      "count": 1
+    },
+    {
+      "id": "FullBackupContent",
       "message": "`direct_boot_keyboard_config.xml` is not in an included path",
       "files": [
         "app/src/main/res/xml/backup_rules.xml"
@@ -179,6 +197,15 @@
         "app/src/main/res/values/strings.xml"
       ],
       "source": "<string name=\"about_signing_attestations\">Signing attestations</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"adb_error_key_store\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"adb_error_key_store\">Failed to access the ADB key store.</string>",
       "count": 1
     },
     {
@@ -831,11 +858,551 @@
     },
     {
       "id": "MissingTranslation",
+      "message": "\"backlight_tile_holder_description\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"backlight_tile_holder_description\">Keep the permission the keyboard-light tile needs, even when Smart backlight is off.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"backlight_tile_holder_title\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"backlight_tile_holder_title\">Quick Settings tile</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"backlight_tile_label\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"backlight_tile_label\">Keyboard light</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"backlight_tile_no_permission_subtitle\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"backlight_tile_no_permission_subtitle\">Needs ADB grant</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"backlight_tile_permission_missing\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"backlight_tile_permission_missing\">The keyboard light tile needs a permission that Plektra holds only while you ask for it. Open Titan 2 Elite tools in Plektra settings, finish the device setup and turn on \\\"Quick Settings tile\\\" under Smart backlight.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_disable\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"bloat_disable\">Disable</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_intro\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"bloat_intro\">Unihertz ships apps that cannot be removed the normal way. Plektra can use the wireless-debugging pairing from the device setup card at the top of this screen, so it can disable or uninstall them for you — and put every one of them back.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_not_paired\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"bloat_not_paired\">Needs the wireless-debugging pairing from the device setup card at the top of Titan 2 Elite tools.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_preset_action\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"bloat_preset_action\">Disable all %1$d</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_preset_description\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"bloat_preset_description\">Unihertz ships several tools whose job is stopping background apps from running: a phone manager, an app freezer, a blocker, a junk cleaner and a chipset logger that writes constantly. Android Auto is a long-running session, which is exactly what those interrupt.\\n\\nWorth being straight with you: this is the most likely cause of Android Auto dropping, not a proven one. What is certain is what these apps do. Disabling is reversible, which is what makes it worth trying.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_preset_factory_description\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"bloat_preset_factory_description\">Production-line tooling: burn-in and hardware tests, sensor calibration, an IMEI writer, a RAM tester, a GPS checker and a couple of packages that were never meant to ship. None of it has an icon, none of it does anything for a phone that has left the factory. The safest set here.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_preset_factory_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"bloat_preset_factory_title\">Factory and lab tools</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_preset_in_testing\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"bloat_preset_in_testing\">In testing</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_preset_privacy_description\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"bloat_preset_privacy_description\">Packages that report or record: battery telemetry for the vendor, carrier APN details, a chipset logger that writes continuously, and automatic call recording. Some of these also appear in the sets above — a package can be factory tooling and a privacy question at the same time.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_preset_privacy_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"bloat_preset_privacy_title\">Sends data onward</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_preset_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"bloat_preset_title\">Android Auto stabilizer</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_preset_vendor_description\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"bloat_preset_vendor_description\">Unihertz\\'s own convenience apps — a toolbox, game mode, bedtime, a pedometer, rotation control, a cycling speedometer, a call recorder and an NFC helper. These are real features, so this one is taste rather than safety. App Lock, Private Space and Student Mode are deliberately left out in case you rely on them, and the IR Remote is never touched because it drives the infrared blaster.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_preset_vendor_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"bloat_preset_vendor_title\">Vendor apps and games</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_restore\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"bloat_restore\">Restore</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_restore_all\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"bloat_restore_all\">Restore all</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_restore_all_summary\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<plurals name=\"bloat_restore_all_summary\">",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_row_description\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"bloat_row_description\">Disable or uninstall the Unihertz apps Android won\\'t let you remove</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_set_up_pairing\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"bloat_set_up_pairing\">Set up pairing</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_state_active\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"bloat_state_active\">Active</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_state_disabled\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"bloat_state_disabled\">Disabled</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_state_uninstalled\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"bloat_state_uninstalled\">Uninstalled</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_tier_optional\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"bloat_tier_optional\">Vendor features</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_tier_optional_blurb\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"bloat_tier_optional_blurb\">Real features that duplicate something Android already does, or that you may simply not want.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_tier_safe\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"bloat_tier_safe\">Factory tools</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_tier_safe_blurb\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"bloat_tier_safe_blurb\">Test and calibration apps left over from the production line. Nothing uses them.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_tier_useful\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"bloat_tier_useful\">Drives hardware</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_tier_useful_blurb\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"bloat_tier_useful_blurb\">Listed so you can see them, but removing these makes real hardware stop working.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"bloat_title\">Remove bloat</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_uninstall\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"bloat_uninstall\">Uninstall</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_uninstall_confirm_message\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"bloat_uninstall_confirm_message\">Disabling is usually enough: it hides the app and stops it running, and is instantly reversible. Uninstalling removes it for this user — Plektra can still restore it because the app stays in system storage, but a firmware update may bring it back, and if wireless debugging is ever unavailable you cannot undo it from here.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_uninstall_confirm_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"bloat_uninstall_confirm_title\">Uninstall %1$s?</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_unknown_description\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"bloat_unknown_description\">Every Titan 2 Elite ships identically, so these came from a firmware update after this list was written — or this is not a Titan 2 Elite. Shown, not touched: an app nobody has checked is not one to remove.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_unknown_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<plurals name=\"bloat_unknown_title\">",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"bloat_wrong_device\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"bloat_wrong_device\">This list was written for the Titan 2 Elite and stays switched off on other phones, because it removes packages by name.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"broker_audit_clear\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"broker_audit_clear\">Clear log</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"broker_audit_description\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"broker_audit_description\">Every command Plektra ran through wireless debugging or Shizuku, and every permission it granted or took back. Kept on this phone only, last 200 entries.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"broker_audit_empty\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"broker_audit_empty\">Nothing yet.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"broker_audit_failed\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"broker_audit_failed\">failed</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"broker_audit_ok\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"broker_audit_ok\" tools:ignore=\"ButtonCase,Typos\">ok</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"broker_audit_title\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"broker_audit_title\">Broker activity</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"broker_auth_timeout_help\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"broker_auth_timeout_help\">Leave \\\"Disable adb authorization timeout\\\" in Developer options off. Android then forgets a paired key that has not been used for 7 days, so a pairing you no longer use stops working by itself. Plektra never changes this setting.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"broker_blocked_no_service\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"broker_blocked_no_service\">Wireless debugging is on but the phone is not advertising it. Turn it off and on again in Developer options.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"broker_blocked_not_paired\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"broker_blocked_not_paired\">Not paired. Follow the steps to set up wireless debugging.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"broker_blocked_shizuku\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"broker_blocked_shizuku\">Shizuku is chosen under \\\"Privileged access via\\\" but is not running, or Plektra is not allowed in Shizuku.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"broker_blocked_wireless_debugging\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"broker_blocked_wireless_debugging\">Wireless debugging is off. Android turns it off after a restart — turn it back on in Developer options.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"broker_forget_done\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"broker_forget_done\">Unpaired. Plektra removed its key from Wireless debugging and deleted it here.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"broker_forget_manual\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"broker_forget_manual\">Plektra deleted its key here but could not remove it from your phone. Open Wireless debugging, tap plektra-djb under Paired devices, then tap Forget.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"broker_forget_open_wireless\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"broker_forget_open_wireless\">Remove plektra-djb in Wireless debugging</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"broker_forget_permission_kept\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"broker_forget_permission_kept\">Plektra still holds permission to change secure settings, because the phone could not be reached to take it back. Pair again and forget the pairing, or uninstall Plektra, to remove it.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"broker_forgetting\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"broker_forgetting\">Forgetting the pairing…</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"broker_pin_mismatch_body\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"broker_pin_mismatch_body\">adbd\\'s certificate changed. Forget the pairing and pair again.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"broker_repair\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"broker_repair\">Re-pair</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"broker_wireless_off_after_setup_description\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"broker_wireless_off_after_setup_description\">When Plektra finishes a setup step, it turns Wireless debugging off again, so nothing on your network can reach it. Plektra can\\'t reach the system again until you turn Wireless debugging back on in Developer options.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"broker_wireless_off_after_setup_title\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"broker_wireless_off_after_setup_title\">Turn Wireless debugging off after setup</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
       "message": "\"built_in_keyboards_title\" is not translated in \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
       "files": [
         "app/src/main/res/values/strings.xml"
       ],
       "source": "<string name=\"built_in_keyboards_title\">Built-in Keyboards</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"cannot_connect_port\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"cannot_connect_port\">Cannot connect to the pairing port.</string>",
       "count": 1
     },
     {
@@ -2883,6 +3450,339 @@
     },
     {
       "id": "MissingTranslation",
+      "message": "\"density_apply\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"density_apply\">Apply</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"density_confirm_message\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<plurals name=\"density_confirm_message\">",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"density_confirm_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"density_confirm_title\">Can you still read this?</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"density_intro\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"density_intro\">Lower density fits more on screen; higher makes everything bigger. The Titan\\'s screen is short, so a small reduction buys a surprising number of extra lines — and with a physical keyboard, none of that space goes back to an on-screen one.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"density_keep\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"density_keep\">Keep it</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"density_larger\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"density_larger\">Everything larger, less fits on screen</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"density_reset\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"density_reset\">Back to stock</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"density_revert\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"density_revert\">Undo now</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"density_revert_pending\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"density_revert_pending\">A display size change was not confirmed, and Plektra could not undo it by itself. Tap Revert to put the display size back.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"density_row_description\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"density_row_description\">Fit more on screen, or make everything bigger</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"density_smaller\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"density_smaller\">Everything smaller, more fits on screen</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"density_stock\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"density_stock\">The density this screen shipped with</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"density_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"density_title\">Screen density</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"density_value\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"density_value\" tools:ignore=\"PluralsCandidate\">%1$d dpi (stock is %2$d)</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"device_setup_checking_body\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"device_setup_checking_body\">Testing whether the tools can reach the system.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"device_setup_checking_title\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"device_setup_checking_title\">Checking…</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"device_setup_dnd_on\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"device_setup_dnd_on\">Do Not Disturb is on and may hide the pairing code. Turn it off until you are paired.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"device_setup_forget_pairing\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"device_setup_forget_pairing\">Forget pairing</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"device_setup_link_description\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"device_setup_link_description\">Pair wireless debugging so the app can run privileged commands itself</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"device_setup_link_title\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"device_setup_link_title\">Device setup</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"device_setup_needed_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"device_setup_needed_title\">Setup needed</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"device_setup_needs_notifications\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"device_setup_needs_notifications\">Allow Plektra notifications first — the pairing code arrives as one.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"device_setup_open_about\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"device_setup_open_about\">Open About phone</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"device_setup_open_pairing\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"device_setup_open_pairing\">Pair in Wireless debugging</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"device_setup_open_wireless\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"device_setup_open_wireless\">Open Wireless debugging</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"device_setup_ready_body\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"device_setup_ready_body\">The tools below can reach the system. Survives reboots.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"device_setup_ready_shizuku_body\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"device_setup_ready_shizuku_body\">The tools below reach the system through Shizuku, so Plektra doesn\\'t need its own pairing. Choose \\\"Built-in broker only\\\" to use the pairing instead.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"device_setup_ready_shizuku_title\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"device_setup_ready_shizuku_title\">Connected through Shizuku</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"device_setup_ready_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"device_setup_ready_title\">Paired</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"device_setup_rejected_body\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"device_setup_rejected_body\">Paired, but your phone is refusing the connection — the pairing code was probably mistyped, so the app is holding a key your phone never accepted. Re-pair to fix it.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"device_setup_step_dev_1\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"device_setup_step_dev_1\">Open Settings → About phone</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"device_setup_step_dev_2\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"device_setup_step_dev_2\">Tap Build number seven times</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"device_setup_step_dev_3\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"device_setup_step_dev_3\">Come back here</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"device_setup_step_pair_1\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"device_setup_step_pair_1\">Turn on Wireless debugging</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"device_setup_step_pair_2\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"device_setup_step_pair_2\">Tap Pair device with pairing code</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"device_setup_step_pair_3\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"device_setup_step_pair_3\">Type the code into the Plektra notification</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"device_setup_unreachable_title\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"device_setup_unreachable_title\">Cannot reach the system</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
       "message": "\"device_specific_interface_section\" is not translated in \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
       "files": [
         "app/src/main/res/values/strings.xml"
@@ -2906,6 +3806,15 @@
         "app/src/main/res/values/strings.xml"
       ],
       "source": "<string name=\"device_sym_layer_title\">Customize Device SYM Layer</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"dialog_adb_pairing_paring_code\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"dialog_adb_pairing_paring_code\">Pairing code</string>",
       "count": 1
     },
     {
@@ -3185,6 +4094,114 @@
         "app/src/main/res/values/strings.xml"
       ],
       "source": "<string name=\"feature_status_experimental_hint\">This may already work, but it is new and may soon be changed or improved. Bug reports are welcome.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"fn_ctrl_map_action\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"fn_ctrl_map_action\">Set Fn → Ctrl</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"fn_ctrl_map_already_set\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"fn_ctrl_map_already_set\">Fn is set to Ctrl ✓</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"fn_ctrl_map_description\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"fn_ctrl_map_description\">Map the Fn key to Ctrl at the system level, so Fn works as Ctrl everywhere (recommended for Titan 2 Elite). Experimental and Titan-specific: the Ctrl mapping is inferred from a device that had Fn=Ctrl set, so it may behave differently on other firmware, and a reboot may be needed.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"fn_ctrl_map_summary\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"fn_ctrl_map_summary\">Map the Fn key to Ctrl at the system level (experimental)</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"fn_ctrl_map_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"fn_ctrl_map_title\">Set Fn key to Ctrl</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"fn_ctrl_map_warning\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"fn_ctrl_map_warning\">⚠ This changes a system-wide setting that affects every keyboard and stays after you uninstall Plektra. You can undo it here anytime.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"fn_ctrl_reset_action\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"fn_ctrl_reset_action\">Reset Fn key to default</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"fn_ctrl_reset_failed\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"fn_ctrl_reset_failed\">Couldn\\'t reset the Fn key. Grant Plektra \\\"Modify system settings\\\", or set up the wireless-debugging pairing at the top of this screen, then try again.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"fn_ctrl_reset_success\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"fn_ctrl_reset_success\">Fn key restored — you may need to reboot for it to fully apply.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"fn_ctrl_status_failed\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"fn_ctrl_status_failed\">Couldn\\'t apply the mapping. Grant Plektra \\\"Modify system settings\\\", or set up the wireless-debugging pairing at the top of this screen, then try again.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"fn_ctrl_status_needs_permission\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"fn_ctrl_status_needs_permission\">Opening the write-settings screen — grant \\\"Modify system settings\\\" for Plektra, then tap again.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"fn_ctrl_status_success\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"fn_ctrl_status_success\">Fn is now Ctrl — you may need to reboot for it to fully apply.</string>",
       "count": 1
     },
     {
@@ -4953,6 +5970,42 @@
     },
     {
       "id": "MissingTranslation",
+      "message": "\"keymap_footnote\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"keymap_footnote\">Keys with an arrow can be changed. The rest are fixed by the phone or the hardware.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"keymap_intro\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"keymap_intro\">Bindings live in two places that never talk to each other: rows the firmware reads before any app sees the key, and Plektra\\'s own handling. This is both, per key — including the ones bound to nothing.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"keymap_row_description\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"keymap_row_description\">Every physical key and what it currently does</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"keymap_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"keymap_title\">Key mapping</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
       "message": "\"kw_about_plektra_github\" is not translated in \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
       "files": [
         "app/src/main/res/values/strings.xml"
@@ -4985,6 +6038,15 @@
         "app/src/main/res/values/strings.xml"
       ],
       "source": "<string name=\"kw_accessibility_suggestions_delay\">delay, suggestions, accessibility, timeout</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"kw_advanced_reset_all\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"kw_advanced_reset_all\">reset, reset all, defaults, factory, factory reset, restore defaults, clear settings</string>",
       "count": 1
     },
     {
@@ -5133,6 +6195,15 @@
     },
     {
       "id": "MissingTranslation",
+      "message": "\"kw_main_advanced\" is not translated in \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"kw_main_advanced\">advanced, backup, restore, reset, defaults, debug, expert</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
       "message": "\"kw_main_app_language\" is not translated in \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
       "files": [
         "app/src/main/res/values/strings.xml"
@@ -5201,6 +6272,15 @@
         "app/src/main/res/values/strings.xml"
       ],
       "source": "<string name=\"kw_main_text_input\">typing, text, punctuation, quotes, spacing, capitalization</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"kw_main_titan2_elite_tools\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"kw_main_titan2_elite_tools\">titan, elite, t2e, toolbox, tools, device setup, broker, adb, wireless debugging, pairing, privileged</string>",
       "count": 1
     },
     {
@@ -5363,6 +6443,114 @@
         "app/src/main/res/values/strings.xml"
       ],
       "source": "<string name=\"kw_theme_toggle_show_leds\">LED, LEDs, lights, indicators, on-screen keyboard</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"kw_titan2_elite_tools_backlight_tile\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"kw_titan2_elite_tools_backlight_tile\">keyboard light, keyboard backlight, tile, quick settings, toggle, permission, write secure settings</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"kw_titan2_elite_tools_bloat\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"kw_titan2_elite_tools_bloat\">bloat, debloat, uninstall, disable, apps, unihertz, vendor, factory, android auto, privacy</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"kw_titan2_elite_tools_density\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"kw_titan2_elite_tools_density\">density, dpi, display size, screen size, zoom, smaller, larger</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"kw_titan2_elite_tools_device_setup\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"kw_titan2_elite_tools_device_setup\">adb, wireless debugging, pair, pairing, broker, shizuku, grant, secure settings</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"kw_titan2_elite_tools_fn_ctrl\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"kw_titan2_elite_tools_fn_ctrl\">fn, ctrl, control, modifier, remap, programmable key</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"kw_titan2_elite_tools_key_mapping\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"kw_titan2_elite_tools_key_mapping\">keys, key map, orange key, side key, space, fn, sym, bindings</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"kw_titan2_elite_tools_notification_ring\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"kw_titan2_elite_tools_notification_ring\">notification, ring, led, light, glow, camera, hole, cutout, aod, always on display, lock screen, notifications, colour, color</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"kw_titan2_elite_tools_privileged_access\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"kw_titan2_elite_tools_privileged_access\">shizuku, shizukutendcf, broker, privileged, root, shell, adb, automatic, backend</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"kw_titan2_elite_tools_reset_to_stock\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"kw_titan2_elite_tools_reset_to_stock\">reset, stock, undo, revert, uninstall, factory, default</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"kw_titan2_elite_tools_show_status_bar\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"kw_titan2_elite_tools_show_status_bar\">status bar, hide, strip, collapse, bar, full screen</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"kw_titan2_elite_tools_smart_backlight\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"kw_titan2_elite_tools_smart_backlight\">keyboard backlight, keyboard light, led, backlight, dark, timeout, 30 seconds, always on, tile, quick settings</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"kw_titan2_elite_tools_tweaks\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"kw_titan2_elite_tools_tweaks\">animation, animations, speed, one-handed, notification history, system</string>",
       "count": 1
     },
     {
@@ -6051,6 +7239,96 @@
     },
     {
       "id": "MissingTranslation",
+      "message": "\"notification_adb_pairing_failed_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"notification_adb_pairing_failed_title\">Pairing failed</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"notification_adb_pairing_input_paring_code\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"notification_adb_pairing_input_paring_code\">Enter pairing code</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"notification_adb_pairing_retry\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"notification_adb_pairing_retry\">Retry</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"notification_adb_pairing_searching_for_service_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"notification_adb_pairing_searching_for_service_title\">Searching for pairing service…</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"notification_adb_pairing_service_found_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"notification_adb_pairing_service_found_title\">Pairing service found</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"notification_adb_pairing_stop_searching\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"notification_adb_pairing_stop_searching\">Stop</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"notification_adb_pairing_succeed_text\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"notification_adb_pairing_succeed_text\">This device can now connect to wireless debugging.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"notification_adb_pairing_succeed_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"notification_adb_pairing_succeed_title\">Paired successfully</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"notification_adb_pairing_working_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"notification_adb_pairing_working_title\">Pairing…</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"notification_channel_adb_pairing\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"notification_channel_adb_pairing\">ADB pairing</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
       "message": "\"notification_plektra_stable_update_text\" is not translated in \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
       "files": [
         "app/src/main/res/values/strings.xml"
@@ -6123,6 +7401,15 @@
     },
     {
       "id": "MissingTranslation",
+      "message": "\"paring_code_is_wrong\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"paring_code_is_wrong\">The pairing code is wrong.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
       "message": "\"plektra_stable_update_message\" is not translated in \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
       "files": [
         "app/src/main/res/values/strings.xml"
@@ -6146,6 +7433,132 @@
         "app/src/main/res/values/strings.xml"
       ],
       "source": "<string name=\"plektra_stable_update_title\">Plektra security update available</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"privileged_access_description\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"privileged_access_description\">How Plektra runs the commands the tools below need. Automatic uses Shizuku when it is running and Plektra is allowed, otherwise the built-in broker.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"privileged_access_mode_auto\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"privileged_access_mode_auto\">Automatic</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"privileged_access_mode_broker\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"privileged_access_mode_broker\">Built-in broker only</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"privileged_access_mode_shizuku\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"privileged_access_mode_shizuku\">Shizuku only</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"privileged_access_shizuku_allow\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"privileged_access_shizuku_allow\">Allow</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"privileged_access_shizuku_denied_permanently\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"privileged_access_shizuku_denied_permanently\">Shizuku (Sui): Plektra was denied and will not be asked again</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"privileged_access_shizuku_not_allowed\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"privileged_access_shizuku_not_allowed\">Shizuku: running, not allowed</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"privileged_access_shizuku_not_installed\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"privileged_access_shizuku_not_installed\">Shizuku: not installed</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"privileged_access_shizuku_not_running\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"privileged_access_shizuku_not_running\">Shizuku: not running</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"privileged_access_shizuku_ready\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"privileged_access_shizuku_ready\">Shizuku: running and allowed</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"privileged_access_shizuku_too_old\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"privileged_access_shizuku_too_old\">Shizuku: too old (needs version 11 or newer)</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"privileged_access_title\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"privileged_access_title\">Privileged access via</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"privileged_access_using_broker\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"privileged_access_using_broker\">Commands run through the built-in broker (wireless debugging).</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"privileged_access_using_shizuku\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"privileged_access_using_shizuku\">Commands run through Shizuku. Plektra leaves Wireless debugging alone.</string>",
       "count": 1
     },
     {
@@ -6240,6 +7653,204 @@
     },
     {
       "id": "MissingTranslation",
+      "message": "\"reset_all_settings\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"reset_all_settings\">Reset all settings</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"reset_all_settings_description\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"reset_all_settings_description\">Put every setting back to its default</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"reset_backup_failed_not_reset\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"reset_backup_failed_not_reset\">Backup failed, so nothing was reset: %1$s</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"reset_backup_first_message\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"reset_backup_first_message\">A backup ZIP lets you undo this reset: restore it from Advanced → Restore from file. Back up now?</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"reset_backup_first_title\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"reset_backup_first_title\">Back up first?</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"reset_backup_now\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"reset_backup_now\">Back up now</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"reset_completed\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"reset_completed\">Settings reset to defaults</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"reset_confirm_button\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"reset_confirm_button\">Reset</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"reset_confirm_field_label\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"reset_confirm_field_label\">Type reset</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"reset_confirm_message\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"reset_confirm_message\">This puts every setting back to its default: preferences, key remaps, custom keyboard layouts, themes, the Ctrl shortcut mappings, variations and the custom typing sound.\\n\\nThis stays as it is: downloaded dictionaries, your user dictionary and words, auto-correct rules, snippets, notes, clipboard history, the Shizuku and Titan 2 Elite tool setup and anything those tools changed on the phone, and the setup tutorial. Plektra stays your keyboard.\\n\\nType “reset” to confirm.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"reset_confirm_title\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"reset_confirm_title\">Reset all settings?</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"reset_failed\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"reset_failed\">Reset failed: %1$s</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"reset_skip_backup\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"reset_skip_backup\">Skip backup</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"reset_to_stock_confirm_action\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"reset_to_stock_confirm_action\">Reset to stock</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"reset_to_stock_confirm_cancel\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"reset_to_stock_confirm_cancel\">Cancel</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"reset_to_stock_confirm_message\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"reset_to_stock_confirm_message\">This restores the Fn key mapping to your device\\'s stock setting. Your Plektra preferences are kept. You can re-apply it anytime.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"reset_to_stock_confirm_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"reset_to_stock_confirm_title\">Reset device settings to stock?</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"reset_to_stock_description\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"reset_to_stock_description\">Undo the Fn key mapping Plektra applied at the system level, restoring it to stock. Display density, system tweaks and removed apps have their own reset buttons. Do this BEFORE uninstalling; uninstalling alone won\\'t undo it.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"reset_to_stock_result_needs_permission\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"reset_to_stock_result_needs_permission\">Grant Plektra \\\"Modify system settings\\\", or pair wireless debugging, then try again.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"reset_to_stock_result_partial\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"reset_to_stock_result_partial\">Some settings were restored. A reboot may be needed for changes to fully apply.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"reset_to_stock_result_success\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"reset_to_stock_result_success\">Device settings restored to stock.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"reset_to_stock_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"reset_to_stock_title\">Reset device settings to stock</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
       "message": "\"restore_device_change_adapt\" is not translated in \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
       "files": [
         "app/src/main/res/values/strings.xml"
@@ -6281,6 +7892,501 @@
         "app/src/main/res/values/dictionary_packages.xml"
       ],
       "source": "<string name=\"restore_missing_dictionary_packs\">Backup restored. Download these dictionaries to restore their suggestions: %1$s</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_access_granted\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_access_granted\">Granted</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_access_missing\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_access_missing\">Not granted — the ring cannot see notifications</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_access_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_access_title\">Notification access</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_adjust\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_adjust\">Fit the ring to the lens</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_adjust_description\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_adjust_description\">The ring comes fitted to one Titan 2 Elite, and panels differ by a few pixels. If yours is off: on a white screen the lens shows as a dark spot — drag the ring onto it, resize it and set the thickness you want. Auto puts the fitted default back.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_adjust_done\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_adjust_done\">Done</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_adjust_hint\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_adjust_hint\">Drag to move · arrows nudge · + and − resize · [ and ] change thickness · Enter saves</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_adjust_larger\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_adjust_larger\">+</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_adjust_reset\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_adjust_reset\">Auto</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_adjust_smaller\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_adjust_smaller\">−</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_adjust_thicker\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_adjust_thicker\">Thicker</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_adjust_thinner\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_adjust_thinner\">Thinner</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_app_colors_add\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_app_colors_add\">Add an app</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_app_colors_description\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_app_colors_description\">Give an app its own ring colour, so you know who it is before you pick the phone up. Apps not listed use the colour they declare for their notifications, or green.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_app_colors_pick\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_app_colors_pick\">Pick the ring colour for this app.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_app_colors_remove\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_app_colors_remove\">Remove</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_app_colors_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_app_colors_title\">App colours</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_brightness_bright\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_brightness_bright\">Bright</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_brightness_dim\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_brightness_dim\">Dim</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_brightness_normal\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_brightness_normal\">Normal</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_brightness_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_brightness_title\">Ring brightness</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_channel_description\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_channel_description\">Used only to turn the screen on for the ring. Silent, and dismissed on its own.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_channel_name\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_channel_name\">Notification ring</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_color_too_dark\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_color_too_dark\">This is too dark to see on the screen while it is off. Slide the brightness up.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_default_color_description\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_default_color_description\">Used by apps that set no colour of their own, and by apps whose colour is too dark to see on a black screen.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_default_color_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_default_color_title\">Default colour</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_duration_description\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_duration_description\">After this the ring lets go and the phone\\'s own timeout turns the screen off. Longer costs battery: the panel is on, even if almost all of it is black.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_duration_minutes\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_duration_minutes\">%1$d min</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_duration_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_duration_title\">Keep the screen on for</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_enable_description\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_enable_description\">Only notifications you could dismiss; nothing for downloads, playback or apps running in the background.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_enable_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_enable_title\">Ring on new notifications</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_fullscreen_granted\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_fullscreen_granted\">Allowed</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_fullscreen_missing\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_fullscreen_missing\">Not allowed — the ring cannot turn the screen on</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_fullscreen_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_fullscreen_title\">Show over the lock screen</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_grant_open_settings\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_grant_open_settings\">Open settings</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_grant_pairing_hint\" is not translated in \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_grant_pairing_hint\">Pair wireless debugging once with the device setup card on the Titan 2 Elite tools screen and every permission here is granted without a trip into system settings.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_grant_via_broker\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_grant_via_broker\">Grant with the paired setup</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_icons_description\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_icons_description\">Draw the waiting apps\\' icons below the ring. Off, it is just the ring.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_icons_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_icons_title\">Show app icons</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_intro\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_intro\">When a notification arrives and the screen is off, a ring lights up around the camera hole in the app\\'s colour, with the waiting apps below it. The rest of the screen stays black, which on this AMOLED panel means off. It ends when you touch the screen, press a key or unlock, and it stops holding the screen on after the time you choose.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_keyboard_dark_description\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_keyboard_dark_description\">The keyboard backlight normally comes on whenever the screen does, so a ring at night lights up the whole keyboard with it.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_keyboard_dark_title\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_keyboard_dark_title\">Keep the keyboard dark</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_keyboard_dark_unavailable\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_keyboard_dark_unavailable\">Unavailable until the phone has been paired once, with the device setup card on the Titan 2 Elite tools screen.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_launcher_text\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_launcher_text\">Turning the screen on for a notification</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_post_granted\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_post_granted\">Allowed</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_post_missing\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_post_missing\">Blocked — the ring is announced through a silent notification you never see</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_post_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_post_title\">Plektra notifications</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_row_description\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_row_description\">A glow around the camera hole while the screen is off</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_title\">Notification ring</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_try\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_try\">Try it</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"ring_try_description\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"ring_try_description\">Shows the ring for a few seconds with Plektra\\'s own icon. Lock the phone first to see it the way it will really look.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"screen_trackpad_terminal_apps_description\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"screen_trackpad_terminal_apps_description\">In these apps the trackpad also works when no text field is focused, as in terminals and SSH clients, and sends arrow keys. In every other app it stays limited to text fields.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"screen_trackpad_terminal_apps_empty\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"screen_trackpad_terminal_apps_empty\">No apps. The trackpad only works in text fields.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"screen_trackpad_terminal_apps_reset\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"screen_trackpad_terminal_apps_reset\">Restore default list</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"screen_trackpad_terminal_apps_title\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"screen_trackpad_terminal_apps_title\">Terminal apps</string>",
       "count": 1
     },
     {
@@ -6987,6 +9093,114 @@
     },
     {
       "id": "MissingTranslation",
+      "message": "\"shizuku_blocked_allow\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"shizuku_blocked_allow\">Allow Shizuku</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"shizuku_blocked_denied_permanently\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"shizuku_blocked_denied_permanently\">Shizuku is chosen under Privileged access via, but Plektra was denied in Sui with \\\"Don\\'t ask again\\\", so Android will not show the prompt again. Allow Plektra in Sui\\'s management screen (long-press the Settings icon on the home screen and pick the Sui shortcut).</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"shizuku_blocked_failed\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"shizuku_blocked_failed\">Shizuku is chosen under Privileged access via and Plektra is allowed, but the tools could not reach the system through it. Check that Shizuku is still running, then reopen this screen.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"shizuku_blocked_not_allowed\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"shizuku_blocked_not_allowed\">Shizuku is chosen under Privileged access via, and it is running, but Plektra is not allowed in it yet.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"shizuku_blocked_not_installed\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"shizuku_blocked_not_installed\">Shizuku is chosen under Privileged access via, but it is not installed.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"shizuku_blocked_not_running\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"shizuku_blocked_not_running\">Shizuku is chosen under Privileged access via, but it is not running. Start Shizuku, then come back.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"shizuku_blocked_open_sui\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"shizuku_blocked_open_sui\">Open Developer options (Sui)</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"shizuku_blocked_or_shizuku\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"shizuku_blocked_or_shizuku\">Shizuku works too: start it and allow Plektra in it, and the tools use it without pairing.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"shizuku_blocked_too_old\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"shizuku_blocked_too_old\">Shizuku is chosen under Privileged access via, but the Shizuku running here is too old. Plektra needs Shizuku 11 or newer.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"shizuku_blocked_use_broker\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"shizuku_blocked_use_broker\">To use the built-in broker instead, choose it in Titan 2 Elite tools > Privileged access via.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"show_status_bar_description\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"show_status_bar_description\">Off hides the on-screen bar entirely — handy with the Titan\\'s physical keyboard.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"show_status_bar_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"show_status_bar_title\">Show status bar</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
       "message": "\"slim_preview_suggestions\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
       "files": [
         "app/src/main/res/values/strings.xml"
@@ -7028,6 +9242,105 @@
         "app/src/main/res/values/strings.xml"
       ],
       "source": "<string name=\"slim_status_bar_slots_right\">Slim right buttons</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"smart_backlight_apply_now\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"smart_backlight_apply_now\">Apply now</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"smart_backlight_blocked_wireless_debugging\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"smart_backlight_blocked_wireless_debugging\">Wireless debugging is off, so the backlight setting cannot be applied. Android turns it off after a restart — turn it back on in Developer options.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"smart_backlight_enable_description\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"smart_backlight_enable_description\">Keeps the keyboard backlight on whenever the screen is on. Needs the device setup above once, and survives reboots.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"smart_backlight_enable_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"smart_backlight_enable_title\">Smart backlight</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"smart_backlight_last_error\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"smart_backlight_last_error\">Last attempt failed: %1$s</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"smart_backlight_not_applied_yet\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"smart_backlight_not_applied_yet\">The device setup is ready, but the always-on setting has not been written to your phone yet.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"smart_backlight_not_on_device\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"smart_backlight_not_on_device\">Your phone is no longer holding the always-on setting — a system update or another app reset it. The backlight will time out until it is applied again.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"smart_backlight_reapply\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"smart_backlight_reapply\">Apply again</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"smart_backlight_row_description\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"smart_backlight_row_description\">Keep the keyboard lit in the dark, past the 30s limit</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"smart_backlight_setup_ready\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"smart_backlight_setup_ready\">Always on — set up once, survives reboots.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"smart_backlight_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"smart_backlight_title\">Smart keyboard backlight</string>",
       "count": 1
     },
     {
@@ -8832,6 +11145,33 @@
     },
     {
       "id": "MissingTranslation",
+      "message": "\"titan2_elite_tools_description\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"titan2_elite_tools_description\">Device setup for features that change the phone itself</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"titan2_elite_tools_intro\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"titan2_elite_tools_intro\">Tools for the Titan 2 Elite that reach into the phone itself rather than the keyboard. They need the one-time wireless debugging pairing below.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"titan2_elite_tools_title\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"titan2_elite_tools_title\">Titan 2 Elite tools</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
       "message": "\"titan2_elite_top_corner_description\" is not translated in \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
       "files": [
         "app/src/main/res/values/strings.xml"
@@ -8846,6 +11186,15 @@
         "app/src/main/res/values/strings.xml"
       ],
       "source": "<string name=\"titan2_elite_top_corner_title\">Upper button corners</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"toolbox_group_system\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"toolbox_group_system\">Device tools</string>",
       "count": 1
     },
     {
@@ -8936,6 +11285,42 @@
         "app/src/main/res/values/strings.xml"
       ],
       "source": "<string name=\"trackpad_delete_swipe_threshold_title\">Delete Swipe</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"trackpad_exclusive_continue\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"trackpad_exclusive_continue\">Continue</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"trackpad_exclusive_dialog_title\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"trackpad_exclusive_dialog_title\">Only one trackpad feature at a time</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"trackpad_exclusive_screen_trackpad_message\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"trackpad_exclusive_screen_trackpad_message\">Turning on Screen trackpad turns off Trackpad Gestures. Both turn touches into cursor movement, so they cannot be on together. Continue?</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"trackpad_exclusive_trackpad_gestures_message\" is not translated in \"de\" (German), \"hy\" (Armenian), \"ru\" (Russian), \"vi\" (Vietnamese), \"uk\" (Ukrainian), \"el\" (Greek), \"it\" (Italian), \"fr\" (French), \"pl\" (Polish), \"es\" (Spanish)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"trackpad_exclusive_trackpad_gestures_message\">Turning on Trackpad Gestures turns off Screen trackpad. Both turn touches into cursor movement, so they cannot be on together. Continue?</string>",
       "count": 1
     },
     {
@@ -9296,6 +11681,123 @@
         "app/src/main/res/values/strings.xml"
       ],
       "source": "<string name=\"tutorial_t2e_trackpad_note\">Trackpad control still needs refinement and will continue to improve in Plektra.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"tweaks_animation_description\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"tweaks_animation_description\">Android animates in three separate places. Changing only one is why this tweak usually feels half-done — all three move together here.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"tweaks_animation_fast\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"tweaks_animation_fast\">Fast</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"tweaks_animation_normal\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"tweaks_animation_normal\">Normal</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"tweaks_animation_off\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"tweaks_animation_off\">Off</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"tweaks_animation_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"tweaks_animation_title\">Animation speed</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"tweaks_intro\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"tweaks_intro\">Android supports all of these; Unihertz just never surfaced them. Each one applies straight away and every one can be put back.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"tweaks_notification_history_description\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"tweaks_notification_history_description\">Keeps a log of notifications you already dismissed, so a swiped-away message is still findable. Standard on Pixel.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"tweaks_notification_history_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"tweaks_notification_history_title\">Notification history</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"tweaks_one_handed_description\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"tweaks_one_handed_description\">Pull the top of the screen down into reach with a swipe on the navigation bar.</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"tweaks_one_handed_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"tweaks_one_handed_title\">One-handed mode</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"tweaks_reset\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"tweaks_reset\">Put all of these back to stock</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"tweaks_row_description\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"tweaks_row_description\">Settings Android supports that this phone never shows you</string>",
+      "count": 1
+    },
+    {
+      "id": "MissingTranslation",
+      "message": "\"tweaks_title\" is not translated in \"el\" (Greek)",
+      "files": [
+        "app/src/main/res/values/strings.xml"
+      ],
+      "source": "<string name=\"tweaks_title\">System tweaks</string>",
       "count": 1
     },
     {

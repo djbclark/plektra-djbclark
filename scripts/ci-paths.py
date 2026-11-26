@@ -11,7 +11,11 @@ def selection(paths):
         p = PurePosixPath(path)
         return p.suffix.lower() in ('.md', '.rst') and (
             len(p.parts) == 1 or p.parts[0] == 'docs')
-    android = not paths or not all(docs(path) for path in paths)
+    def qa_only(path):
+        # Fork-only qa/ has its own host/overlay CI workflow.
+        p = PurePosixPath(path)
+        return len(p.parts) > 1 and p.parts[0] == 'qa'
+    android = not paths or not all(docs(path) or qa_only(path) for path in paths)
     def release(path):
         p = PurePosixPath(path)
         return (path.startswith(('app/src/release/', 'buildSrc/', 'build-logic/', 'gradle/'))
