@@ -11,14 +11,15 @@ The Plektra QA companion app shows instructions and controls in a movable, trans
 
 ## Install
 
-Build on CI (the workflow `djb-overlay-app.yml` on the fork's `ci/base` branch uploads the APK as an artifact; a release run attaches it to a GitHub release named `overlay-app-<UTC time>-<sha8>`). Then:
+Download the latest signed `overlay-app-*` APK and `.sha256` checksum from [GitHub Releases](https://github.com/djbclark/plektra-djbclark/releases) (built by `djb-overlay-app.yml` on the fork's `ci/base` branch), or build a debug APK locally with `gradle -p qa/overlay-app assembleDebug` (Gradle 8.13, JDK 17, Android SDK 36; there is no checked-in Gradle wrapper). Then:
 
 ```bash
-adb install -r hitl-button-bar-<sha8>.apk
+sha256sum -c hitl-button-bar-<sha8>.apk.sha256   # when using a release APK
+adb install -r hitl-button-bar-<sha8>.apk        # or qa/overlay-app/app/build/outputs/apk/debug/app-debug.apk
 adb shell appops set dev.hitlbar.overlay SYSTEM_ALERT_WINDOW allow   # or: open the app and use its button
 ```
 
-A build before version 0.2.0 has no **Redo** button, labels **◀ Prev** as **Redo last** and shows no wait card of its own. The test bench needs version 0.3.0 (version code 3). Install a current one.
+A build before version 0.2.0 has no **Redo** button, labels **◀ Prev** as **Redo last** and shows no wait card of its own. The test bench needs at least version 0.3.0 (version code 3). Current [`qa/SETUP.md`](../SETUP.md) expects version 0.4.1 (version code 5) or later for the movable bar, QA bubble, and current bench fixes. Install a current release.
 
 ## Protocol
 

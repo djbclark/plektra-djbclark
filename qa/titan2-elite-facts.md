@@ -64,10 +64,11 @@ FIRERPA install and the HITL harness spec: `qa/firerpa-hitl.md`.
 1. `shared_prefs/plektra_prefs.xml` (main), `embedded_adb.xml` (toolbox revert records), `app_list_cache_prefs.xml`,
    `perf_img_scale.xml`, `recent_emojis_prefs.xml`; device-protected `/data/user_de/0/rocks.pkb.plektra.djb/
    shared_prefs/direct_boot_keyboard_config.xml` (layout, modifier latches, currency symbol, profile override).
-2. Key remaps are the pref `hardware_key_remaps` (JSON `{"v":1,"profiles":{"titan2elite_qwerty":{"rules":[...]}}}`).
-   "Swap right Shift and Enter" = rules `{match:scan, scan:54, key:60, to:66}` + `{match:key, key:66, to:60}`. A scan
-   rule matches the scan code alone (`HardwareKeyRemap.targetFor`; `key` there is informational), so printed right ⇧
-   becomes Enter whatever keycode the vendor layer gives it; printed ⏎ (keycode 66) becomes SHIFT_RIGHT.
+2. Key remaps: on current `plk/main` (`key-remap-v2`), active remaps are stored as boolean prefs such as
+   `key_remap_swap_shift_right_enter` (see §16.1; `qa/plektra_qa/keys.py` reads these). Superseded v1 format:
+   `hardware_key_remaps` JSON (`{"v":1,"profiles":{"titan2elite_qwerty":{"rules":[...]}}}`), where "Swap right Shift
+   and Enter" was `{match:scan, scan:54, key:60, to:66}` + `{match:key, key:66, to:60}`. Stale v1 JSON may still sit
+   in `plektra_prefs.xml` after an upgrade and is ignored when `key-remap-v2` is active.
 3. `files/`: `ctrl_key_mappings.json` (nav mode), `user_defaults.json` (user word list), `dictionaries_serialized/
    custom/`, `keyboard_layouts/`, `theme-images/` (created by a restore, may be empty).
 4. Backups: `/storage/emulated/0/Documents/Plektra/plektra-backup-YYYYMMDD-HHMM.zip` (prefs/plektra_prefs.json,

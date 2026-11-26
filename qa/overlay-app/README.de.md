@@ -11,14 +11,15 @@ Die Begleit-App für Plektra-QA zeigt Anweisungen und Schaltflächen in einer ve
 
 ## Installieren
 
-Der Bau läuft in der CI (der Workflow `djb-overlay-app.yml` auf dem Branch `ci/base` des Forks lädt die APK als Artefakt hoch; ein Release-Lauf hängt sie an ein GitHub-Release namens `overlay-app-<UTC-Zeit>-<sha8>`). Dann:
+Die neueste signierte `overlay-app-*`-APK samt `.sha256`-Prüfsumme von [GitHub Releases](https://github.com/djbclark/plektra-djbclark/releases) herunterladen (gebaut von `djb-overlay-app.yml` auf dem Branch `ci/base` des Forks) oder lokal mit `gradle -p qa/overlay-app assembleDebug` bauen (Gradle 8.13, JDK 17, Android SDK 36; es gibt keinen eingecheckten Gradle-Wrapper). Dann:
 
 ```bash
-adb install -r hitl-button-bar-<sha8>.apk
+sha256sum -c hitl-button-bar-<sha8>.apk.sha256   # bei einer Release-APK
+adb install -r hitl-button-bar-<sha8>.apk        # oder qa/overlay-app/app/build/outputs/apk/debug/app-debug.apk
 adb shell appops set dev.hitlbar.overlay SYSTEM_ALERT_WINDOW allow   # oder: App öffnen und deren Schaltfläche nutzen
 ```
 
-Ein Build vor Version 0.2.0 hat keine Schaltfläche **Redo**, beschriftet **◀ Prev** als **Redo last** und zeigt von sich aus keine Wartekarte. Der Prüfstand braucht Version 0.3.0 (Versionscode 3). Einen aktuellen Build installieren.
+Ein Build vor Version 0.2.0 hat keine Schaltfläche **Redo**, beschriftet **◀ Prev** als **Redo last** und zeigt von sich aus keine Wartekarte. Der Prüfstand braucht mindestens Version 0.3.0 (Versionscode 3). Das aktuelle [`qa/SETUP.md`](../SETUP.md) erwartet Version 0.4.1 (Versionscode 5) oder neuer für die verschiebbare Leiste, die QA-Blase und die aktuellen Prüfstand-Fixes. Ein aktuelles Release installieren.
 
 ## Protokoll
 
