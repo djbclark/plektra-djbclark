@@ -1006,6 +1006,10 @@ Nav Mode использует физическое положение клави
     <string name="screen_trackpad_hint_enabled_title">Показывать экранную подсказку</string>
     <string name="screen_trackpad_hint_enabled_description">Небольшая пилюля вверху экрана, пока трекпад активен</string>
     <string name="screen_trackpad_hint_cursor">✥ Курсор</string>
+    <string name="trackpad_exclusive_dialog_title">Только одна функция трекпада одновременно</string>
+    <string name="trackpad_exclusive_screen_trackpad_message">При включении функции «Экранный трекпад» функция «Предложения жестов тачпада» выключается. Обе превращают касания в движение курсора, поэтому не могут быть включены одновременно. Продолжить?</string>
+    <string name="trackpad_exclusive_trackpad_gestures_message">При включении функции «Предложения жестов тачпада» функция «Экранный трекпад» выключается. Обе превращают касания в движение курсора, поэтому не могут быть включены одновременно. Продолжить?</string>
+    <string name="trackpad_exclusive_continue">Продолжить</string>
     <string name="screen_trackpad_hint_select">⇧ Выделение</string>
     <string name="screen_trackpad_hint_sticky">✥ Курсор · нажмите для выхода</string>
     <string name="kw_screen_trackpad">трекпад, курсор, свайп, сенсорный экран, пробел, удерживать, стрелки, выделение, trackpad, cursor, swipe</string>

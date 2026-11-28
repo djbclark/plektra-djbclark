@@ -1006,6 +1006,10 @@ Każdy klawisz można skonfigurować jako Keycode, Akcja, Native Ctrl lub Brak. 
     <string name="screen_trackpad_hint_enabled_title">Pokazuj wskazówkę na ekranie</string>
     <string name="screen_trackpad_hint_enabled_description">Mała pastylka u góry ekranu, gdy trackpad jest aktywny</string>
     <string name="screen_trackpad_hint_cursor">✥ Kursor</string>
+    <string name="trackpad_exclusive_dialog_title">Tylko jedna funkcja trackpada naraz</string>
+    <string name="trackpad_exclusive_screen_trackpad_message">Włączenie funkcji „Trackpad ekranowy” wyłącza funkcję „Sugestie Gestów Trackpada”. Obie zamieniają dotyk w ruch kursora, więc nie mogą być włączone jednocześnie. Kontynuować?</string>
+    <string name="trackpad_exclusive_trackpad_gestures_message">Włączenie funkcji „Sugestie Gestów Trackpada” wyłącza funkcję „Trackpad ekranowy”. Obie zamieniają dotyk w ruch kursora, więc nie mogą być włączone jednocześnie. Kontynuować?</string>
+    <string name="trackpad_exclusive_continue">Kontynuuj</string>
     <string name="screen_trackpad_hint_select">⇧ Zaznaczanie</string>
     <string name="screen_trackpad_hint_sticky">✥ Kursor · dotknij, aby wyjść</string>
     <string name="kw_screen_trackpad">trackpad, kursor, przesuwanie, ekran dotykowy, spacja, przytrzymaj, strzałki, zaznacz, swipe</string>

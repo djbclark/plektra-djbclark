@@ -1003,6 +1003,10 @@ Mỗi phím có thể cấu hình là Keycode, Action, Native Ctrl hoặc None. 
     <string name="screen_trackpad_hint_enabled_title">Hiện gợi ý trên màn hình</string>
     <string name="screen_trackpad_hint_enabled_description">Viên thuốc nhỏ ở đầu màn hình khi bàn di chuột đang hoạt động</string>
     <string name="screen_trackpad_hint_cursor">✥ Con trỏ</string>
+    <string name="trackpad_exclusive_dialog_title">Mỗi lần chỉ dùng một tính năng trackpad</string>
+    <string name="trackpad_exclusive_screen_trackpad_message">Bật “Bàn di chuột màn hình” sẽ tắt “Gợi ý bằng cử chỉ trackpad”. Cả hai đều biến thao tác chạm thành chuyển động con trỏ nên không thể bật cùng lúc. Tiếp tục?</string>
+    <string name="trackpad_exclusive_trackpad_gestures_message">Bật “Gợi ý bằng cử chỉ trackpad” sẽ tắt “Bàn di chuột màn hình”. Cả hai đều biến thao tác chạm thành chuyển động con trỏ nên không thể bật cùng lúc. Tiếp tục?</string>
+    <string name="trackpad_exclusive_continue">Tiếp tục</string>
     <string name="screen_trackpad_hint_select">⇧ Chọn</string>
     <string name="screen_trackpad_hint_sticky">✥ Con trỏ · chạm để thoát</string>
     <string name="kw_screen_trackpad">bàn di chuột, con trỏ, vuốt, màn hình cảm ứng, phím cách, giữ, phím mũi tên, chọn, trackpad, cursor, swipe</string>

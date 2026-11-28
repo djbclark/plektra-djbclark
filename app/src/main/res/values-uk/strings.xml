@@ -1006,6 +1006,10 @@ Ctrl-ярлики застосунків із урахуванням розкл�
     <string name="screen_trackpad_hint_enabled_title">Показувати екранну підказку</string>
     <string name="screen_trackpad_hint_enabled_description">Маленька «пігулка» вгорі екрана, поки трекпад активний</string>
     <string name="screen_trackpad_hint_cursor">✥ Курсор</string>
+    <string name="trackpad_exclusive_dialog_title">Лише одна функція трекпада одночасно</string>
+    <string name="trackpad_exclusive_screen_trackpad_message">Увімкнення функції «Екранний трекпад» вимикає функцію «Жести тачпада для пропозицій». Обидві перетворюють дотики на рух курсора, тому не можуть бути ввімкнені одночасно. Продовжити?</string>
+    <string name="trackpad_exclusive_trackpad_gestures_message">Увімкнення функції «Жести тачпада для пропозицій» вимикає функцію «Екранний трекпад». Обидві перетворюють дотики на рух курсора, тому не можуть бути ввімкнені одночасно. Продовжити?</string>
+    <string name="trackpad_exclusive_continue">Продовжити</string>
     <string name="screen_trackpad_hint_select">⇧ Виділення</string>
     <string name="screen_trackpad_hint_sticky">✥ Курсор · торкніться, щоб вийти</string>
     <string name="kw_screen_trackpad">трекпад, курсор, свайп, сенсорний екран, пробіл, утримувати, стрілки, виділення, trackpad, cursor, swipe</string>

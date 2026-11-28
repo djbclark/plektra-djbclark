@@ -1846,6 +1846,10 @@ QWERTZ σε φυσικό QWERTY
     <string name="screen_trackpad_hint_enabled_title">Εμφάνιση ένδειξης στην οθόνη</string>
     <string name="screen_trackpad_hint_enabled_description">Μικρή ένδειξη στο επάνω μέρος της οθόνης όσο το trackpad είναι ενεργό</string>
     <string name="screen_trackpad_hint_cursor">✥ Δρομέας</string>
+    <string name="trackpad_exclusive_dialog_title">Μόνο μία λειτουργία trackpad κάθε φορά</string>
+    <string name="trackpad_exclusive_screen_trackpad_message">Η ενεργοποίηση της λειτουργίας «Trackpad οθόνης» απενεργοποιεί τη λειτουργία «Προτάσεις με χειρονομίες trackpad». Και οι δύο μετατρέπουν τα αγγίγματα σε κίνηση του δρομέα, επομένως δεν μπορούν να είναι ενεργές ταυτόχρονα. Συνέχεια;</string>
+    <string name="trackpad_exclusive_trackpad_gestures_message">Η ενεργοποίηση της λειτουργίας «Προτάσεις με χειρονομίες trackpad» απενεργοποιεί τη λειτουργία «Trackpad οθόνης». Και οι δύο μετατρέπουν τα αγγίγματα σε κίνηση του δρομέα, επομένως δεν μπορούν να είναι ενεργές ταυτόχρονα. Συνέχεια;</string>
+    <string name="trackpad_exclusive_continue">Συνέχεια</string>
     <string name="screen_trackpad_hint_select">⇧ Επιλογή</string>
     <string name="screen_trackpad_hint_sticky">✥ Δρομέας · πατήστε για έξοδο</string>
     <string name="kw_screen_trackpad">trackpad, δρομέας, σύρσιμο, οθόνη αφής, πλήκτρο διαστήματος, παρατεταμένο πάτημα, βέλη, επιλογή, cursor, swipe</string>

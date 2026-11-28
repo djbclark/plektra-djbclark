@@ -2040,6 +2040,10 @@ Jede Taste kann als Keycode, Aktion, Native Ctrl oder Keine konfiguriert werden.
     <string name="screen_trackpad_hint_enabled_title">Hinweis auf dem Bildschirm anzeigen</string>
     <string name="screen_trackpad_hint_enabled_description">Kleine Pille oben am Bildschirm, solange das Trackpad aktiv ist</string>
     <string name="screen_trackpad_hint_cursor">✥ Cursor</string>
+    <string name="trackpad_exclusive_dialog_title">Nur eine Trackpad-Funktion gleichzeitig</string>
+    <string name="trackpad_exclusive_screen_trackpad_message">Wenn du „Bildschirm-Trackpad“ einschaltest, wird „Trackpad-Gesten-Vorschläge“ ausgeschaltet. Beide wandeln Berührungen in Cursorbewegungen um und können deshalb nicht gleichzeitig aktiv sein. Fortfahren?</string>
+    <string name="trackpad_exclusive_trackpad_gestures_message">Wenn du „Trackpad-Gesten-Vorschläge“ einschaltest, wird „Bildschirm-Trackpad“ ausgeschaltet. Beide wandeln Berührungen in Cursorbewegungen um und können deshalb nicht gleichzeitig aktiv sein. Fortfahren?</string>
+    <string name="trackpad_exclusive_continue">Weiter</string>
     <string name="screen_trackpad_hint_select">⇧ Auswählen</string>
     <string name="screen_trackpad_hint_sticky">✥ Cursor · tippen zum Beenden</string>
     <string name="kw_screen_trackpad">Trackpad, Cursor, Wischen, Touchscreen, Leertaste, halten, Pfeiltasten, markieren, trackpad, cursor, swipe</string>

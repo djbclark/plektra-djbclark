@@ -1004,6 +1004,10 @@ Nav Mode-ը օգտագործում է ստեղնի ֆիզիկական դիրքը
     <string name="screen_trackpad_hint_enabled_title">Ցուցադրել էկրանային հուշումը</string>
     <string name="screen_trackpad_hint_enabled_description">Փոքր հաբիկ էկրանի վերևում, քանի դեռ թաչփադն ակտիվ է</string>
     <string name="screen_trackpad_hint_cursor">✥ Կուրսոր</string>
+    <string name="trackpad_exclusive_dialog_title">Միաժամանակ միայն մեկ թաչփադի գործառույթ</string>
+    <string name="trackpad_exclusive_screen_trackpad_message">«Էկրանային թաչփադ» գործառույթի միացումն անջատում է «Trackpad Gesture Suggestions» գործառույթը։ Երկուսն էլ հպումները վերածում են կուրսորի շարժման, ուստի չեն կարող միաժամանակ միացված լինել։ Շարունակե՞լ</string>
+    <string name="trackpad_exclusive_trackpad_gestures_message">«Trackpad Gesture Suggestions» գործառույթի միացումն անջատում է «Էկրանային թաչփադ» գործառույթը։ Երկուսն էլ հպումները վերածում են կուրսորի շարժման, ուստի չեն կարող միաժամանակ միացված լինել։ Շարունակե՞լ</string>
+    <string name="trackpad_exclusive_continue">Շարունակել</string>
     <string name="screen_trackpad_hint_select">⇧ Ընտրել</string>
     <string name="screen_trackpad_hint_sticky">✥ Կուրսոր · հպեք՝ դուրս գալու համար</string>
     <string name="kw_screen_trackpad">թրեքփեդ, կուրսոր, սահեցնել, հպէկրան, բացատ, պահել, սլաքներ, ընտրել, trackpad, cursor, swipe</string>

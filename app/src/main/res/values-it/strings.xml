@@ -1182,6 +1182,10 @@ Ogni tasto può essere configurato come Keycode, Azione, Native Ctrl o Nessuno. 
     <string name="screen_trackpad_hint_enabled_title">Mostra il suggerimento su schermo</string>
     <string name="screen_trackpad_hint_enabled_description">Piccola pillola in cima allo schermo mentre il trackpad è attivo</string>
     <string name="screen_trackpad_hint_cursor">✥ Cursore</string>
+    <string name="trackpad_exclusive_dialog_title">Una sola funzione trackpad alla volta</string>
+    <string name="trackpad_exclusive_screen_trackpad_message">Attivando «Trackpad su schermo» si disattiva «Suggerimenti Gesture Trackpad». Entrambe le funzioni trasformano i tocchi in movimenti del cursore, quindi non possono essere attive insieme. Continuare?</string>
+    <string name="trackpad_exclusive_trackpad_gestures_message">Attivando «Suggerimenti Gesture Trackpad» si disattiva «Trackpad su schermo». Entrambe le funzioni trasformano i tocchi in movimenti del cursore, quindi non possono essere attive insieme. Continuare?</string>
+    <string name="trackpad_exclusive_continue">Continua</string>
     <string name="screen_trackpad_hint_select">⇧ Seleziona</string>
     <string name="screen_trackpad_hint_sticky">✥ Cursore · tocca per uscire</string>
     <string name="kw_screen_trackpad">trackpad, cursore, scorrere, touchscreen, barra spaziatrice, tenere premuto, frecce, selezionare, swipe</string>
